@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+data:
+  fluent-bit.conf: |
+    [INPUT]
+        Name        forward
+        Listen      0.0.0.0
+        Port        24224
+
+    [OUTPUT]
+        Name        grafana-loki
+        Match       *
+        Url         http://loki:3100/loki/api/v1/push
+        RemoveKeys  source,container_id
+        Labels      {job="fluent-bit"}
+        LabelKeys   container_name
+        BatchWait   1s
+        BatchSize   1001024
+        LineFormat  json
+        LogLevel    info
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fluent-bit-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fluent-bit
+  labels:
+    app: fluent-bit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fluent-bit
+  template:
+    metadata:
+      labels:
+        app: fluent-bit
+    spec:
+      securityContext:
+        fsGroup: 1000  # Ensures write permission to storage path
+      containers:
+        - name: fluent-bit
+          image: grafana/fluent-bit-plugin-loki:2.9.8
+          ports:
+            - containerPort: 24224
+          env:
+            - name: LOKI_URL
+              value: "http://loki:3100/loki/api/v1/push"
+          volumeMounts:
+            - name: fluent-bit-config
+              mountPath: /fluent-bit/etc/fluent-bit.conf
+              subPath: fluent-bit.conf
+            - name: fluent-bit-storage
+              mountPath: /var/log/fluent-bit
+      volumes:
+        - name: fluent-bit-config
+          configMap:
+            name: fluent-bit-config
+        - name: fluent-bit-storage
+          persistentVolumeClaim:
+            claimName: fluent-bit-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fluent-bit
+spec:
+  selector:
+    app: fluent-bit
+  ports:
+    - name: fluent-forward
+      protocol: TCP
+      port: 24224
+      targetPort: 24224
+  type: ClusterIP

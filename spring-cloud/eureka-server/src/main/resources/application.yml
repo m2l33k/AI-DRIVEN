@@ -1,0 +1,45 @@
+server:
+  port: 8761
+  shutdown: graceful
+
+spring:
+  application:
+    name: eureka-server
+  lifecycle:
+    timeout-per-shutdown-phase: 15s
+
+# A standalone Eureka server should not register with or fetch from itself.
+eureka:
+  instance:
+    hostname: ${EUREKA_INSTANCE_HOSTNAME:localhost}
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+  server:
+    # Disable self-preservation for local/dev so dead instances are evicted quickly.
+    enable-self-preservation: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics,prometheus"
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    root: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{trace_id:-N/A}] [%X{span_id:-N/A}] %-5level %logger{36} - %msg%n"
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+eureka:
+  instance:
+    hostname: eureka-server

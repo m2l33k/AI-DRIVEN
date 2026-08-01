@@ -1,0 +1,91 @@
+app:
+  jwk-set-uri: ${APP_KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/course-management-realm/protocol/openid-connect/certs}
+server:
+  port: 9000
+  netty:
+    connection-timeouts: 2s
+    idle-timeouts: 15s
+  shutdown: graceful
+spring:
+  application:
+    name: gateway-service
+  lifecycle:
+    timeout-per-shutdown-phase: 15s
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          # Auto-route to services registered in Eureka via /<service-id>/**
+          discovery:
+            locator:
+              enabled: true
+              lower-case-service-id: true
+          routes: []
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics,prometheus"
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+      uri: "http_server_requests"
+    endpoint:
+      gateway:
+        enabled: true
+      metrics:
+        enabled: true
+      prometheus:
+        enabled: true
+      health:
+        show-details: always
+    distribution:
+      percentiles-histogram: # enable histogram for percentile
+        http.server.requests: true
+      slo:
+        http.server.requests: 10ms, 50ms, 100ms, 500ms, 1s
+
+
+# Security
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/course-management-realm}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/course-management-realm/protocol/openid-connect/certs}
+logging:
+  level:
+    root: INFO
+    io.example.springcloud.gateway: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{trace_id:-N/A}] [%X{span_id:-N/A}] %-5level %logger{36} - %msg%n"
+---
+app:
+  jwk-set-uri: http://keycloak:8080/realms/course-management-realm/protocol/openid-connect/certs
+spring:
+  config:
+    activate:
+      on-profile: docker
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes: []
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://keycloak:8080/realms/course-management-realm
+          jwk-set-uri: http://keycloak:8080/realms/course-management-realm/protocol/openid-connect/certs

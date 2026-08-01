@@ -1,0 +1,140 @@
+{
+  "realm": "course-management-realm",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "accessTokenLifespan": 900,
+  "roles": {
+    "client": {
+      "platform-client": [
+        { "name": "users:read",             "description": "View users" },
+        { "name": "users:write",            "description": "Create/update/delete users" },
+        { "name": "roles:read",             "description": "View roles" },
+        { "name": "roles:write",            "description": "Assign/modify roles" },
+        { "name": "platform-config:read",   "description": "View platform configuration" },
+        { "name": "platform-config:write",  "description": "Change platform configuration" },
+        { "name": "nf:read",                "description": "View Network Function status" },
+        { "name": "nf:restart",             "description": "Restart Network Functions" },
+        { "name": "core-config:read",       "description": "View 5GC core configuration" },
+        { "name": "core-config:write",      "description": "Apply configuration to the 5GC core" },
+        { "name": "security-alerts:read",   "description": "View security alerts" },
+        { "name": "roaming-events:read",    "description": "View roaming events" },
+        { "name": "detection-rules:read",   "description": "View detection rules" },
+        { "name": "detection-rules:write",  "description": "Tune detection rules" },
+        { "name": "audit:read",             "description": "Read audit logs" },
+        { "name": "audit:delete",           "description": "Delete audit logs (granted to nobody by design)" }
+      ]
+    },
+    "realm": [
+      {
+        "name": "PLATFORM_ADMIN",
+        "description": "Manage users, roles, platform config. Cannot operate the 5GC.",
+        "composite": true,
+        "composites": {
+          "client": {
+            "platform-client": [
+              "users:read", "users:write",
+              "roles:read", "roles:write",
+              "platform-config:read", "platform-config:write"
+            ]
+          }
+        }
+      },
+      {
+        "name": "NETWORK_OPERATOR",
+        "description": "View NF status, restart NFs, apply config to the core. Cannot manage users or delete audit logs.",
+        "composite": true,
+        "composites": {
+          "client": {
+            "platform-client": [
+              "nf:read", "nf:restart",
+              "core-config:read", "core-config:write"
+            ]
+          }
+        }
+      },
+      {
+        "name": "SECURITY_ANALYST",
+        "description": "View security alerts and roaming events, tune detection rules. Cannot change network config.",
+        "composite": true,
+        "composites": {
+          "client": {
+            "platform-client": [
+              "security-alerts:read",
+              "roaming-events:read",
+              "detection-rules:read", "detection-rules:write"
+            ]
+          }
+        }
+      },
+      {
+        "name": "AUDITOR",
+        "description": "Read everything, including audit logs. Cannot write anything.",
+        "composite": true,
+        "composites": {
+          "client": {
+            "platform-client": [
+              "users:read", "roles:read", "platform-config:read",
+              "nf:read", "core-config:read",
+              "security-alerts:read", "roaming-events:read", "detection-rules:read",
+              "audit:read"
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "platform-client",
+      "name": "5GC Platform Client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "platform-client-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": ["*"],
+      "webOrigins": ["*"],
+      "defaultClientScopes": ["web-origins", "profile", "roles", "email"]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin-user",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "admin-user@example.com",
+      "credentials": [ { "type": "password", "value": "password", "temporary": false } ],
+      "realmRoles": ["PLATFORM_ADMIN"]
+    },
+    {
+      "username": "operator-user",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "operator-user@example.com",
+      "credentials": [ { "type": "password", "value": "password", "temporary": false } ],
+      "realmRoles": ["NETWORK_OPERATOR"]
+    },
+    {
+      "username": "analyst-user",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "analyst-user@example.com",
+      "credentials": [ { "type": "password", "value": "password", "temporary": false } ],
+      "realmRoles": ["SECURITY_ANALYST"]
+    },
+    {
+      "username": "auditor-user",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "auditor-user@example.com",
+      "credentials": [ { "type": "password", "value": "password", "temporary": false } ],
+      "realmRoles": ["AUDITOR"]
+    }
+  ]
+}

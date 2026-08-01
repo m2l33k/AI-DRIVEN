@@ -1,0 +1,12 @@
+# IDE settings
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+
+# Java / Maven build output
+**/target/
+
+# Logs
+*.log
