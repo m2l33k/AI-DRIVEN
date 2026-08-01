@@ -60,6 +60,8 @@ public class SecurityConfig {
                 .authorizeExchange(exchanges -> exchanges
                         // Public / infra endpoints
                         .pathMatchers("/api/public", "/actuator/**").permitAll()
+                        // OpenAPI / Swagger UI
+                        .pathMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**").permitAll()
 
                         // --- IAM: users (PLATFORM_ADMIN) ---
                         .pathMatchers(HttpMethod.GET, "/api/users/**").hasAuthority("PERM_users:read")

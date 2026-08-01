@@ -71,6 +71,26 @@ logging:
     io.example.springcloud.gateway: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{trace_id:-N/A}] [%X{span_id:-N/A}] %-5level %logger{36} - %msg%n"
+
+springdoc:
+  # Document the actuator endpoints (health, info, metrics, prometheus) in the spec,
+  # so the gateway's own Swagger shows operations even before business routes exist.
+  show-actuator: true
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    use-root-path: true
+    # Aggregated view: one entry per API. Downstream services are reachable through
+    # the Eureka discovery locator at /<service-id>/v3/api-docs, so add a line per
+    # service as you register them (uncomment the example below).
+    urls:
+      - name: gateway
+        url: /v3/api-docs
+      # - name: course-service
+      #   url: /course-service/v3/api-docs
+      # - name: review-service
+      #   url: /review-service/v3/api-docs
 ---
 app:
   jwk-set-uri: http://keycloak:8080/realms/auth-management/protocol/openid-connect/certs
