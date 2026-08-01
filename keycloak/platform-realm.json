@@ -1,5 +1,5 @@
 {
-  "realm": "course-management-realm",
+  "realm": "auth-management",
   "enabled": true,
   "sslRequired": "external",
   "registrationAllowed": false,
@@ -108,6 +108,8 @@
       "username": "admin-user",
       "enabled": true,
       "emailVerified": true,
+      "firstName": "Admin",
+      "lastName": "User",
       "email": "admin-user@example.com",
       "credentials": [ { "type": "password", "value": "password", "temporary": false } ],
       "realmRoles": ["PLATFORM_ADMIN"]
@@ -116,6 +118,8 @@
       "username": "operator-user",
       "enabled": true,
       "emailVerified": true,
+      "firstName": "Operator",
+      "lastName": "User",
       "email": "operator-user@example.com",
       "credentials": [ { "type": "password", "value": "password", "temporary": false } ],
       "realmRoles": ["NETWORK_OPERATOR"]
@@ -124,6 +128,8 @@
       "username": "analyst-user",
       "enabled": true,
       "emailVerified": true,
+      "firstName": "Analyst",
+      "lastName": "User",
       "email": "analyst-user@example.com",
       "credentials": [ { "type": "password", "value": "password", "temporary": false } ],
       "realmRoles": ["SECURITY_ANALYST"]
@@ -132,6 +138,8 @@
       "username": "auditor-user",
       "enabled": true,
       "emailVerified": true,
+      "firstName": "Auditor",
+      "lastName": "User",
       "email": "auditor-user@example.com",
       "credentials": [ { "type": "password", "value": "password", "temporary": false } ],
       "realmRoles": ["AUDITOR"]

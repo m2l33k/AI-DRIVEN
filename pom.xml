@@ -5,12 +5,12 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>io.javatab.microservices</groupId>
-    <artifactId>course-management-system</artifactId>
+    <artifactId>auth-management-system</artifactId>
     <version>1.0.0</version>
     <packaging>pom</packaging>
 
-    <name>course-management-system</name>
-    <description>Parent Pom for the course management system project</description>
+    <name>auth-management-system</name>
+    <description>Parent Pom for the auth management platform</description>
 
     <parent>
         <groupId>org.springframework.boot</groupId>

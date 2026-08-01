@@ -210,12 +210,12 @@ Full permission catalog, role→permission mapping, and enforcement details are 
 
 ### Get a token and call the gateway
 
-Import `keycloak/platform-realm.json` first (realm `course-management-realm`, client
+Import `keycloak/platform-realm.json` first (realm `auth-management`, client
 `platform-client`, one test user per role with password `password`).
 
 ```bash
 # 1) Get a bearer token
-curl -X POST http://localhost:8081/realms/course-management-realm/protocol/openid-connect/token \
+curl -X POST http://localhost:8081/realms/auth-management/protocol/openid-connect/token \
   -d grant_type=password \
   -d client_id=platform-client \
   -d client_secret=platform-client-secret \

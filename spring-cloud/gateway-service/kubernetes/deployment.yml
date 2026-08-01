@@ -26,8 +26,8 @@ spec:
             - containerPort: 9000
           env:
             - name: APP_KEYCLOAK_JWK_SET_URI
-              value: http://keycloak:8080/realms/course-management-realm/protocol/openid-connect/certs
+              value: http://keycloak:8080/realms/auth-management/protocol/openid-connect/certs
             - name: KEYCLOAK_ISSUER_URI
-              value: http://keycloak:8080/realms/course-management-realm
+              value: http://keycloak:8080/realms/auth-management
             - name: KEYCLOAK_JWK_SET_URI
-              value: http://keycloak:8080/realms/course-management-realm/protocol/openid-connect/certs
+              value: http://keycloak:8080/realms/auth-management/protocol/openid-connect/certs

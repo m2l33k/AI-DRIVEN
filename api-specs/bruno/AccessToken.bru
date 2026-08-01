@@ -5,16 +5,16 @@ meta {
 }
 
 post {
-  url: http://localhost:8081/realms/course-management-realm/protocol/openid-connect/token
+  url: {{keycloakBaseUrl}}/realms/auth-management/protocol/openid-connect/token
   body: formUrlEncoded
   auth: none
 }
 
 body:form-urlencoded {
   grant_type: password
-  client_id: course-app
-  client_secret: v1sCIPjANbvyJ87RsTkYeI9xHonDqZh7
-  username: nasruddin
+  client_id: platform-client
+  client_secret: platform-client-secret
+  username: operator-user
   password: password
   scope: openid roles
 }

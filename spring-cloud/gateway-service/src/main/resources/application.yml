@@ -1,5 +1,5 @@
 app:
-  jwk-set-uri: ${APP_KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/course-management-realm/protocol/openid-connect/certs}
+  jwk-set-uri: ${APP_KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/auth-management/protocol/openid-connect/certs}
 server:
   port: 9000
   netty:
@@ -63,8 +63,8 @@ management:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/course-management-realm}
-          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/course-management-realm/protocol/openid-connect/certs}
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/auth-management}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/auth-management/protocol/openid-connect/certs}
 logging:
   level:
     root: INFO
@@ -73,7 +73,7 @@ logging:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{trace_id:-N/A}] [%X{span_id:-N/A}] %-5level %logger{36} - %msg%n"
 ---
 app:
-  jwk-set-uri: http://keycloak:8080/realms/course-management-realm/protocol/openid-connect/certs
+  jwk-set-uri: http://keycloak:8080/realms/auth-management/protocol/openid-connect/certs
 spring:
   config:
     activate:
@@ -87,5 +87,5 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://keycloak:8080/realms/course-management-realm
-          jwk-set-uri: http://keycloak:8080/realms/course-management-realm/protocol/openid-connect/certs
+          issuer-uri: http://keycloak:8080/realms/auth-management
+          jwk-set-uri: http://keycloak:8080/realms/auth-management/protocol/openid-connect/certs

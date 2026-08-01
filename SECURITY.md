@@ -62,7 +62,7 @@ Retention/purge, if ever needed, must be an out-of-band job (DB TTL/archival), n
 
 ## Realm & test users
 
-Import `keycloak/platform-realm.json` into Keycloak (realm `course-management-realm`).
+Import `keycloak/platform-realm.json` into Keycloak (realm `auth-management`).
 It defines the four roles, the `platform-client` client (secret `platform-client-secret`),
 and one user per role (password `password`):
 
@@ -76,7 +76,7 @@ and one user per role (password `password`):
 ### Get a token
 
 ```bash
-curl -X POST http://localhost:8081/realms/course-management-realm/protocol/openid-connect/token \
+curl -X POST http://localhost:8081/realms/auth-management/protocol/openid-connect/token \
   -d grant_type=password \
   -d client_id=platform-client \
   -d client_secret=platform-client-secret \
