@@ -66,17 +66,21 @@ fi
 echo "Freeing service ports..."
 kill_service_on_port 8761
 kill_service_on_port 9000
+kill_service_on_port 9001
 
-# Start Eureka first so the gateway can register with it.
+# Start Eureka first so the other services can register with it.
 run_service "spring-cloud/eureka-server"
 echo "Waiting for Eureka to come up..."
 sleep 15
+run_service "microservices/auth-service"
 run_service "spring-cloud/gateway-service"
 
 echo
 echo "Services starting:"
 echo "  Eureka dashboard  http://localhost:8761"
 echo "  Gateway health    http://localhost:9000/actuator/health"
+echo "  Gateway Swagger   http://localhost:9000/swagger-ui.html"
+echo "  Auth service      http://localhost:9001/swagger-ui.html"
 echo
 echo "Press Ctrl+C to stop."
 

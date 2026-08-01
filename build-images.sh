@@ -4,6 +4,7 @@ echo "Building Docker images for Kubernetes using Minikube..."
 SERVICES=(
   "spring-cloud/eureka-server:eureka-server"
   "spring-cloud/gateway-service:gateway-service"
+  "microservices/auth-service:auth-service"
 )
 
 eval $(minikube docker-env --profile microservice-deployment)

@@ -1,0 +1,70 @@
+server:
+  port: 9001
+  shutdown: graceful
+
+spring:
+  application:
+    name: auth-service
+  lifecycle:
+    timeout-per-shutdown-phase: 15s
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/auth-management}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/auth-management/protocol/openid-connect/certs}
+
+keycloak:
+  base-url: ${KEYCLOAK_BASE_URL:http://localhost:8081}
+  realm: ${KEYCLOAK_REALM:auth-management}
+  client-id: ${KEYCLOAK_CLIENT_ID:platform-client}
+  client-secret: ${KEYCLOAK_CLIENT_SECRET:platform-client-secret}
+  admin-realm: ${KEYCLOAK_ADMIN_REALM:master}
+  admin-client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
+  admin-username: ${KEYCLOAK_ADMIN_USERNAME:admin}
+  admin-password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics,prometheus"
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    root: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{trace_id:-N/A}] [%X{span_id:-N/A}] %-5level %logger{36} - %msg%n"
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://keycloak:8080/realms/auth-management
+          jwk-set-uri: http://keycloak:8080/realms/auth-management/protocol/openid-connect/certs
+keycloak:
+  base-url: http://keycloak:8080
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka/

@@ -57,11 +57,17 @@ public class SecurityConfig {
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         http
+                // Stateless API gateway (JWT bearer auth) — CSRF protection not applicable.
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
                         // Public / infra endpoints
                         .pathMatchers("/api/public", "/actuator/**").permitAll()
-                        // OpenAPI / Swagger UI
+                        // OpenAPI / Swagger UI (gateway's own + aggregated downstream docs)
                         .pathMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**").permitAll()
+                        .pathMatchers("/*/v3/api-docs", "/*/v3/api-docs/**").permitAll()
+
+                        // Auth service public endpoints
+                        .pathMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/forgot-password").permitAll()
 
                         // --- IAM: users (PLATFORM_ADMIN) ---
                         .pathMatchers(HttpMethod.GET, "/api/users/**").hasAuthority("PERM_users:read")

@@ -13,6 +13,25 @@ services:
     networks:
       - shared-network
 
+  auth-service:
+    build: ../microservices/auth-service
+    mem_limit: 512m
+    ports:
+      - "9001:9001"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - KEYCLOAK_ADMIN_USERNAME=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+    depends_on:
+      - eureka-server
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+    networks:
+      - shared-network
+
   gateway-service:
     build: ../spring-cloud/gateway-service
     mem_limit: 512m

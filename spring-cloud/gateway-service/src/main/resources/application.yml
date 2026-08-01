@@ -21,7 +21,17 @@ spring:
             locator:
               enabled: true
               lower-case-service-id: true
-          routes: []
+          routes:
+            - id: auth-service
+              uri: lb://auth-service
+              predicates:
+                - Path=/api/auth/**,/api/users/**
+            - id: auth-service-docs
+              uri: lb://auth-service
+              predicates:
+                - Path=/auth-service/v3/api-docs
+              filters:
+                - RewritePath=/auth-service/(?<segment>.*), /$\{segment}
 
 eureka:
   client:
@@ -87,10 +97,8 @@ springdoc:
     urls:
       - name: gateway
         url: /v3/api-docs
-      # - name: course-service
-      #   url: /course-service/v3/api-docs
-      # - name: review-service
-      #   url: /review-service/v3/api-docs
+      - name: auth-service
+        url: /auth-service/v3/api-docs
 ---
 app:
   jwk-set-uri: http://keycloak:8080/realms/auth-management/protocol/openid-connect/certs
@@ -102,7 +110,17 @@ spring:
     gateway:
       server:
         webflux:
-          routes: []
+          routes:
+            - id: auth-service
+              uri: lb://auth-service
+              predicates:
+                - Path=/api/auth/**,/api/users/**
+            - id: auth-service-docs
+              uri: lb://auth-service
+              predicates:
+                - Path=/auth-service/v3/api-docs
+              filters:
+                - RewritePath=/auth-service/(?<segment>.*), /$\{segment}
   security:
     oauth2:
       resourceserver:

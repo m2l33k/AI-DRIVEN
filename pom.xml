@@ -22,5 +22,6 @@
         <module>util</module>
         <module>spring-cloud/eureka-server</module>
         <module>spring-cloud/gateway-service</module>
+        <module>microservices/auth-service</module>
     </modules>
 </project>

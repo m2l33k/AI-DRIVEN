@@ -41,6 +41,26 @@ k8s_resource(
     labels=["services"]
 )
 
+# Define and build auth-service
+docker_build(
+    "auth-service",
+    context="./microservices/auth-service",
+    dockerfile="./microservices/auth-service/Dockerfile",
+    live_update=[
+        sync("./microservices/auth-service/src", "/application/src"),
+        run("mvn package -DskipTests", trigger=["/application/src"]),
+    ]
+)
+k8s_yaml([
+    "microservices/auth-service/kubernetes/deployment.yml",
+    "microservices/auth-service/kubernetes/service.yml"
+])
+k8s_resource(
+    "auth-service",
+    port_forwards="9001:9001",
+    labels=["services"]
+)
+
 # Define and build gateway-service
 docker_build(
     "gateway-service",
