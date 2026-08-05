@@ -1,11 +1,11 @@
-FROM eclipse-temurin:17.0.5_8-jre-focal as builder
+FROM eclipse-temurin:19.0.2_7-jre-focal as builder
 WORKDIR extracted
 
 ADD ./target/*.jar app.jar
 
 RUN java -Djarmode=layertools -jar app.jar extract
 
-FROM eclipse-temurin:17.0.5_8-jre-focal
+FROM eclipse-temurin:19.0.2_7-jre-focal
 WORKDIR application
 
 # Copy the dependencies layer from the builder stage
