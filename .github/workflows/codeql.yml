@@ -57,6 +57,23 @@ jobs:
           ./mvnw -B -ntp clean compile -DskipTests
 
       - name: Perform CodeQL Analysis
+        id: analyze
+        # Uploading results needs Code Scanning (GitHub Advanced Security on private
+        # repos). If it is not enabled, the upload fails but we do not block CI — the
+        # SARIF is still produced and archived below. Enable GHAS to light up the
+        # Security tab automatically.
+        continue-on-error: true
         uses: github/codeql-action/analyze@v3
         with:
           category: '/language:${{ matrix.language }}'
+          output: codeql-results
+          upload: always
+
+      - name: Archive CodeQL SARIF (always available)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: codeql-sarif-${{ matrix.language }}
+          path: codeql-results
+          retention-days: 7
+          if-no-files-found: ignore
