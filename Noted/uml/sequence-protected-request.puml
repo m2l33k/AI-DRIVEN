@@ -1,0 +1,25 @@
+@startuml sequence-protected-request
+title Protected request — RBAC enforcement at the gateway
+
+skinparam shadowing false
+autonumber
+
+actor Client
+participant "Gateway\n:9000" as GW
+participant "Keycloak JWK\n:8081" as JWK
+participant "Downstream\nService" as SVC
+
+Client -> GW : POST /api/nf/amf-1/restart\nAuthorization: Bearer <JWT>
+GW -> JWK : fetch/verify signing keys (cached)
+JWK --> GW : JWK set
+GW -> GW : validate JWT\nextract authorities:\n ROLE_<realm role>\n PERM_<permissions>
+alt has PERM_nf:restart
+  GW -> SVC : forward request (+ Bearer JWT)
+  SVC -> SVC : re-validate JWT\n@PreAuthorize PERM_* (defence in depth)
+  SVC --> GW : 200 / 204
+  GW --> Client : 200 / 204
+else missing permission
+  GW --> Client : 403 Forbidden
+end
+
+@enduml

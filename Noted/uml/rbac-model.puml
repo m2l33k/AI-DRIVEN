@@ -1,0 +1,62 @@
+@startuml rbac-model
+title RBAC — Roles (composite) → Permissions (client roles)
+
+skinparam shadowing false
+left to right direction
+
+package "Realm roles (composite)" {
+  class PLATFORM_ADMIN
+  class NETWORK_OPERATOR
+  class SECURITY_ANALYST
+  class AUDITOR
+}
+
+package "platform-client permissions (client roles)" {
+  class "users:read" as ur
+  class "users:write" as uw
+  class "roles:read" as rr
+  class "roles:write" as rw
+  class "platform-config:read" as pcr
+  class "platform-config:write" as pcw
+  class "nf:read" as nfr
+  class "nf:restart" as nfx
+  class "core-config:read" as ccr
+  class "core-config:write" as ccw
+  class "security-alerts:read" as sar
+  class "roaming-events:read" as roa
+  class "detection-rules:read" as drr
+  class "detection-rules:write" as drw
+  class "audit:read" as aur
+  class "audit:delete" as aud <<no role>>
+}
+
+PLATFORM_ADMIN --> ur
+PLATFORM_ADMIN --> uw
+PLATFORM_ADMIN --> rr
+PLATFORM_ADMIN --> rw
+PLATFORM_ADMIN --> pcr
+PLATFORM_ADMIN --> pcw
+
+NETWORK_OPERATOR --> nfr
+NETWORK_OPERATOR --> nfx
+NETWORK_OPERATOR --> ccr
+NETWORK_OPERATOR --> ccw
+
+SECURITY_ANALYST --> sar
+SECURITY_ANALYST --> roa
+SECURITY_ANALYST --> drr
+SECURITY_ANALYST --> drw
+
+AUDITOR --> ur
+AUDITOR --> rr
+AUDITOR --> pcr
+AUDITOR --> nfr
+AUDITOR --> ccr
+AUDITOR --> sar
+AUDITOR --> roa
+AUDITOR --> drr
+AUDITOR --> aur
+
+note bottom of aud : Granted to NO role by design\n(audit logs are append-only)
+
+@enduml

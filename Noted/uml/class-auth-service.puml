@@ -1,0 +1,75 @@
+@startuml class-auth-service
+' Class diagram — auth-service (io.javatab.microservices.auth)
+title Auth Service — Class Diagram
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+
+class AuthServiceApplication <<@SpringBootApplication>>
+
+class AuthController <<@RestController>> {
+  - keycloak : KeycloakService
+  + login(LoginRequest) : Map<String,Object>
+  + forgotPassword(ForgotPasswordRequest) : ResponseEntity
+  + updatePassword(Jwt, UpdatePasswordRequest) : ResponseEntity
+}
+
+class UserController <<@RestController>> {
+  - keycloak : KeycloakService
+  + listUsers() : List<UserSummary>          <<PERM_users:read>>
+  + createUser(CreateUserRequest) : ResponseEntity  <<PERM_users:write>>
+  + deleteUser(String) : ResponseEntity      <<PERM_users:write>>
+}
+
+class KeycloakService <<@Service>> {
+  - props : KeycloakProperties
+  - rest : RestClient
+  + login(user, pwd) : Map
+  + createUser(CreateUserRequest) : void
+  + listUsers() : List<UserSummary>
+  + deleteUser(username) : void
+  + resetForgottenPassword(username) : String
+  + updatePassword(user, current, new) : void
+  - adminToken() : String
+  - findRealmRole(role, admin) : Map
+  - assignRealmRole(...) : void
+  - setPassword(...) : void
+}
+
+class KeycloakProperties <<@ConfigurationProperties>> {
+  + baseUrl : String
+  + realm : String
+  + clientId : String
+  + clientSecret : String
+  + adminRealm : String
+  + adminClientId : String
+  + adminUsername : String
+  + adminPassword : String
+}
+
+class SecurityConfig <<@Configuration>> {
+  + filterChain(HttpSecurity) : SecurityFilterChain
+  - jwtAuthenticationConverter() : JwtAuthenticationConverter
+}
+
+class OpenApiConfig <<@Configuration>>
+class ApiExceptionHandler <<@RestControllerAdvice>>
+
+class LoginRequest <<record>>
+class CreateUserRequest <<record>>
+class ForgotPasswordRequest <<record>>
+class UpdatePasswordRequest <<record>>
+class UserSummary <<record>>
+
+AuthController --> KeycloakService
+UserController --> KeycloakService
+KeycloakService --> KeycloakProperties
+AuthController ..> LoginRequest
+AuthController ..> ForgotPasswordRequest
+AuthController ..> UpdatePasswordRequest
+UserController ..> CreateUserRequest
+UserController ..> UserSummary
+KeycloakService ..> CreateUserRequest
+KeycloakService ..> UserSummary
+
+@enduml

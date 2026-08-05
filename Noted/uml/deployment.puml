@@ -1,0 +1,51 @@
+@startuml deployment
+' Deployment diagram — Docker Compose topology
+title Auth Management System — Deployment (Docker Compose)
+
+skinparam shadowing false
+
+node "Developer Host" {
+  artifact "Browser / curl / Bruno" as client
+}
+
+node "Docker network: shared-network" {
+
+  node "eureka-server\n:8761" as eureka
+  node "auth-service\n:9001" as auth
+  node "gateway-service\n:9000" as gw
+
+  node "keycloak\n:8081 -> 8080" as kc
+
+  node "prometheus\n:9090" as prom
+  node "grafana\n:3000" as graf
+  node "loki\n:3100" as loki
+  node "tempo\n:4317/4318/3200" as tempo
+  node "fluent-bit\n:24224" as fb
+
+  database "postgres :5432\n(legacy/optional)" as pg
+  database "mongodb :27017\n(legacy/optional)" as mongo
+}
+
+client --> gw : :9000
+client --> kc : :8081 (admin)
+client --> graf : :3000
+
+gw --> auth
+gw --> eureka
+auth --> eureka
+gw --> kc
+auth --> kc
+
+gw ..> fb
+auth ..> fb
+eureka ..> fb
+fb --> loki
+gw --> tempo
+prom --> gw
+prom --> auth
+prom --> eureka
+graf --> prom
+graf --> loki
+graf --> tempo
+
+@enduml

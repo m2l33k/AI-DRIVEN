@@ -1,0 +1,21 @@
+@startuml sequence-login
+title Login flow — obtaining a JWT
+
+skinparam shadowing false
+autonumber
+
+actor Client
+participant "Gateway\n:9000" as GW
+participant "Auth Service\n:9001" as Auth
+participant "Keycloak\n:8081" as KC
+
+Client -> GW : POST /api/auth/login\n{ email, password }
+note right of GW : /api/auth/login is permitAll
+GW -> Auth : route lb://auth-service
+Auth -> KC : POST /realms/auth-management/.../token\ngrant_type=password\nclient_id=platform-client\nscope=openid roles
+KC --> Auth : 200 { access_token (JWT), refresh_token, ... }
+note right of KC : JWT claims:\n realm_access.roles\n resource_access.platform-client.roles
+Auth --> GW : 200 token response
+GW --> Client : 200 token response
+
+@enduml

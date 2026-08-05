@@ -1,0 +1,51 @@
+@startuml component
+' Component / architecture diagram — Auth Management System starter
+title Auth Management System — Component Diagram
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultTextAlignment center
+
+actor "Client\n(curl / Bruno / SPA)" as Client
+
+package "Platform (Spring Cloud)" {
+  [Gateway Service\n:9000\nSpring Cloud Gateway\n+ OAuth2 RS + RBAC] as Gateway
+  [Auth Service\n:9001\nOAuth2 RS + Keycloak Admin] as Auth
+  [Eureka Server\n:8761\nService Registry] as Eureka
+  [Util (shared lib)] as Util
+}
+
+package "Identity" {
+  [Keycloak\n:8081\nrealm: auth-management\nclient: platform-client] as Keycloak
+}
+
+package "Observability" {
+  [Prometheus :9090] as Prom
+  [Grafana :3000] as Grafana
+  [Loki :3100] as Loki
+  [Tempo :4318] as Tempo
+  [Fluent Bit :24224] as Fluent
+}
+
+Client --> Gateway : HTTPS + Bearer JWT
+
+Gateway --> Auth : lb://auth-service\n(route /api/auth, /api/users)
+Gateway ..> Eureka : register / discover
+Auth ..> Eureka : register
+Gateway --> Keycloak : validate JWT (JWK set)
+Auth --> Keycloak : password grant\n+ Admin REST API
+Auth ..> Util : uses
+
+Gateway ..> Fluent : logs (fluentd driver)
+Auth ..> Fluent : logs
+Eureka ..> Fluent : logs
+Fluent --> Loki : push logs
+Gateway --> Tempo : OTLP traces (OTel agent)
+Prom --> Gateway : scrape /actuator/prometheus
+Prom --> Auth : scrape /actuator/prometheus
+Prom --> Eureka : scrape /actuator/prometheus
+Grafana --> Prom : query metrics
+Grafana --> Loki : query logs
+Grafana --> Tempo : query traces
+
+@enduml
