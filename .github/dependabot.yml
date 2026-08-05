@@ -1,0 +1,46 @@
+version: 2
+updates:
+  # ---- Java / Maven dependencies (whole multi-module reactor) ------------
+  - package-ecosystem: maven
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "java"]
+    groups:
+      spring:
+        patterns:
+          - "org.springframework*"
+          - "io.micrometer*"
+      test-and-tooling:
+        patterns:
+          - "*junit*"
+          - "*mockito*"
+          - "org.springframework.security:spring-security-test"
+
+  # ---- GitHub Actions used by the workflows ------------------------------
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    labels: ["dependencies", "ci"]
+
+  # ---- Base images in the service Dockerfiles ----------------------------
+  - package-ecosystem: docker
+    directory: "/microservices/auth-service"
+    schedule:
+      interval: weekly
+    labels: ["dependencies", "docker"]
+  - package-ecosystem: docker
+    directory: "/spring-cloud/eureka-server"
+    schedule:
+      interval: weekly
+    labels: ["dependencies", "docker"]
+  - package-ecosystem: docker
+    directory: "/spring-cloud/gateway-service"
+    schedule:
+      interval: weekly
+    labels: ["dependencies", "docker"]
