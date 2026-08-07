@@ -1,0 +1,164 @@
+/* ============================================================
+   Global styles — Huawei-console inspired design system
+   ============================================================ */
+
+:root {
+  /* Brand */
+  --hw-red: #c7000b;
+  --hw-red-hover: #e60012;
+  --hw-red-active: #a5000a;
+  --hw-red-soft: rgba(199, 0, 11, 0.08);
+
+  /* Neutrals */
+  --hw-bg: #f2f3f5;
+  --hw-surface: #ffffff;
+  --hw-surface-2: #fafbfc;
+  --hw-border: #e5e6eb;
+  --hw-border-strong: #d0d3d9;
+
+  /* Text */
+  --hw-text: #1a1a1a;
+  --hw-text-2: #4e5969;
+  --hw-text-3: #86909c;
+  --hw-text-inverse: #ffffff;
+
+  /* Status */
+  --hw-success: #00a870;
+  --hw-warning: #ff8f1f;
+  --hw-danger: #f53f3f;
+  --hw-info: #3491fa;
+
+  /* Chart palette */
+  --hw-chart-1: #c7000b;
+  --hw-chart-2: #3491fa;
+  --hw-chart-3: #00a870;
+  --hw-chart-4: #ff8f1f;
+  --hw-chart-5: #722ed1;
+
+  /* Elevation */
+  --hw-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --hw-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --hw-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  /* Radius */
+  --hw-radius-sm: 4px;
+  --hw-radius: 8px;
+  --hw-radius-lg: 12px;
+
+  /* Layout */
+  --hw-sidebar-w: 232px;
+  --hw-header-h: 56px;
+
+  --hw-font: "HarmonyOS Sans", "Segoe UI", -apple-system, BlinkMacSystemFont,
+    Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei",
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--hw-font);
+  background: var(--hw-bg);
+  color: var(--hw-text);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--hw-border-strong);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------- Reusable primitives ---------- */
+
+.hw-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 18px;
+  border: 1px solid var(--hw-border-strong);
+  border-radius: var(--hw-radius-sm);
+  background: var(--hw-surface);
+  color: var(--hw-text);
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+.hw-btn:hover {
+  border-color: var(--hw-red);
+  color: var(--hw-red);
+}
+.hw-btn--primary {
+  background: var(--hw-red);
+  border-color: var(--hw-red);
+  color: var(--hw-text-inverse);
+}
+.hw-btn--primary:hover {
+  background: var(--hw-red-hover);
+  border-color: var(--hw-red-hover);
+  color: var(--hw-text-inverse);
+}
+.hw-btn--block {
+  width: 100%;
+}
+.hw-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.hw-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--hw-border-strong);
+  border-radius: var(--hw-radius-sm);
+  background: var(--hw-surface);
+  color: var(--hw-text);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.hw-input::placeholder {
+  color: var(--hw-text-3);
+}
+.hw-input:focus {
+  border-color: var(--hw-red);
+  box-shadow: 0 0 0 3px var(--hw-red-soft);
+}
+
+.hw-card {
+  background: var(--hw-surface);
+  border: 1px solid var(--hw-border);
+  border-radius: var(--hw-radius);
+  box-shadow: var(--hw-shadow-sm);
+}
