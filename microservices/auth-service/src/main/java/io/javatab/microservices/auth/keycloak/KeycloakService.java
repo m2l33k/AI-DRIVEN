@@ -140,7 +140,8 @@ public class KeycloakService {
 				(String) m.get("email"),
 				(String) m.get("firstName"),
 				(String) m.get("lastName"),
-				Boolean.TRUE.equals(m.get("enabled")))).toList();
+				Boolean.TRUE.equals(m.get("enabled")),
+				m.get("createdTimestamp") instanceof Number n ? n.longValue() : null)).toList();
 	}
 
 	/** Delete a user by username. Requires users:write. */

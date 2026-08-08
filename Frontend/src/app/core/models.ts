@@ -16,6 +16,8 @@ export interface UserSummary {
   firstName: string;
   lastName: string;
   enabled: boolean;
+  /** Epoch millis the account was created in Keycloak (used for growth charts). */
+  createdTimestamp?: number;
 }
 
 export interface CreateUserRequest {

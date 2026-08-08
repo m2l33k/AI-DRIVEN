@@ -6,6 +6,7 @@ public record UserSummary(
 		String email,
 		String firstName,
 		String lastName,
-		boolean enabled
+		boolean enabled,
+		Long createdTimestamp
 ) {
 }

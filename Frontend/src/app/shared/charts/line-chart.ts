@@ -55,6 +55,8 @@ export class LineChart {
   labels = input<string[]>([]);
   color = input<string>('var(--hw-chart-1)');
   ariaLabel = input<string>('Line chart');
+  /** When true, draw a smooth Catmull-Rom curve instead of straight segments. */
+  smooth = input<boolean>(false);
 
   protected readonly W = 600;
   protected readonly H = 240;
@@ -80,17 +82,34 @@ export class LineChart {
 
   points = this.scaled;
 
-  linePath = computed(() => {
-    const p = this.scaled();
+  private path(p: { x: number; y: number }[]): string {
     if (!p.length) return '';
-    return p.map((pt, i) => `${i ? 'L' : 'M'}${pt.x},${pt.y}`).join(' ');
-  });
+    if (!this.smooth() || p.length < 3) {
+      return p.map((pt, i) => `${i ? 'L' : 'M'}${pt.x},${pt.y}`).join(' ');
+    }
+    // Cardinal spline (tension 0.2) rendered as cubic beziers.
+    const t = 0.2;
+    let d = `M${p[0].x},${p[0].y}`;
+    for (let i = 0; i < p.length - 1; i++) {
+      const p0 = p[i - 1] ?? p[i];
+      const p1 = p[i];
+      const p2 = p[i + 1];
+      const p3 = p[i + 2] ?? p2;
+      const c1x = p1.x + (p2.x - p0.x) * t;
+      const c1y = p1.y + (p2.y - p0.y) * t;
+      const c2x = p2.x - (p3.x - p1.x) * t;
+      const c2y = p2.y - (p3.y - p1.y) * t;
+      d += ` C${c1x},${c1y} ${c2x},${c2y} ${p2.x},${p2.y}`;
+    }
+    return d;
+  }
+
+  linePath = computed(() => this.path(this.scaled()));
 
   areaPath = computed(() => {
     const p = this.scaled();
     if (!p.length) return '';
-    const line = p.map((pt, i) => `${i ? 'L' : 'M'}${pt.x},${pt.y}`).join(' ');
-    return `${line} L${p[p.length - 1].x},${this.H - this.pad} L${p[0].x},${this.H - this.pad} Z`;
+    return `${this.path(p)} L${p[p.length - 1].x},${this.H - this.pad} L${p[0].x},${this.H - this.pad} Z`;
   });
 
   gridLines = computed(() => {
