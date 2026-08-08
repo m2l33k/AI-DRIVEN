@@ -10,52 +10,103 @@ export interface NavItem {
 }
 
 /**
- * Reusable console shell: collapsible left sidebar + top header + content outlet.
- * Every role supplies its own brand, accent colour and nav items.
+ * Reusable console shell with a glassmorphism (liquid-glass) sidebar over a soft red canvas.
+ * Three states: expanded (icons + labels), collapsed (icons only), mobile overlay.
  */
 @Component({
   selector: 'hw-role-shell',
   standalone: true,
   imports: [RouterLink, RouterLinkActive, RouterOutlet],
   template: `
-    <div class="shell" [class.collapsed]="collapsed()" [style.--role-accent]="accent()">
-      <!-- Sidebar -->
+    <div class="shell" [class.collapsed]="collapsed()" [class.mobile-open]="mobileOpen()"
+         [style.--role-accent]="accent()">
+
+      <!-- Mobile floating menu button -->
+      <button class="mobile-toggle" (click)="mobileOpen.set(!mobileOpen())" aria-label="Menu">
+        <svg class="li" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      @if (mobileOpen()) { <div class="scrim" (click)="mobileOpen.set(false)"></div> }
+
+      <!-- Glass sidebar -->
       <aside class="sidebar">
-        <div class="brand">
-          <span class="logo">5GC</span>
-          @if (!collapsed()) { <span class="brand-name">{{ brand() }}</span> }
+        <div class="glass-edge"></div>
+
+        <!-- Brand + search -->
+        <div class="brand-row">
+          <div class="brand">
+            <span class="logo">5GC</span>
+            @if (!collapsed()) { <span class="brand-name">5GC</span> }
+          </div>
+          @if (!collapsed()) {
+            <button class="chip-btn" aria-label="Search">
+              <svg class="li" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </button>
+          }
         </div>
 
-        @if (!collapsed()) { <span class="nav-section">Menu</span> }
-        <nav>
-          @for (item of navItems(); track item.path) {
-            <a [routerLink]="item.path" routerLinkActive="active"
-               [routerLinkActiveOptions]="{ exact: false }" class="nav-item"
-               [attr.title]="item.label">
-              <svg viewBox="0 0 24 24" class="ico"><path [attr.d]="item.icon" /></svg>
-              @if (!collapsed()) { <span>{{ item.label }}</span> }
-            </a>
-          }
-        </nav>
+        <div class="scroll">
+          <!-- Main navigation -->
+          @if (!collapsed()) { <span class="nav-section">Main</span> }
+          <nav>
+            @for (item of navItems(); track item.path) {
+              <a [routerLink]="item.path" routerLinkActive="active"
+                 [routerLinkActiveOptions]="{ exact: false }" class="nav-item"
+                 [attr.title]="item.label" (click)="mobileOpen.set(false)">
+                <svg viewBox="0 0 24 24" class="ico"><path [attr.d]="item.icon" /></svg>
+                @if (!collapsed()) { <span class="lbl">{{ item.label }}</span> }
+              </a>
+            }
+          </nav>
 
-        <div class="side-foot">
-          <div class="mini-user" [attr.title]="displayName()">
-            <span class="avatar sm">{{ userInitials() }}</span>
+          <!-- Account / secondary -->
+          @if (!collapsed()) { <span class="nav-section">Account</span> }
+          <nav>
+            <button class="nav-item" title="Notifications">
+              <svg class="li" viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+              @if (!collapsed()) { <span class="lbl">Notifications</span> <span class="badge">3</span> }
+              @else { <i class="dot"></i> }
+            </button>
+            <button class="nav-item" title="Messages">
+              <svg class="li" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+              @if (!collapsed()) { <span class="lbl">Messages</span> <span class="badge alt">5</span> }
+              @else { <i class="dot alt"></i> }
+            </button>
+            <button class="nav-item" (click)="openChangePw()" title="Change password">
+              <svg class="li" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+              @if (!collapsed()) { <span class="lbl">Change password</span> }
+            </button>
+          </nav>
+        </div>
+
+        <!-- User profile -->
+        <div class="profile" [class.menu-open]="profileMenu()">
+          @if (profileMenu()) {
+            <div class="pmenu">
+              <button (click)="openChangePw(); profileMenu.set(false)">Change password</button>
+              <button class="danger" (click)="logout()">Sign out</button>
+            </div>
+          }
+          <div class="pcard" (click)="collapsed() ? logout() : profileMenu.set(!profileMenu())">
+            <span class="avatar">{{ userInitials() }}</span>
             @if (!collapsed()) {
-              <div class="mu-text">
-                <span class="mu-name">{{ displayName() }}</span>
-                <span class="mu-role">{{ roleName() }}</span>
+              <div class="pinfo">
+                <span class="pname">{{ displayName() }}</span>
+                <span class="pmail">{{ userEmail() }}</span>
               </div>
+              <button class="dots" aria-label="Menu">
+                <svg class="li" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/></svg>
+              </button>
             }
           </div>
-          <button class="collapse" (click)="collapsed.set(!collapsed())"
-                  [attr.aria-label]="collapsed() ? 'Expand' : 'Collapse'">
-            <svg viewBox="0 0 24 24" class="ico">
-              <path [attr.d]="collapsed() ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'" />
-            </svg>
-            @if (!collapsed()) { <span>Collapse</span> }
-          </button>
         </div>
+
+        <button class="collapse" (click)="collapsed.set(!collapsed())"
+                [attr.aria-label]="collapsed() ? 'Expand' : 'Collapse'">
+          <svg class="li" viewBox="0 0 24 24">
+            <path [attr.d]="collapsed() ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'" />
+          </svg>
+          @if (!collapsed()) { <span>Collapse</span> }
+        </button>
       </aside>
 
       <!-- Main -->
@@ -66,18 +117,8 @@ export interface NavItem {
           </div>
           <div class="top-actions">
             <button class="icon-btn" aria-label="Notifications">
-              <svg viewBox="0 0 24 24" class="ico"><path d="M12 22a2 2 0 002-2h-4a2 2 0 002 2zm6-6V11a6 6 0 00-4-5.65V5a2 2 0 10-4 0v.35A6 6 0 006 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+              <svg class="li" viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
               <i class="badge-dot"></i>
-            </button>
-            <div class="user">
-              <span class="avatar">{{ userInitials() }}</span>
-              @if (!collapsed()) { <span class="uname">{{ displayName() }}</span> }
-            </div>
-            <button class="icon-btn" (click)="openChangePw()" aria-label="Change password" title="Change password">
-              <svg viewBox="0 0 24 24" class="ico"><path d="M12 1a5 5 0 00-5 5v3H6a2 2 0 00-2 2v9a2 2 0 002 2h12a2 2 0 002-2v-9a2 2 0 00-2-2h-1V6a5 5 0 00-5-5zm3 8H9V6a3 3 0 016 0v3z"/></svg>
-            </button>
-            <button class="icon-btn logout" (click)="logout()" aria-label="Sign out" title="Sign out">
-              <svg viewBox="0 0 24 24" class="ico"><path d="M16 17l5-5-5-5v3H9v4h7v3zM4 5h8V3H4a2 2 0 00-2 2v14a2 2 0 002 2h8v-2H4V5z"/></svg>
             </button>
           </div>
         </header>
@@ -114,99 +155,172 @@ export interface NavItem {
     </div>
   `,
   styles: [`
-    .shell { display: flex; height: 100vh; overflow: hidden; }
+    :host {
+      --crimson: #c11536;
+      --crimson-deep: #8a0f2a;
+    }
+    .shell {
+      display: flex; height: 100vh; overflow: hidden; gap: 0;
+      background:
+        radial-gradient(720px 460px at 6% 2%, rgba(193,21,54,.16), transparent 62%),
+        radial-gradient(680px 520px at 100% 100%, rgba(138,15,42,.10), transparent 60%),
+        linear-gradient(135deg, #f6eef0 0%, #f2f3f6 45%, #eef0f4 100%);
+    }
 
+    /* ---- Glass sidebar ---- */
     .sidebar {
-      width: var(--hw-sidebar-w); flex: none;
-      background: linear-gradient(180deg, #23232c 0%, #191920 100%);
-      display: flex; flex-direction: column; transition: width .18s ease;
-      border-right: 1px solid rgba(255,255,255,.06);
+      position: relative; width: var(--hw-sidebar-w); flex: none;
+      margin: 12px 0 12px 12px; padding: 6px 10px 10px; border-radius: 20px;
+      display: flex; flex-direction: column;
+      background: rgba(255,255,255,.55);
+      -webkit-backdrop-filter: blur(22px) saturate(150%);
+      backdrop-filter: blur(22px) saturate(150%);
+      border: 1px solid rgba(255,255,255,.6);
+      box-shadow: 0 10px 40px rgba(64,12,24,.14), inset 0 1px 0 rgba(255,255,255,.5);
+      transition: width .2s ease, transform .2s ease;
     }
-    .collapsed .sidebar { width: 72px; }
+    .collapsed .sidebar { width: 76px; }
+    /* subtle top reflection */
+    .glass-edge {
+      position: absolute; inset: 0; border-radius: 20px; pointer-events: none;
+      background: linear-gradient(180deg, rgba(255,255,255,.35), transparent 24%);
+    }
 
-    .brand {
-      display: flex; align-items: center; gap: 11px; height: var(--hw-header-h);
-      padding: 0 18px; color: #fff; border-bottom: 1px solid rgba(255,255,255,.06);
-    }
-    .collapsed .brand { padding: 0; justify-content: center; }
+    .brand-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 4px; }
+    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .collapsed .brand-row { justify-content: center; padding: 8px 0 4px; }
     .logo {
-      background: var(--role-accent); color: #fff; font-weight: 800; font-size: 13px;
-      width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center;
-      flex: none; letter-spacing: -.5px;
-      box-shadow: 0 4px 14px color-mix(in srgb, var(--role-accent) 45%, transparent);
+      width: 34px; height: 34px; border-radius: 10px; flex: none;
+      background: linear-gradient(135deg, var(--crimson), var(--crimson-deep));
+      color: #fff; font-weight: 800; font-size: 13px; letter-spacing: -.5px;
+      display: grid; place-items: center; box-shadow: 0 6px 16px rgba(193,21,54,.4);
     }
-    .brand-name { font-size: 14px; font-weight: 600; white-space: nowrap; }
+    .brand-name { font-size: 15px; font-weight: 700; color: #2a1a1e; white-space: nowrap; }
+    .chip-btn {
+      width: 32px; height: 32px; border-radius: 9px; border: 1px solid rgba(120,60,70,.14);
+      background: rgba(255,255,255,.5); color: #7a4650; display: grid; place-items: center; cursor: pointer;
+      transition: all .14s;
+    }
+    .chip-btn:hover { background: #fff; color: var(--crimson); }
+
+    .scroll { flex: 1; overflow-y: auto; padding: 6px 0 2px; }
+    .scroll::-webkit-scrollbar { width: 0; }
 
     .nav-section {
-      display: block; padding: 16px 20px 8px; font-size: 10.5px; letter-spacing: .09em;
-      text-transform: uppercase; color: #63656f; font-weight: 700;
+      display: block; padding: 14px 14px 6px; font-size: 10.5px; letter-spacing: .1em;
+      text-transform: uppercase; color: #a98a90; font-weight: 700;
     }
-    nav { flex: 1; padding: 4px 12px; overflow-y: auto; }
+    nav { display: flex; flex-direction: column; gap: 3px; padding: 0 6px; }
     .nav-item {
-      position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 12px;
-      border-radius: 8px; color: #a9acb6; font-size: 14px; margin-bottom: 3px;
-      white-space: nowrap; transition: background .14s, color .14s;
+      position: relative; display: flex; align-items: center; gap: 12px; width: 100%;
+      padding: 10px 12px; border: 0; background: transparent; border-radius: 11px;
+      color: #5a464b; font-size: 14px; font-weight: 500; text-align: left; cursor: pointer;
+      white-space: nowrap; transition: background .16s, color .16s, box-shadow .16s;
     }
-    .collapsed .nav-item { justify-content: center; padding: 10px; }
-    .nav-item:hover { background: rgba(255,255,255,.05); color: #fff; }
-    .nav-item.active { background: color-mix(in srgb, var(--role-accent) 16%, transparent); color: #fff; }
-    .nav-item.active::before {
-      content: ''; position: absolute; left: -12px; top: 50%; transform: translateY(-50%);
-      width: 3px; height: 20px; border-radius: 0 3px 3px 0; background: var(--role-accent);
+    .collapsed .nav-item { justify-content: center; padding: 11px 0; }
+    .nav-item:hover { background: rgba(193,21,54,.07); color: #2a1a1e; }
+    .nav-item.active {
+      background: linear-gradient(135deg, var(--crimson), var(--crimson-deep));
+      color: #fff; box-shadow: 0 8px 20px rgba(193,21,54,.34);
     }
-    .nav-item.active .ico { color: var(--role-accent); }
+    .nav-item.active .ico, .nav-item.active .li { color: #fff; }
     .ico { width: 20px; height: 20px; fill: currentColor; flex: none; }
-
-    .side-foot { padding: 10px; border-top: 1px solid rgba(255,255,255,.06); }
-    .mini-user { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; }
-    .collapsed .mini-user { justify-content: center; padding: 8px 0; }
-    .avatar.sm {
-      width: 32px; height: 32px; border-radius: 50%; background: var(--role-accent); color: #fff;
-      font-size: 12px; font-weight: 600; display: grid; place-items: center; flex: none;
+    .li { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+    .lbl { flex: 1; }
+    .badge {
+      font-size: 11px; font-weight: 700; color: #fff; background: var(--crimson);
+      padding: 1px 7px; border-radius: 10px; min-width: 18px; text-align: center;
     }
-    .mu-text { display: flex; flex-direction: column; min-width: 0; }
-    .mu-name { font-size: 13px; color: #fff; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .mu-role { font-size: 11px; color: #7d808b; white-space: nowrap; }
+    .badge.alt { background: #f59e0b; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--crimson); position: absolute; top: 8px; right: 20px; }
+    .dot.alt { background: #f59e0b; }
+
+    /* Profile card */
+    .profile { position: relative; margin: 6px 6px 0; }
+    .pcard {
+      display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 13px;
+      background: rgba(255,255,255,.45); border: 1px solid rgba(255,255,255,.55); cursor: pointer;
+      transition: background .14s;
+    }
+    .pcard:hover { background: rgba(255,255,255,.75); }
+    .collapsed .pcard { justify-content: center; padding: 9px 0; }
+    .avatar {
+      width: 36px; height: 36px; border-radius: 50%; flex: none; display: grid; place-items: center;
+      background: linear-gradient(135deg, var(--crimson), var(--crimson-deep));
+      color: #fff; font-size: 13px; font-weight: 700;
+    }
+    .pinfo { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+    .pname { font-size: 13px; font-weight: 600; color: #2a1a1e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pmail { font-size: 11px; color: #9a7d83; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dots { border: 0; background: transparent; color: #9a7d83; padding: 2px; cursor: pointer; border-radius: 6px; }
+    .dots:hover { color: var(--crimson); }
+    .pmenu {
+      position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; padding: 6px;
+      background: rgba(255,255,255,.9); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+      border: 1px solid rgba(255,255,255,.7); border-radius: 12px; box-shadow: 0 12px 30px rgba(64,12,24,.18);
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .pmenu button {
+      border: 0; background: transparent; text-align: left; padding: 9px 12px; border-radius: 8px;
+      font-size: 13px; color: #4a363b; cursor: pointer;
+    }
+    .pmenu button:hover { background: rgba(193,21,54,.08); color: var(--crimson); }
+    .pmenu button.danger:hover { background: rgba(245,63,63,.1); color: #e0324a; }
 
     .collapse {
-      width: 100%; margin-top: 8px; height: 36px; border: 0; border-radius: 8px;
-      background: rgba(255,255,255,.05); color: #a9acb6;
-      display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px;
-      cursor: pointer; transition: background .14s, color .14s;
+      margin-top: 8px; height: 38px; border: 0; border-radius: 12px; cursor: pointer;
+      background: rgba(138,15,42,.06); color: #7a4650;
+      display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; font-weight: 600;
+      transition: all .16s;
     }
-    .collapse:hover { background: rgba(255,255,255,.1); color: #fff; }
+    .collapse:hover { background: rgba(193,21,54,.12); color: var(--crimson); }
 
+    /* ---- Main ---- */
     .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
     .topbar {
-      height: var(--hw-header-h); flex: none; background: var(--hw-surface);
-      border-bottom: 1px solid var(--hw-border);
-      display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+      height: var(--hw-header-h); flex: none; margin: 12px 12px 0; padding: 0 18px;
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(255,255,255,.55); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,.6); border-radius: 16px;
+      box-shadow: 0 6px 20px rgba(64,12,24,.08);
     }
     .role-badge {
-      background: var(--hw-red-soft); color: var(--role-accent); font-weight: 600;
-      font-size: 12px; padding: 5px 12px; border-radius: 20px;
+      background: linear-gradient(135deg, var(--crimson), var(--crimson-deep)); color: #fff; font-weight: 600;
+      font-size: 12px; padding: 5px 13px; border-radius: 20px; box-shadow: 0 4px 12px rgba(193,21,54,.3);
     }
-    .top-actions { display: flex; align-items: center; gap: 14px; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
     .icon-btn {
-      position: relative; width: 36px; height: 36px; border: 0; border-radius: 8px;
-      background: transparent; color: var(--hw-text-2); display: grid; place-items: center;
+      position: relative; width: 38px; height: 38px; border: 0; border-radius: 10px;
+      background: transparent; color: #6a565b; display: grid; place-items: center; cursor: pointer;
     }
-    .icon-btn:hover { background: var(--hw-bg); color: var(--hw-text); }
-    .badge-dot {
-      position: absolute; top: 8px; right: 9px; width: 7px; height: 7px;
-      border-radius: 50%; background: var(--hw-danger); border: 1.5px solid #fff;
-    }
-    .user { display: flex; align-items: center; gap: 8px; }
-    .avatar {
-      width: 32px; height: 32px; border-radius: 50%; background: var(--role-accent);
-      color: #fff; font-size: 13px; font-weight: 600; display: grid; place-items: center;
-    }
-    .uname { font-size: 13px; color: var(--hw-text); font-weight: 500; }
-    .logout:hover { color: var(--hw-danger); }
+    .icon-btn:hover { background: rgba(193,21,54,.08); color: var(--crimson); }
+    .badge-dot { position: absolute; top: 9px; right: 10px; width: 7px; height: 7px; border-radius: 50%; background: var(--crimson); border: 1.5px solid #fff; }
+    .content { flex: 1; overflow-y: auto; padding: 20px 24px 24px; }
 
-    .content { flex: 1; overflow-y: auto; padding: 24px; }
+    /* ---- Mobile ---- */
+    .mobile-toggle {
+      display: none; position: fixed; top: 16px; left: 16px; z-index: 70; width: 44px; height: 44px;
+      border: 1px solid rgba(255,255,255,.6); border-radius: 12px; cursor: pointer; color: var(--crimson);
+      background: rgba(255,255,255,.7); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+      box-shadow: 0 6px 18px rgba(64,12,24,.16); place-items: center;
+    }
+    .scrim { display: none; }
 
-    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: grid; place-items: center; z-index: 60; }
+    @media (max-width: 860px) {
+      .sidebar {
+        position: fixed; top: 0; left: 0; bottom: 0; z-index: 80; width: 272px;
+        margin: 12px; transform: translateX(-115%);
+      }
+      .mobile-open .sidebar { transform: translateX(0); }
+      .collapsed .sidebar { width: 272px; }
+      .mobile-toggle { display: grid; }
+      .mobile-open .scrim { display: block; position: fixed; inset: 0; z-index: 75; background: rgba(30,10,16,.35); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+      .collapse { display: none; }
+      .topbar { margin: 12px 12px 0 68px; }
+    }
+
+    /* ---- Change-password modal ---- */
+    .overlay { position: fixed; inset: 0; background: rgba(30,10,16,.4); display: grid; place-items: center; z-index: 90; }
     .pw-modal { width: 100%; max-width: 400px; padding: 26px 28px; }
     .pw-modal h3 { margin: 0 0 16px; font-size: 18px; color: var(--hw-text); }
     .pw-modal label { display: block; font-size: 12px; font-weight: 500; margin: 12px 0 6px; color: var(--hw-text-2); }
@@ -225,12 +339,14 @@ export class RoleShell {
   userName = input<string>('');
 
   collapsed = signal(false);
+  mobileOpen = signal(false);
+  profileMenu = signal(false);
+
   private router = inject(Router);
   private auth = inject(AuthService);
 
-  /** Prefer the explicit input, else fall back to the signed-in user's name. */
   displayName = () => this.userName() || this.auth.user()?.name || 'User';
-
+  userEmail = () => this.auth.user()?.email || '';
   userInitials = () =>
     this.displayName().split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase();
 
@@ -254,6 +370,7 @@ export class RoleShell {
   openChangePw() {
     this.cur.set(''); this.nw.set(''); this.nw2.set('');
     this.pwError.set(''); this.pwOk.set('');
+    this.profileMenu.set(false);
     this.showChangePw.set(true);
   }
 
