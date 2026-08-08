@@ -15,7 +15,10 @@ Open threads and backlog. Check items off / move them to [[Session-Log]] when do
 ## Frontend — integration
 - [x] Real login via `/api/auth/login` (3-status flow) + first-login + OTP reset (2026-08-08).
 - [x] Per-role route guards (`authGuard` + `roleGuard`) on `/admin /operator /security /audit`.
-- [x] Admin **Users** page wired to `/api/users` (list/create/delete/reset); logout clears session.
+- [x] Admin **Users** page wired to `/api/users` (list/create/delete/reset + pagination); logout clears session.
+- [x] **Admin dashboard** live from `/api/users` (stat cards + user-growth curve + status donut).
+- [x] **Glassmorphism sidebar** redesign (crimson theme, sections, profile, 3 responsive states).
+- [x] **Roles & Permissions** page mirrors Keycloak (profile cards + matrix + detail popup).
 - [ ] Wire the remaining **data pages** to gateway APIs (NFs, security alerts, roaming events —
       `/api/roaming/*`, audit logs, platform/core config).
 - [ ] Global HTTP error handling → route to `/error/500`; 404 already handled by `**`.

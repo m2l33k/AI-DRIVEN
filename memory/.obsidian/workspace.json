@@ -33,12 +33,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Auth-Service.md",
+                "file": "Frontend-Architecture.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Auth-Service"
+              "title": "Frontend-Architecture"
             }
           }
         ]
@@ -119,7 +119,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Auth-Service.md",
+                "file": "Frontend-Architecture.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -209,9 +209,9 @@
   },
   "active": "6fac48bc53ddcdb7",
   "lastOpenFiles": [
+    "Auth-Service.md",
     "Next-Steps.md.tmp.22828.5f85fb436a68",
     "Backend-and-Infra.md",
-    "Auth-Service.md",
     "Backend-and-Infra.md.tmp.22828.65df2a20cae7",
     "Session-Log.md.tmp.22828.673d8ff1649c",
     "README.md.tmp.22828.38bfaeb86e45",
@@ -224,7 +224,6 @@
     "Session-Log.md.tmp.17412.7af09b1d6507",
     "Backend-and-Infra.md.tmp.17412.03574933f6c9",
     "README.md.tmp.17412.10cc70b4d95a",
-    "Roaming-Analysis-Service.md.tmp.17412.c8103a673149",
     "Session-Log.md",
     "Frontend-Architecture.md"
   ]

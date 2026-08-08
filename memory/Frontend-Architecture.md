@@ -91,13 +91,31 @@ npm run build    # production build (verified clean)
   - `models.ts` — `LoginResponse`, `UserSummary`, `CreateUserRequest`, `CurrentUser`.
 - **Screens wired:** `login` (real auth, routes by role; PASSWORD_CHANGE → `/first-login`;
   EMAIL_VERIFICATION → message), new `auth/first-login/`, `reset-password` (3-step OTP:
-  email → otp → new password), `roles/admin/users/` (live table + create modal + reset + delete),
-  `role-shell` logout now clears the session.
+  email → otp → new password), `roles/admin/users/` (live table + create modal + reset + delete
+  + client-side pagination 10/page), `role-shell` logout now clears the session.
 - Full auth API contract in [[Auth-Service]]. `npm run build` → clean.
 
+## UI redesign (2026-08-08)
+- **Glassmorphism sidebar** (`shared/layout/role-shell`): floating translucent glass panel over a
+  soft red canvas, **crimson theme** (`#c11536 → #8a0f2a`, via local `--crimson` vars — overrides the
+  per-role accent for the sidebar chrome; role identity still shows in the topbar badge). Sections
+  **Main** (route nav) + **Account** (Notifications/Messages badges, Change password), bottom **user
+  profile** (avatar/name/email/three-dot → change pw / sign out). Brand = **5GC**; Feather search
+  icon. Three states: expanded / collapsed (76px) / mobile overlay (≤860px, floating + scrim). The
+  self-service **change-password modal** (`PUT /api/auth/password`) lives here for all roles.
+- **`shared/ui/page-header`**: clickable **Home › <page>** breadcrumb (Home → `auth.homeRoute()`).
+- **`roles/admin/roles`**: static Keycloak mirror — role **profile cards** (image banner + avatar),
+  16×4 **permission matrix** (computed from role data), per-role **detail popup**.
+- **`roles/admin/dashboard`**: live from `GET /api/users` — stat cards (Total / New this month /
+  Active / Active rate), **user-growth curve** (cumulative by month from `createdTimestamp`),
+  Users-by-status donut, recent-users table. `shared/charts/line-chart` gained a `[smooth]`
+  (Catmull-Rom) curve option. `anyComponentStyle` budget raised in `angular.json`.
+
 ## Integration TODO (remaining)
-Role dashboard **data pages** (network functions, security alerts, roaming events, audit logs,
-platform/core config) still render mock data — wire them to their gateway APIs next. See [[Next-Steps]].
+- Other role dashboards + **data pages** (network functions, security alerts, roaming events
+  `/api/roaming/*`, audit logs, platform/core config) still render mock data.
+- Main nav icons are still filled glyphs (chrome icons are line-style); optional: convert them.
+- Optional: real "Users by role" needs backend role data (see [[Auth-Service]] TODO).
 
 ## Related notes
 - [[Frontend-Components]]

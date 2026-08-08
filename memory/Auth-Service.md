@@ -74,6 +74,13 @@ this (we send it) — it's still configured but only matters if you later use Ke
 - `otp/OtpService` — OTP codes keyed by email.
 - `otp/ResetTokenService` — reset tokens → email (single-use).
 - `otp/FirstLoginTokenService` — first-login tokens → username (single-use).
+- `otp/EmailVerificationTokenService` — email-verify tokens → username (24h, single-use).
+
+## Misc backend notes
+- **Login scope** is `openid profile email roles`, so the JWT carries `name` + `email` (the frontend
+  shell shows them). Realm role names → `ROLE_*`, `platform-client` perms → `PERM_*`.
+- **`listUsers`** maps Keycloak's `createdTimestamp` into `UserSummary` (used by the admin dashboard's
+  user-growth curve). Brief representation includes it.
 
 ## Email (our SMTP, separate from Keycloak's)
 - `spring-boot-starter-mail` + `mail/MailService` (`sendOtp`, `sendTemporaryPassword`).
@@ -94,10 +101,10 @@ this (we send it) — it's still configured but only matters if you later use Ke
 - In Swagger, an old **Authorize** token is sent to public endpoints and causes 401 — log out first.
 
 ## TODO / next
-- Keycloak realm SMTP is wired (same Gmail); run `keycloak/configure-smtp.ps1` against a
-  running instance, then test in Realm settings → Email → Test connection.
 - Move in-memory OTP/token stores to Redis if multi-instance.
-- Wire the Angular login/reset screens to these endpoints (see [[Next-Steps]]).
+- Optional: a `GET /api/roles` (or per-role user counts) so the dashboard/roles UI can be live
+  rather than a static mirror; and roles in `UserSummary` for a real "Users by role" chart.
+- ✅ Angular login / first-login / reset / users / dashboard wired (see [[Frontend-Architecture]]).
 
 ## Related notes
 - [[Backend-and-Infra]] · [[Roles-and-Permissions]] · [[Roaming-Analysis-Service]] · [[Next-Steps]] · [[Session-Log]]

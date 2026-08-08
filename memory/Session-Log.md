@@ -11,6 +11,38 @@ something meaningful.
 
 ## 2026-08-08
 
+### Frontend — glass sidebar, roles page, real admin dashboard (detail: [[Frontend-Architecture]])
+- **Glassmorphism sidebar** (`shared/layout/role-shell`): floating translucent panel, backdrop blur,
+  crimson theme (`#c11536→#8a0f2a`), Main + Account sections, notification badges, bottom user
+  profile (avatar/name/email/three-dot menu), 3 states (expanded / collapsed 76px / mobile overlay).
+  Brand is just **5GC**; search uses a proper magnifier icon. (Personal/Business toggle was added
+  then removed per request.) Change-password modal lives here (all roles). Style budget bumped in
+  `angular.json` (anyComponentStyle 12kB warn).
+- **PageHeader** now shows a clickable **Home › <page>** breadcrumb (Home → `auth.homeRoute()`).
+- **Admin Users** page: client-side **pagination (10/page)** + search.
+- **Roles & Permissions** (`admin/roles`): static page mirroring Keycloak — **profile cards** with
+  per-role images (banner + avatar), **permission matrix** (16 perms × 4 roles, computed from role
+  data), and a **click-to-open detail popup** per role. Read-only (roles managed in Keycloak).
+- **Admin dashboard** now **live** from `GET /api/users`: stat cards (Total, New this month, Active,
+  Active rate) + **user-growth curve** (cumulative by month, from `createdTimestamp`) + Users-by-status
+  donut + recent-users table. Added `[smooth]` (Catmull-Rom) option to `shared/charts/line-chart`.
+- Backend: `UserSummary` gained `createdTimestamp` (mapped from Keycloak); login scope now
+  `openid profile email roles` so the JWT carries `name`/`email` (shown in the shell). `npm run build`
+  + `mvnw compile` → clean.
+
+### Auth Service — own email-verification flow + realm SMTP + email-login fix (detail: [[Auth-Service]])
+- **Replaced Keycloak's verify-email UI** with our own: `EmailVerificationService` issues a 24h
+  single-use token (`EmailVerificationTokenService`), emails `${app.verify-email-url}?token=…`;
+  `GET /api/auth/verify-email` calls `KeycloakService.markEmailVerified` (Admin API sets
+  `emailVerified=true` + drops `VERIFY_EMAIL`) and renders our own confirmation page. `createUser`
+  no longer calls Keycloak `send-verify-email`.
+- **Keycloak realm SMTP** wired to the same Gmail (for any future Keycloak-native emails, now
+  optional): `smtpServer` block in `platform-realm.json` (`${KC_SMTP_*}` placeholders),
+  `docker-compose-infra.yml` passes `KC_SMTP_*` from `MAIL_*` + `--import-realm`, and live scripts
+  `keycloak/configure-smtp.ps1` / `.sh` (Admin API, read `.env`). Ran the ps1 successfully.
+- **Email-login fix:** `KeycloakService.userId()` now resolves by username **or** email (login
+  accepts either), fixing "User not found" on first-login when signing in with an email.
+
 ### Frontend — wired auth + user management to the backend (detail: [[Frontend-Architecture]])
 - Added `Frontend/proxy.conf.json` (`/api` → gateway :9000) + `angular.json` serve `proxyConfig`.
 - New `src/app/core/`: `auth.service` (login 3-status, first-login, OTP reset, change-pw, JWT decode
