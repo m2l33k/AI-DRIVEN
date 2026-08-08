@@ -219,14 +219,19 @@ public class KeycloakService {
 		return props.baseUrl() + "/admin/realms/" + props.realm();
 	}
 
-	private String userId(String username, String admin) {
+	/**
+	 * Resolve a user id from an identifier that may be a username <em>or</em> an email — login
+	 * accepts either (email login is enabled), so state/first-login lookups must too.
+	 */
+	private String userId(String identifier, String admin) {
 		List<Map<String, Object>> users = rest.get()
-				.uri(adminBase() + "/users?username={u}&exact=true", username)
+				.uri(adminBase() + "/users?username={u}&exact=true", identifier)
 				.header("Authorization", "Bearer " + admin)
 				.retrieve()
 				.body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
 		if (users == null || users.isEmpty()) {
-			throw new IllegalArgumentException("User not found: " + username);
+			return userIdByEmail(identifier, admin)
+					.orElseThrow(() -> new IllegalArgumentException("User not found: " + identifier));
 		}
 		return (String) users.get(0).get("id");
 	}

@@ -86,6 +86,9 @@ this (we send it) — it's still configured but only matters if you later use Ke
   required** now that we own the verification flow — keep it only for future Keycloak-native emails.
 
 ## Gotchas learned
+- **Login accepts username *or* email** (email login enabled), so `KeycloakService.userId()` resolves
+  by username first, then falls back to email — otherwise state/first-login lookups threw
+  "User not found" for users who logged in with their email.
 - Temp/required-action accounts **cannot** use the direct password grant until cleared — that's the
   "Account is not fully set up" the login flow now translates instead of erroring.
 - In Swagger, an old **Authorize** token is sent to public endpoints and causes 401 — log out first.
