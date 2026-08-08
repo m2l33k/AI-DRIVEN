@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: roaming-analysis-service
+  labels:
+    app: roaming-analysis-service
+spec:
+  type: ClusterIP
+  selector:
+    app: roaming-analysis-service
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 9002

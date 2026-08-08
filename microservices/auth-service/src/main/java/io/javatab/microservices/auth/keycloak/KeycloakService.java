@@ -13,6 +13,7 @@ import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -104,6 +105,19 @@ public class KeycloakService {
 		return temp;
 	}
 
+	/** Find a user's id by exact email match, if one exists. Used by the OTP reset flow. */
+	public Optional<String> findUserIdByEmail(String email) {
+		return userIdByEmail(email, adminToken());
+	}
+
+	/** Set a new permanent password for the user with the given email (OTP flow, post-verification). */
+	public void resetPasswordByEmail(String email, String newPassword) {
+		String admin = adminToken();
+		String id = userIdByEmail(email, admin)
+				.orElseThrow(() -> new IllegalArgumentException("User not found for email: " + email));
+		setPassword(id, newPassword, false, admin);
+	}
+
 	/** Change the caller's own password after verifying the current one. */
 	public void updatePassword(String username, String currentPassword, String newPassword) {
 		try {
@@ -153,6 +167,18 @@ public class KeycloakService {
 			throw new IllegalArgumentException("User not found: " + username);
 		}
 		return (String) users.get(0).get("id");
+	}
+
+	private Optional<String> userIdByEmail(String email, String admin) {
+		List<Map<String, Object>> users = rest.get()
+				.uri(adminBase() + "/users?email={e}&exact=true", email)
+				.header("Authorization", "Bearer " + admin)
+				.retrieve()
+				.body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+		if (users == null || users.isEmpty()) {
+			return Optional.empty();
+		}
+		return Optional.ofNullable((String) users.get(0).get("id"));
 	}
 
 	private void setPassword(String id, String value, boolean temporary, String admin) {

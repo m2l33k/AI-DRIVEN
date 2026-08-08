@@ -1,4 +1,4 @@
-package io.javatab.microservices.auth.config;
+package io.javatab.microservices.roaming.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,11 +16,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Resource-server security for auth-service.
+ * Resource-server security for roaming-analysis-service.
  *
- * <p>Public: login, forgot-password, docs, actuator. Everything else needs a valid JWT.
- * Realm roles become {@code ROLE_<NAME>}; {@code platform-client} permissions become
- * {@code PERM_<permission>} (e.g. {@code PERM_users:write}) so method security can require them.</p>
+ * <p>Public: docs and actuator. Everything else needs a valid JWT. Realm roles become
+ * {@code ROLE_<NAME>}; {@code platform-client} permissions become {@code PERM_<permission>}
+ * (e.g. {@code PERM_roaming-events:read}) so method security can require them.</p>
  */
 @Configuration
 @EnableWebSecurity
@@ -34,8 +34,6 @@ public class SecurityConfig {
 		http
 				.csrf(csrf -> csrf.disable())
 				.authorizeHttpRequests(auth -> auth
-						.requestMatchers("/api/auth/login", "/api/auth/forgot-password",
-								"/api/auth/verify-otp", "/api/auth/reset-password").permitAll()
 						.requestMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 						.anyRequest().authenticated())
 				.oauth2ResourceServer(oauth2 -> oauth2

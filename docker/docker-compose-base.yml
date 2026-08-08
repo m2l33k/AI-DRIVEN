@@ -23,6 +23,8 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - KEYCLOAK_ADMIN_USERNAME=admin
       - KEYCLOAK_ADMIN_PASSWORD=admin
+      - MAIL_USERNAME=${MAIL_USERNAME:-}
+      - MAIL_PASSWORD=${MAIL_PASSWORD:-}
     depends_on:
       - eureka-server
     logging:

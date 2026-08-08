@@ -12,6 +12,15 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Load local secrets/config (e.g. Gmail app password for password-reset emails) if present.
+# Exported so both the local JARs and Docker Compose variable substitution pick them up.
+if [[ -f ".env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source ./.env
+  set +a
+fi
+
 # Prefer the Maven wrapper if present, otherwise fall back to a system mvn.
 if [[ -x "./mvnw" ]]; then
   MVN="./mvnw"

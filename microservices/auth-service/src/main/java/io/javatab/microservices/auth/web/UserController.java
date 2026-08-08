@@ -52,6 +52,19 @@ public class UserController {
 				.body(Map.of("message", "User created", "username", request.username()));
 	}
 
+	@Operation(summary = "Reset a user's password (admin)",
+			description = "Sets a temporary password and forces the user to change it at next login. "
+					+ "Returns the temporary password. Requires the users:write permission (PLATFORM_ADMIN).",
+			security = @SecurityRequirement(name = "bearerAuth"))
+	@PreAuthorize("hasAuthority('PERM_users:write')")
+	@PostMapping("/{username}/reset-password")
+	public ResponseEntity<Map<String, String>> resetUserPassword(@PathVariable String username) {
+		String temp = keycloak.resetForgottenPassword(username);
+		return ResponseEntity.ok(Map.of(
+				"message", "Temporary password set; the user must change it at next login.",
+				"temporaryPassword", temp));
+	}
+
 	@Operation(summary = "Delete a user",
 			description = "Deletes a user by username. Requires the users:write permission (PLATFORM_ADMIN).",
 			security = @SecurityRequirement(name = "bearerAuth"))

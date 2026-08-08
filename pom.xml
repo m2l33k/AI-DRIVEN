@@ -23,5 +23,6 @@
         <module>spring-cloud/eureka-server</module>
         <module>spring-cloud/gateway-service</module>
         <module>microservices/auth-service</module>
+        <module>microservices/roaming-analysis-service</module>
     </modules>
 </project>

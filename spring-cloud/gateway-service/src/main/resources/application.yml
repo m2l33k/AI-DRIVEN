@@ -32,6 +32,16 @@ spring:
                 - Path=/auth-service/v3/api-docs
               filters:
                 - RewritePath=/auth-service/(?<segment>.*), /$\{segment}
+            - id: roaming-analysis-service
+              uri: lb://roaming-analysis-service
+              predicates:
+                - Path=/api/roaming/**
+            - id: roaming-analysis-service-docs
+              uri: lb://roaming-analysis-service
+              predicates:
+                - Path=/roaming-analysis-service/v3/api-docs
+              filters:
+                - RewritePath=/roaming-analysis-service/(?<segment>.*), /$\{segment}
 
 eureka:
   client:
@@ -99,6 +109,8 @@ springdoc:
         url: /v3/api-docs
       - name: auth-service
         url: /auth-service/v3/api-docs
+      - name: roaming-analysis-service
+        url: /roaming-analysis-service/v3/api-docs
 ---
 app:
   jwk-set-uri: http://keycloak:8080/realms/auth-management/protocol/openid-connect/certs
@@ -121,6 +133,16 @@ spring:
                 - Path=/auth-service/v3/api-docs
               filters:
                 - RewritePath=/auth-service/(?<segment>.*), /$\{segment}
+            - id: roaming-analysis-service
+              uri: lb://roaming-analysis-service
+              predicates:
+                - Path=/api/roaming/**
+            - id: roaming-analysis-service-docs
+              uri: lb://roaming-analysis-service
+              predicates:
+                - Path=/roaming-analysis-service/v3/api-docs
+              filters:
+                - RewritePath=/roaming-analysis-service/(?<segment>.*), /$\{segment}
   security:
     oauth2:
       resourceserver:

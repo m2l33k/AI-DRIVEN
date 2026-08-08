@@ -1,10 +1,10 @@
 server:
-  port: 9001
+  port: 9002
   shutdown: graceful
 
 spring:
   application:
-    name: auth-service
+    name: roaming-analysis-service
   lifecycle:
     timeout-per-shutdown-phase: 15s
   security:
@@ -13,27 +13,6 @@ spring:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/auth-management}
           jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/auth-management/protocol/openid-connect/certs}
-  mail:
-    host: ${MAIL_HOST:smtp.gmail.com}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
-
-keycloak:
-  base-url: ${KEYCLOAK_BASE_URL:http://localhost:8081}
-  realm: ${KEYCLOAK_REALM:auth-management}
-  client-id: ${KEYCLOAK_CLIENT_ID:platform-client}
-  client-secret: ${KEYCLOAK_CLIENT_SECRET:platform-client-secret}
-  admin-realm: ${KEYCLOAK_ADMIN_REALM:master}
-  admin-client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
-  admin-username: ${KEYCLOAK_ADMIN_USERNAME:admin}
-  admin-password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
 
 eureka:
   client:
@@ -76,8 +55,6 @@ spring:
         jwt:
           issuer-uri: http://keycloak:8080/realms/auth-management
           jwk-set-uri: http://keycloak:8080/realms/auth-management/protocol/openid-connect/certs
-keycloak:
-  base-url: http://keycloak:8080
 eureka:
   client:
     service-url:

@@ -1,0 +1,220 @@
+{
+  "main": {
+    "id": "c62e5ab270772d7b",
+    "type": "split",
+    "children": [
+      {
+        "id": "88843cf8b9945e2a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "323760985b7783df",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Backend-and-Infra.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Backend-and-Infra"
+            }
+          }
+        ]
+      },
+      {
+        "id": "603a531e6e7404c4",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "6fac48bc53ddcdb7",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Graph view"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "9214df1dab31a731",
+    "type": "split",
+    "children": [
+      {
+        "id": "22237f6e2b56bad3",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "178c984a213c2bbb",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "56726370e1934570",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "7076938fcb6caaf2",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "188ac7f326bad437",
+    "type": "split",
+    "children": [
+      {
+        "id": "27856ef33c08659c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "6746162d5d88269f",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "6e766e211385c416",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Next-Steps.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "e8e4b6881c0ee9bb",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "d811bb7a1cde25ee",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "4f2f291518b72060",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Next-Steps.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "6fac48bc53ddcdb7",
+  "lastOpenFiles": [
+    "Roaming-Analysis-Service.md",
+    "Next-Steps.md",
+    "Roles-and-Permissions.md",
+    "Git-Workflow-and-History.md.tmp.17412.584c63f9a529",
+    "Backend-and-Infra.md.tmp.17412.9b19737e1bea",
+    "Session-Log.md.tmp.17412.7af09b1d6507",
+    "Backend-and-Infra.md.tmp.17412.03574933f6c9",
+    "README.md.tmp.17412.10cc70b4d95a",
+    "Roaming-Analysis-Service.md.tmp.17412.c8103a673149",
+    "Session-Log.md",
+    "Backend-and-Infra.md",
+    "Frontend-Architecture.md"
+  ]
+}
