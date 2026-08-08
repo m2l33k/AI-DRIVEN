@@ -11,6 +11,25 @@ something meaningful.
 
 ## 2026-08-08
 
+### Admin monitoring + gateway metrics endpoint (detail: [[Frontend-Architecture]] · [[Backend-and-Infra]])
+- New admin **System Health** page (`roles/admin/monitoring`): service health (`/infra-health/*`
+  dev-proxy → `:port/actuator/health`), **live gateway JVM metrics** (poll `/actuator/metrics/*`,
+  proxy `/actuator` → :9000; KPI cards + CPU/heap/request-rate curves via new `line-chart [smooth]`),
+  and **request metrics** from a new gateway endpoint. Tool link cards to Grafana/Prometheus/Eureka/
+  Tempo/Loki/Swagger/Keycloak/Actuator.
+- **Gateway endpoint `GET /api/metrics/overview`** (`gateway-service/web/MetricsController`): reactive
+  `WebClient.create` → Prometheus `/api/v1/query` (PromQL on `http_server_requests_seconds_*`, `jvm_*`,
+  `process_*`); returns totalRequests, RPS, exceptions, %2xx/%5xx, requests-by-URI, avg-duration, JVM.
+  Config `prometheus.base-url` (local `:9090` / docker `prometheus:9090`). Secured `PERM_platform-config:read`
+  at the gateway. Gotcha: use `WebClient.create(...)` — no `WebClient.Builder` bean in this gateway.
+- Tried embedding Grafana (iframe + `GF_SECURITY_ALLOW_EMBEDDING`) then **removed** it (app runs local,
+  Grafana is Docker). **Removed** `admin/platform-config` page/route/nav.
+- Added new **API Metrics** page (`roles/admin/metrics`, nav item): polls `/api/metrics/overview` (5s)
+  → KPI cards + bar chart (top endpoints) + donut (2xx/5xx/other) + bar chart (slowest) + table.
+  Moved the request-metrics out of System Health (now health + live JVM only).
+- `docker/prometheus/prometheus.yml` already scrapes host via `host.docker.internal` (gateway/eureka/
+  auth); added **roaming (9002)**. So metrics flow while services run locally.
+
 ### Frontend — glass sidebar, roles page, real admin dashboard (detail: [[Frontend-Architecture]])
 - **Glassmorphism sidebar** (`shared/layout/role-shell`): floating translucent panel, backdrop blur,
   crimson theme (`#c11536→#8a0f2a`), Main + Account sections, notification badges, bottom user

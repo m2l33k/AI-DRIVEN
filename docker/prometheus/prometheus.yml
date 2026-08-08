@@ -18,6 +18,11 @@ scrape_configs:
     static_configs:
       - targets: ['host.docker.internal:9001']
 
+  - job_name: 'roaming-analysis-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:9002']
+
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']

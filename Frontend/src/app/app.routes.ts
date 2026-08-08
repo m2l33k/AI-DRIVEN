@@ -19,8 +19,8 @@ export const routes: Routes = [
       { path: 'dashboard', loadComponent: () => import('./roles/admin/dashboard/admin-dashboard').then((m) => m.AdminDashboard) },
       { path: 'users', loadComponent: () => import('./roles/admin/users/users').then((m) => m.AdminUsers) },
       { path: 'roles', loadComponent: () => import('./roles/admin/roles/roles').then((m) => m.AdminRoles) },
-      { path: 'platform-config', loadComponent: () => import('./roles/admin/platform-config/platform-config').then((m) => m.PlatformConfig) },
       { path: 'monitoring', loadComponent: () => import('./roles/admin/monitoring/monitoring').then((m) => m.AdminMonitoring) },
+      { path: 'metrics', loadComponent: () => import('./roles/admin/metrics/metrics').then((m) => m.AdminMetrics) },
     ],
   },
 

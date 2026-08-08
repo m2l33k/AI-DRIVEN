@@ -19,8 +19,12 @@ Open threads and backlog. Check items off / move them to [[Session-Log]] when do
 - [x] **Admin dashboard** live from `/api/users` (stat cards + user-growth curve + status donut).
 - [x] **Glassmorphism sidebar** redesign (crimson theme, sections, profile, 3 responsive states).
 - [x] **Roles & Permissions** page mirrors Keycloak (profile cards + matrix + detail popup).
+- [x] **System Health** (health + live JVM) + **API Metrics** (Prometheus request analytics: cards +
+      bar/donut charts) pages; gateway `GET /api/metrics/overview`. Removed `admin/platform-config`.
+- [x] **Prometheus scraping for local runs:** `docker/prometheus/prometheus.yml` already targets
+      `host.docker.internal` for gateway/eureka/auth; added roaming (9002).
 - [ ] Wire the remaining **data pages** to gateway APIs (NFs, security alerts, roaming events —
-      `/api/roaming/*`, audit logs, platform/core config).
+      `/api/roaming/*`, audit logs, core config).
 - [ ] Global HTTP error handling → route to `/error/500`; 404 already handled by `**`.
 - [ ] Optional: token refresh using the stored `refresh_token`.
 

@@ -22,6 +22,10 @@ updated: 2026-08-08
 - `spring-cloud/` — `eureka-server` (service discovery) + `gateway-service` (Spring Cloud
   Gateway, WebFlux). Gateway uses the Eureka discovery locator + explicit routes per service,
   and aggregates each service's Swagger under `/<service-id>/v3/api-docs`.
+  - Gateway also hosts a local controller **`GET /api/metrics/overview`** (`web/MetricsController`)
+    that queries **Prometheus** (`prometheus.base-url`) and returns request/JVM metrics as JSON for
+    the admin System Health page. Secured `PERM_platform-config:read`. Use `WebClient.create(...)`
+    (no `WebClient.Builder` bean here). Requests not matching a route fall through to controllers.
 - `microservices/` — business microservices:
   - `auth-service` (port 9001) — Keycloak-backed auth & user management; state-aware login,
     first-login password change, OTP self-service reset, emailed temp passwords. See [[Auth-Service]].

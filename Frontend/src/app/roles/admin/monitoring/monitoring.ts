@@ -10,12 +10,6 @@ type Status = 'UP' | 'DOWN' | 'checking';
 interface Service { key: string; name: string; desc: string; port: number; }
 interface Health { status: Status; detail: string; }
 interface Tool { name: string; desc: string; url: string; color: string; }
-interface Overview {
-  totalRequests: number; requestsPerSecond: number; totalExceptions: number;
-  percent2xx: number; percent5xx: number;
-  requestsByUri: { uri: string; count: number }[];
-  avgDurationByUri: { uri: string; ms: number }[];
-}
 
 const WINDOW = 24;      // rolling chart points
 const POLL_MS = 3000;   // poll interval
@@ -83,43 +77,6 @@ const POLL_MS = 3000;   // poll interval
       </div>
     </div>
 
-    <!-- Request metrics from Prometheus (gateway /api/metrics/overview) -->
-    <h3 class="sec">Request metrics <span class="live">● prometheus</span></h3>
-    @if (overview(); as o) {
-      <div class="stats">
-        <hw-stat-card label="Total requests" [value]="o.totalRequests" accent="#c11536" />
-        <hw-stat-card label="Requests / sec" [value]="o.requestsPerSecond" accent="#3491fa" />
-        <hw-stat-card label="Exceptions" [value]="o.totalExceptions" accent="#f53f3f" />
-        <hw-stat-card label="2xx" [value]="o.percent2xx" unit="%" accent="#00a870" />
-        <hw-stat-card label="5xx" [value]="o.percent5xx" unit="%" accent="#ff8f1f" />
-      </div>
-      <div class="grid two">
-        <div class="hw-card panel">
-          <div class="panel-head"><h3>Requests by URI</h3><span class="tag">count</span></div>
-          <table class="mtbl">
-            <tbody>
-              @for (r of byUri(o); track r.uri) {
-                <tr><td class="uri">{{ r.uri }}</td><td class="num">{{ r.count }}</td></tr>
-              } @empty { <tr><td class="empty" colspan="2">No data yet.</td></tr> }
-            </tbody>
-          </table>
-        </div>
-        <div class="hw-card panel">
-          <div class="panel-head"><h3>Average duration by URI</h3><span class="tag">ms</span></div>
-          <table class="mtbl">
-            <tbody>
-              @for (r of byDuration(o); track r.uri) {
-                <tr><td class="uri">{{ r.uri }}</td><td class="num">{{ r.ms }} ms</td></tr>
-              } @empty { <tr><td class="empty" colspan="2">No data yet.</td></tr> }
-            </tbody>
-          </table>
-        </div>
-      </div>
-    } @else {
-      <div class="hw-card note">Prometheus metrics unavailable — is the observability stack running
-        and scraping the services?</div>
-    }
-
     <h3 class="sec">Dashboards &amp; tools</h3>
     <div class="grid tools">
       @for (t of tools; track t.name) {
@@ -176,15 +133,7 @@ const POLL_MS = 3000;   // poll interval
     .tool-name { font-size: 14px; font-weight: 600; color: var(--hw-text); }
     .tool-name .ext { color: var(--hw-text-3); font-weight: 400; }
     .tool-desc { font-size: 12px; color: var(--hw-text-3); }
-    .two { grid-template-columns: 1fr 1fr; }
-    .note { padding: 14px 18px; font-size: 13px; color: var(--hw-text-3); margin-bottom: 24px; }
-    .mtbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .mtbl td { padding: 8px 4px; border-bottom: 1px solid var(--hw-border); }
-    .mtbl tr:last-child td { border-bottom: 0; }
-    .mtbl .uri { color: var(--hw-text-2); font-family: monospace; font-size: 12px; }
-    .mtbl .num { text-align: right; font-weight: 600; color: var(--hw-text); white-space: nowrap; }
-    .mtbl .empty { text-align: center; color: var(--hw-text-3); padding: 20px; }
-    @media (max-width: 1100px) { .grid, .charts, .stats, .two { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 1100px) { .grid, .charts, .stats { grid-template-columns: repeat(2, 1fr); } }
     @media (max-width: 620px) { .grid, .charts, .stats { grid-template-columns: 1fr; } }
   `],
 })
@@ -209,19 +158,6 @@ export class AdminMonitoring implements OnInit, OnDestroy {
     { name: 'Keycloak', desc: 'Identity & realm admin', url: 'http://localhost:8081/admin', color: '#c11536' },
     { name: 'Actuator', desc: 'Gateway actuator endpoints', url: 'http://localhost:9000/actuator', color: '#722ed1' },
   ];
-
-  // ---- request metrics (Prometheus, via gateway) ----
-  overview = signal<Overview | null>(null);
-
-  byUri = (o: Overview) => [...o.requestsByUri].sort((a, b) => b.count - a.count);
-  byDuration = (o: Overview) => [...o.avgDurationByUri].sort((a, b) => b.ms - a.ms);
-
-  private loadOverview() {
-    this.http.get<Overview>('/api/metrics/overview').subscribe({
-      next: (o) => this.overview.set(o),
-      error: () => this.overview.set(null),
-    });
-  }
 
   // ---- health ----
   health = signal<Record<string, Health>>(
@@ -249,7 +185,6 @@ export class AdminMonitoring implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.checkAll();
-    this.loadOverview();
     this.sub = interval(POLL_MS).pipe(
       startWith(0),
       switchMap(() => forkJoin({
@@ -309,7 +244,6 @@ export class AdminMonitoring implements OnInit, OnDestroy {
 
   // ---- health checks ----
   checkAll() {
-    this.loadOverview();
     for (const s of this.services) {
       this.setHealth(s.key, { status: 'checking', detail: 'Checking…' });
       this.http.get<{ status: string; components?: Record<string, unknown> }>(`/infra-health/${s.key}`)

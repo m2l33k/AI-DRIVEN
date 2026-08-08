@@ -1,7 +1,7 @@
 ---
 title: Frontend Architecture
 tags: [frontend, angular, architecture]
-updated: 2026-08-07
+updated: 2026-08-08
 ---
 
 # Frontend Architecture
@@ -40,7 +40,7 @@ Frontend/src/app/
 ├── auth/         login/ · reset-password/
 ├── errors/       not-found/ (404) · server-error/ (500)
 └── roles/        one folder per role → layout/ + dashboard/ + feature pages
-    ├── admin/               dashboard · users · roles · platform-config
+    ├── admin/               dashboard · users · roles · monitoring (System Health) · metrics (API Metrics)
     ├── network-operator/    dashboard · network-functions · core-config
     ├── security-analyst/    dashboard · security-alerts · roaming-events · detection-rules
     └── auditor/             dashboard · audit-logs
@@ -106,10 +106,22 @@ npm run build    # production build (verified clean)
 - **`shared/ui/page-header`**: clickable **Home › <page>** breadcrumb (Home → `auth.homeRoute()`).
 - **`roles/admin/roles`**: static Keycloak mirror — role **profile cards** (image banner + avatar),
   16×4 **permission matrix** (computed from role data), per-role **detail popup**.
-- **`roles/admin/monitoring`** ("System Health"): live actuator health of gateway/auth/roaming/eureka
-  (via `proxy.conf.json` `/infra-health/*` → each service's `:port/actuator/health` in dev) with an
-  overall status banner, plus link cards to Grafana (3000), Prometheus (9090), Eureka (8761), Tempo,
-  Loki (Grafana Explore), Swagger, Keycloak admin. New admin nav item "System Health".
+- **`roles/admin/monitoring`** ("System Health"): three data sources —
+  (1) **service health** via `proxy.conf.json` `/infra-health/*` → each service's `:port/actuator/health`;
+  (2) **live gateway JVM metrics** polled every 3s from `/actuator/metrics/*` (proxy `/actuator` →
+  `:9000`) → KPI cards + CPU/heap/request-rate curves;
+  (3) **request metrics** from the new gateway endpoint **`GET /api/metrics/overview`** (Prometheus-
+  backed) → Total requests, RPS, exceptions, %2xx/%5xx, requests-by-URI + avg-duration tables.
+  Plus link cards to Grafana (3000)/Prometheus (9090)/Eureka (8761)/Tempo/Loki/Swagger/Keycloak/Actuator.
+  New admin nav item **System Health**. (An embedded-Grafana iframe was tried then removed — the app
+  runs locally, Grafana is Docker.) `auth.interceptor` skips bearer for `/actuator` + `/infra-health`.
+- **`roles/admin/metrics`** ("API Metrics", nav item): polls `GET /api/metrics/overview` every 5s →
+  KPI cards (total req, req/s, 2xx%, 5xx%, exceptions) + **bar chart** top endpoints by requests +
+  **donut** status mix (2xx/5xx/other) + **bar chart** slowest endpoints + endpoints table. The
+  request-metrics were moved here from System Health to keep that page = health + live JVM.
+  Prometheus scrapes host apps via `host.docker.internal` (`docker/prometheus/prometheus.yml`,
+  gateway/eureka/auth/roaming) — so this works while services run locally.
+- **Removed** the `admin/platform-config` page + route + nav item (unused placeholder).
 - **`roles/admin/dashboard`**: live from `GET /api/users` — stat cards (Total / New this month /
   Active / Active rate), **user-growth curve** (cumulative by month from `createdTimestamp`),
   Users-by-status donut, recent-users table. `shared/charts/line-chart` gained a `[smooth]`
