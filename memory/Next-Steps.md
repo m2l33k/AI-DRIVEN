@@ -12,13 +12,14 @@ Open threads and backlog. Check items off / move them to [[Session-Log]] when do
 - [x] Commit the staged `Frontend/` on `main` (user commits themselves — see [[Git-Workflow-and-History]]).
 - [x] Remove `.github/workflows/` on `main` (`git rm -r .github/workflows`), then commit.
 
-## Frontend — integration (currently UI-only)
-- [ ] Replace the login demo role picker with **real Keycloak auth** (OIDC / `keycloak-js`
-      or `angular-oauth2-oidc`).
-- [ ] Add **per-role route guards** (map realm roles → `/admin`, `/operator`, `/security`, `/audit`).
-- [ ] Wire pages to **real APIs** via the Spring Cloud Gateway.
+## Frontend — integration
+- [x] Real login via `/api/auth/login` (3-status flow) + first-login + OTP reset (2026-08-08).
+- [x] Per-role route guards (`authGuard` + `roleGuard`) on `/admin /operator /security /audit`.
+- [x] Admin **Users** page wired to `/api/users` (list/create/delete/reset); logout clears session.
+- [ ] Wire the remaining **data pages** to gateway APIs (NFs, security alerts, roaming events —
+      `/api/roaming/*`, audit logs, platform/core config).
 - [ ] Global HTTP error handling → route to `/error/500`; 404 already handled by `**`.
-- [ ] Decide: keep inline templates/styles or split into `.html`/`.css` files.
+- [ ] Optional: token refresh using the stored `refresh_token`.
 
 ## Frontend — polish (optional)
 - [ ] Responsive pass on tables for small screens.

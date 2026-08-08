@@ -1,5 +1,8 @@
-import { Component, computed, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, computed, inject, signal } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
+import { AuthService } from '../../core/auth.service';
+
+type Step = 'email' | 'otp' | 'password' | 'done';
 
 @Component({
   selector: 'app-reset-password',
@@ -13,44 +16,56 @@ import { RouterLink } from '@angular/router';
           <span class="brand-name">CloudOps Console</span>
         </div>
 
-        @if (!sent()) {
-          <!-- Step 1: request reset -->
-          <h2>Reset your password</h2>
-          <p class="sub">Enter your account email and we'll send a reset link.</p>
-          <form (submit)="$event.preventDefault(); requestReset()">
-            <label>Email address</label>
-            <input class="hw-input" type="email" [value]="email()"
-                   (input)="email.set($any($event.target).value)"
-                   placeholder="you@company.com" />
-            @if (emailError()) { <span class="err">Please enter a valid email.</span> }
-            <button type="submit" class="hw-btn hw-btn--primary hw-btn--block mt">
-              Send reset link
-            </button>
-          </form>
-        } @else {
-          <!-- Step 2: set new password -->
-          <h2>Choose a new password</h2>
-          <p class="sub">A link was sent to <strong>{{ email() }}</strong>. Set a new password below.</p>
-          <form (submit)="$event.preventDefault();">
-            <label>New password</label>
-            <input class="hw-input" type="password" [value]="pw()"
-                   (input)="pw.set($any($event.target).value)" placeholder="At least 8 characters" />
+        @if (error()) { <div class="banner err">{{ error() }}</div> }
 
-            <div class="meter">
-              <span [class.on]="strength() >= 1" class="s1"></span>
-              <span [class.on]="strength() >= 2" class="s2"></span>
-              <span [class.on]="strength() >= 3" class="s3"></span>
-            </div>
-            <span class="hint">{{ strengthLabel() }}</span>
-
-            <label>Confirm password</label>
-            <input class="hw-input" type="password" [value]="pw2()"
-                   (input)="pw2.set($any($event.target).value)" placeholder="Re-enter password" />
-            @if (pw2() && pw() !== pw2()) { <span class="err">Passwords do not match.</span> }
-
-            <button type="submit" class="hw-btn hw-btn--primary hw-btn--block mt"
-                    [disabled]="!canSubmit()">Update password</button>
-          </form>
+        @switch (step()) {
+          @case ('email') {
+            <h2>Reset your password</h2>
+            <p class="sub">Enter your account email and we'll send a one-time code.</p>
+            <form (submit)="$event.preventDefault(); requestOtp()">
+              <label>Email address</label>
+              <input class="hw-input" type="email" [value]="email()"
+                     (input)="email.set($any($event.target).value)" placeholder="you@company.com" />
+              <button type="submit" class="hw-btn hw-btn--primary hw-btn--block mt"
+                      [disabled]="loading() || !validEmail()">
+                {{ loading() ? 'Sending…' : 'Send code' }}
+              </button>
+            </form>
+          }
+          @case ('otp') {
+            <h2>Enter the code</h2>
+            <p class="sub">We sent a 6-digit code to <strong>{{ email() }}</strong>.</p>
+            <form (submit)="$event.preventDefault(); verifyOtp()">
+              <label>One-time code</label>
+              <input class="hw-input" inputmode="numeric" maxlength="6" [value]="otp()"
+                     (input)="otp.set($any($event.target).value)" placeholder="123456" />
+              <button type="submit" class="hw-btn hw-btn--primary hw-btn--block mt"
+                      [disabled]="loading() || otp().length < 6">
+                {{ loading() ? 'Verifying…' : 'Verify code' }}
+              </button>
+            </form>
+          }
+          @case ('password') {
+            <h2>Choose a new password</h2>
+            <p class="sub">Set a new password for <strong>{{ email() }}</strong>.</p>
+            <form (submit)="$event.preventDefault(); resetPassword()">
+              <label>New password</label>
+              <input class="hw-input" type="password" [value]="pw()"
+                     (input)="pw.set($any($event.target).value)" placeholder="At least 8 characters" />
+              <label>Confirm password</label>
+              <input class="hw-input" type="password" [value]="pw2()"
+                     (input)="pw2.set($any($event.target).value)" placeholder="Re-enter password" />
+              @if (pw2() && pw() !== pw2()) { <span class="err">Passwords do not match.</span> }
+              <button type="submit" class="hw-btn hw-btn--primary hw-btn--block mt"
+                      [disabled]="loading() || !canSubmitPw()">
+                {{ loading() ? 'Saving…' : 'Update password' }}
+              </button>
+            </form>
+          }
+          @case ('done') {
+            <h2>Password updated</h2>
+            <p class="sub">You can now sign in with your new password.</p>
+          }
         }
 
         <a routerLink="/login" class="back">← Back to sign in</a>
@@ -70,42 +85,58 @@ import { RouterLink } from '@angular/router';
     label { display: block; font-size: 13px; font-weight: 500; margin: 14px 0 6px; color: var(--hw-text-2); }
     .mt { margin-top: 24px; }
     .err { display: block; color: var(--hw-danger); font-size: 12px; margin-top: 6px; }
-    .hint { display: block; color: var(--hw-text-3); font-size: 12px; margin-top: 6px; }
-    .meter { display: flex; gap: 6px; margin-top: 10px; }
-    .meter span { height: 5px; flex: 1; border-radius: 4px; background: var(--hw-border); }
-    .meter .on.s1 { background: var(--hw-danger); }
-    .meter .on.s2 { background: var(--hw-warning); }
-    .meter .on.s3 { background: var(--hw-success); }
+    .banner { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 8px; }
+    .banner.err { background: rgba(245,63,63,.1); color: var(--hw-danger); }
     .back { display: block; text-align: center; margin-top: 24px; color: var(--hw-red);
       font-size: 13px; font-weight: 500; }
   `],
 })
 export class ResetPassword {
-  email = signal('');
-  emailError = signal(false);
-  sent = signal(false);
+  private auth = inject(AuthService);
 
+  step = signal<Step>('email');
+  loading = signal(false);
+  error = signal('');
+
+  email = signal('');
+  otp = signal('');
   pw = signal('');
   pw2 = signal('');
+  private resetToken = signal('');
 
-  strength = computed(() => {
-    const v = this.pw();
-    let s = 0;
-    if (v.length >= 8) s++;
-    if (/[A-Z]/.test(v) && /[0-9]/.test(v)) s++;
-    if (/[^A-Za-z0-9]/.test(v)) s++;
-    return s;
-  });
+  validEmail = computed(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.email()));
+  canSubmitPw = computed(() => this.pw().length >= 8 && this.pw() === this.pw2());
 
-  strengthLabel = computed(() =>
-    ['Too short', 'Weak', 'Good', 'Strong'][this.strength()] ?? '');
+  requestOtp() {
+    this.error.set('');
+    this.loading.set(true);
+    this.auth.forgotPassword(this.email()).subscribe({
+      next: () => { this.loading.set(false); this.step.set('otp'); },
+      error: () => { this.loading.set(false); this.step.set('otp'); }, // don't reveal existence
+    });
+  }
 
-  canSubmit = computed(() =>
-    this.strength() >= 2 && this.pw() === this.pw2() && !!this.pw2());
+  verifyOtp() {
+    this.error.set('');
+    this.loading.set(true);
+    this.auth.verifyOtp(this.email(), this.otp()).subscribe({
+      next: (res) => { this.loading.set(false); this.resetToken.set(res.resetToken); this.step.set('password'); },
+      error: (err) => {
+        this.loading.set(false);
+        this.error.set(err.error?.error || 'Incorrect or expired code.');
+      },
+    });
+  }
 
-  requestReset() {
-    const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.email());
-    this.emailError.set(!ok);
-    if (ok) this.sent.set(true);
+  resetPassword() {
+    this.error.set('');
+    this.loading.set(true);
+    this.auth.resetPassword(this.resetToken(), this.pw()).subscribe({
+      next: () => { this.loading.set(false); this.step.set('done'); },
+      error: (err) => {
+        this.loading.set(false);
+        this.error.set(err.error?.error || 'Could not reset the password. Please start over.');
+      },
+    });
   }
 }

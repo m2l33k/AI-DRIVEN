@@ -1,15 +1,18 @@
 import { Routes } from '@angular/router';
+import { authGuard, roleGuard } from './core/guards';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'login' },
 
   // ---- Auth (shared) ----
   { path: 'login', loadComponent: () => import('./auth/login/login').then((m) => m.Login) },
+  { path: 'first-login', loadComponent: () => import('./auth/first-login/first-login').then((m) => m.FirstLogin) },
   { path: 'reset-password', loadComponent: () => import('./auth/reset-password/reset-password').then((m) => m.ResetPassword) },
 
   // ---- PLATFORM_ADMIN ----
   {
     path: 'admin',
+    canActivate: [authGuard, roleGuard('PLATFORM_ADMIN')],
     loadComponent: () => import('./roles/admin/layout/admin-layout').then((m) => m.AdminLayout),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
@@ -23,6 +26,7 @@ export const routes: Routes = [
   // ---- NETWORK_OPERATOR ----
   {
     path: 'operator',
+    canActivate: [authGuard, roleGuard('NETWORK_OPERATOR')],
     loadComponent: () => import('./roles/network-operator/layout/operator-layout').then((m) => m.OperatorLayout),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
@@ -35,6 +39,7 @@ export const routes: Routes = [
   // ---- SECURITY_ANALYST ----
   {
     path: 'security',
+    canActivate: [authGuard, roleGuard('SECURITY_ANALYST')],
     loadComponent: () => import('./roles/security-analyst/layout/security-layout').then((m) => m.SecurityLayout),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
@@ -48,6 +53,7 @@ export const routes: Routes = [
   // ---- AUDITOR ----
   {
     path: 'audit',
+    canActivate: [authGuard, roleGuard('AUDITOR')],
     loadComponent: () => import('./roles/auditor/layout/auditor-layout').then((m) => m.AuditorLayout),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },

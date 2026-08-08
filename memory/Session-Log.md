@@ -11,6 +11,16 @@ something meaningful.
 
 ## 2026-08-08
 
+### Frontend — wired auth + user management to the backend (detail: [[Frontend-Architecture]])
+- Added `Frontend/proxy.conf.json` (`/api` → gateway :9000) + `angular.json` serve `proxyConfig`.
+- New `src/app/core/`: `auth.service` (login 3-status, first-login, OTP reset, change-pw, JWT decode
+  → roles/home route), `auth.interceptor` (bearer except public paths; 401 → logout), `guards`
+  (`authGuard` + `roleGuard`), `users.service`, `models`.
+- Rewrote `login` (real auth, routes by role), added `auth/first-login/`, rewrote `reset-password`
+  (email → OTP → new password), rewrote admin `users` (live CRUD + reset). `role-shell` logout
+  clears session. Guards on all four role route trees. `npm run build` → clean.
+- Remaining: role dashboard data pages still mock (see [[Next-Steps]]).
+
 ### Auth Service — password flows + state-aware login (full detail: [[Auth-Service]])
 - **Self-service reset (OTP):** `/forgot-password` (email → 6-digit OTP via Gmail SMTP),
   `/verify-otp` (→ single-use reset token), `/reset-password` (token + new permanent password).

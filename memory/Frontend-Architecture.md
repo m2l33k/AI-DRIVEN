@@ -6,7 +6,8 @@ updated: 2026-08-07
 
 # Frontend Architecture
 
-The Angular console lives in `Frontend/`. **UI only for now — no backend integration.**
+The Angular console lives in `Frontend/`. **Auth + user management now wired to the backend**
+via the gateway (see "Backend integration" below); the role dashboards' data pages are still mock.
 
 ## Stack
 - **Angular 22** (standalone components, no NgModules)
@@ -77,9 +78,26 @@ npm start        # ng serve → http://localhost:4200
 npm run build    # production build (verified clean)
 ```
 
-## Integration TODO
-Login currently has a **demo role picker** that just navigates. Real work: Keycloak auth,
-per-role route guards, API calls through the gateway. See [[Next-Steps]].
+## Backend integration (2026-08-08)
+- **Dev proxy:** `Frontend/proxy.conf.json` maps `/api` → `http://localhost:9000` (gateway),
+  wired via `angular.json` serve `proxyConfig` — avoids CORS from `:4200`. All calls use `/api/...`.
+- **`src/app/core/`:**
+  - `auth.service.ts` — login (3 statuses), first-login change, forgot/verify-otp/reset,
+    change-password; stores JWT in `localStorage`; decodes `realm_access.roles` → `homeRoute()`.
+  - `auth.interceptor.ts` — attaches `Bearer` to `/api/*` except public auth paths (avoids the
+    stale-token 401 gotcha); on 401 → logout + `/login`.
+  - `guards.ts` — `authGuard` + `roleGuard(role)`; applied to `/admin /operator /security /audit`.
+  - `users.service.ts` — list/create/delete/admin-reset against `/api/users`.
+  - `models.ts` — `LoginResponse`, `UserSummary`, `CreateUserRequest`, `CurrentUser`.
+- **Screens wired:** `login` (real auth, routes by role; PASSWORD_CHANGE → `/first-login`;
+  EMAIL_VERIFICATION → message), new `auth/first-login/`, `reset-password` (3-step OTP:
+  email → otp → new password), `roles/admin/users/` (live table + create modal + reset + delete),
+  `role-shell` logout now clears the session.
+- Full auth API contract in [[Auth-Service]]. `npm run build` → clean.
+
+## Integration TODO (remaining)
+Role dashboard **data pages** (network functions, security alerts, roaming events, audit logs,
+platform/core config) still render mock data — wire them to their gateway APIs next. See [[Next-Steps]].
 
 ## Related notes
 - [[Frontend-Components]]

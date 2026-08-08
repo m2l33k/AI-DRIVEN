@@ -1,12 +1,6 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-
-interface RoleOption {
-  key: string;
-  name: string;
-  route: string;
-  desc: string;
-}
+import { AuthService } from '../../core/auth.service';
 
 @Component({
   selector: 'app-login',
@@ -39,11 +33,14 @@ interface RoleOption {
           <h2>Sign in</h2>
           <p class="sub">Welcome back. Please enter your credentials.</p>
 
+          @if (error()) { <div class="banner err">{{ error() }}</div> }
+          @if (info()) { <div class="banner info">{{ info() }}</div> }
+
           <form (submit)="$event.preventDefault(); submit()">
-            <label>Username</label>
-            <input class="hw-input" type="text" [value]="username()"
-                   (input)="username.set($any($event.target).value)"
-                   placeholder="e.g. admin-user" autocomplete="username" />
+            <label>Email</label>
+            <input class="hw-input" type="email" [value]="email()"
+                   (input)="email.set($any($event.target).value)"
+                   placeholder="you@company.com" autocomplete="username" />
 
             <label>Password</label>
             <div class="pw">
@@ -56,27 +53,13 @@ interface RoleOption {
             </div>
 
             <div class="row-between">
-              <label class="remember">
-                <input type="checkbox" [checked]="remember()"
-                       (change)="remember.set($any($event.target).checked)" />
-                <span>Remember me</span>
-              </label>
+              <span></span>
               <a routerLink="/reset-password" class="link">Forgot password?</a>
             </div>
 
-            <p class="pick-label">Sign in as (demo)</p>
-            <div class="roles">
-              @for (r of roles; track r.key) {
-                <button type="button" class="role-chip"
-                        [class.sel]="selected() === r.key" (click)="selected.set(r.key)">
-                  <strong>{{ r.name }}</strong>
-                  <span>{{ r.desc }}</span>
-                </button>
-              }
-            </div>
-
-            <button type="submit" class="hw-btn hw-btn--primary hw-btn--block">
-              Sign in
+            <button type="submit" class="hw-btn hw-btn--primary hw-btn--block"
+                    [disabled]="loading() || !email() || !password()">
+              {{ loading() ? 'Signing in…' : 'Sign in' }}
             </button>
           </form>
         </div>
@@ -124,44 +107,51 @@ interface RoleOption {
       position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
       border: 0; background: transparent; color: var(--hw-red); font-size: 12px; font-weight: 600;
     }
-    .row-between { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 4px; }
-    .remember { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; color: var(--hw-text-2); }
-    .remember input { accent-color: var(--hw-red); }
+    .row-between { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 20px; }
     .link { color: var(--hw-red); font-size: 13px; font-weight: 500; }
-
-    .pick-label { font-size: 12px; color: var(--hw-text-3); margin: 22px 0 8px; }
-    .roles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 22px; }
-    .role-chip {
-      text-align: left; border: 1px solid var(--hw-border-strong); background: var(--hw-surface);
-      border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px;
-      transition: all .12s;
-    }
-    .role-chip strong { font-size: 13px; color: var(--hw-text); }
-    .role-chip span { font-size: 11px; color: var(--hw-text-3); }
-    .role-chip:hover { border-color: var(--hw-red); }
-    .role-chip.sel { border-color: var(--hw-red); background: var(--hw-red-soft); }
+    .banner { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 4px; }
+    .banner.err { background: rgba(245,63,63,.1); color: var(--hw-danger); }
+    .banner.info { background: rgba(0,168,112,.1); color: var(--hw-success); }
 
     @media (max-width: 860px) { .brand-panel { display: none; } }
   `],
 })
 export class Login {
-  username = signal('admin-user');
+  private auth = inject(AuthService);
+  private router = inject(Router);
+
+  email = signal('');
   password = signal('');
   showPw = signal(false);
-  remember = signal(true);
-  selected = signal('admin');
-
-  roles: RoleOption[] = [
-    { key: 'admin', name: 'Platform Admin', route: '/admin', desc: 'Users, roles, config' },
-    { key: 'operator', name: 'Network Operator', route: '/operator', desc: 'NFs & core config' },
-    { key: 'security', name: 'Security Analyst', route: '/security', desc: 'Alerts & detection' },
-    { key: 'auditor', name: 'Auditor', route: '/audit', desc: 'Read-only & audit logs' },
-  ];
-
-  constructor(private router: Router) {}
+  loading = signal(false);
+  error = signal('');
+  info = signal('');
 
   submit() {
-    const role = this.roles.find((r) => r.key === this.selected());
-    this.router.navigate([role ? role.route : '/admin']);
+    this.error.set('');
+    this.info.set('');
+    this.loading.set(true);
+    this.auth.login(this.email(), this.password()).subscribe({
+      next: (res) => {
+        this.loading.set(false);
+        switch (res.status) {
+          case 'SUCCESS':
+            this.router.navigateByUrl(this.auth.homeRoute());
+            break;
+          case 'PASSWORD_CHANGE_REQUIRED':
+            this.router.navigate(['/first-login']);
+            break;
+          case 'EMAIL_VERIFICATION_REQUIRED':
+            this.info.set(res.message || 'Please verify your email address before logging in.');
+            break;
+        }
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.error.set(err.status === 401 || err.status === 400
+          ? 'Invalid username or password.'
+          : 'Unable to sign in. Please try again.');
+      },
+    });
   }
 }

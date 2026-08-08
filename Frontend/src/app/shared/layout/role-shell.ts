@@ -1,5 +1,6 @@
-import { Component, input, signal } from '@angular/core';
+import { Component, inject, input, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet, Router } from '@angular/router';
+import { AuthService } from '../../core/auth.service';
 
 export interface NavItem {
   label: string;
@@ -57,7 +58,7 @@ export interface NavItem {
             </button>
             <div class="user">
               <span class="avatar">{{ userInitials() }}</span>
-              @if (!collapsed()) { <span class="uname">{{ userName() }}</span> }
+              @if (!collapsed()) { <span class="uname">{{ displayName() }}</span> }
             </div>
             <button class="icon-btn logout" (click)="logout()" aria-label="Sign out">
               <svg viewBox="0 0 24 24" class="ico"><path d="M16 17l5-5-5-5v3H9v4h7v3zM4 5h8V3H4a2 2 0 00-2 2v14a2 2 0 002 2h8v-2H4V5z"/></svg>
@@ -145,16 +146,20 @@ export class RoleShell {
   roleName = input<string>('User');
   accent = input<string>('var(--hw-red)');
   navItems = input<NavItem[]>([]);
-  userName = input<string>('Admin User');
+  userName = input<string>('');
 
   collapsed = signal(false);
+  private router = inject(Router);
+  private auth = inject(AuthService);
 
-  constructor(private router: Router) {}
+  /** Prefer the explicit input, else fall back to the signed-in user's name. */
+  displayName = () => this.userName() || this.auth.user()?.name || 'User';
 
   userInitials = () =>
-    this.userName().split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase();
+    this.displayName().split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase();
 
   logout() {
+    this.auth.logout();
     this.router.navigate(['/login']);
   }
 }
