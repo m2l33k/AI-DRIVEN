@@ -26,6 +26,7 @@ export interface NavItem {
           @if (!collapsed()) { <span class="brand-name">{{ brand() }}</span> }
         </div>
 
+        @if (!collapsed()) { <span class="nav-section">Menu</span> }
         <nav>
           @for (item of navItems(); track item.path) {
             <a [routerLink]="item.path" routerLinkActive="active"
@@ -37,12 +38,24 @@ export interface NavItem {
           }
         </nav>
 
-        <button class="collapse" (click)="collapsed.set(!collapsed())"
-                [attr.aria-label]="collapsed() ? 'Expand' : 'Collapse'">
-          <svg viewBox="0 0 24 24" class="ico">
-            <path [attr.d]="collapsed() ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'" />
-          </svg>
-        </button>
+        <div class="side-foot">
+          <div class="mini-user" [attr.title]="displayName()">
+            <span class="avatar sm">{{ userInitials() }}</span>
+            @if (!collapsed()) {
+              <div class="mu-text">
+                <span class="mu-name">{{ displayName() }}</span>
+                <span class="mu-role">{{ roleName() }}</span>
+              </div>
+            }
+          </div>
+          <button class="collapse" (click)="collapsed.set(!collapsed())"
+                  [attr.aria-label]="collapsed() ? 'Expand' : 'Collapse'">
+            <svg viewBox="0 0 24 24" class="ico">
+              <path [attr.d]="collapsed() ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'" />
+            </svg>
+            @if (!collapsed()) { <span>Collapse</span> }
+          </button>
+        </div>
       </aside>
 
       <!-- Main -->
@@ -104,39 +117,64 @@ export interface NavItem {
     .shell { display: flex; height: 100vh; overflow: hidden; }
 
     .sidebar {
-      width: var(--hw-sidebar-w); flex: none; background: #1f1f26;
+      width: var(--hw-sidebar-w); flex: none;
+      background: linear-gradient(180deg, #23232c 0%, #191920 100%);
       display: flex; flex-direction: column; transition: width .18s ease;
-      position: relative;
+      border-right: 1px solid rgba(255,255,255,.06);
     }
-    .collapsed .sidebar { width: 64px; }
+    .collapsed .sidebar { width: 72px; }
 
     .brand {
-      display: flex; align-items: center; gap: 10px; height: var(--hw-header-h);
-      padding: 0 18px; color: #fff; border-bottom: 1px solid rgba(255,255,255,.08);
+      display: flex; align-items: center; gap: 11px; height: var(--hw-header-h);
+      padding: 0 18px; color: #fff; border-bottom: 1px solid rgba(255,255,255,.06);
     }
+    .collapsed .brand { padding: 0; justify-content: center; }
     .logo {
       background: var(--role-accent); color: #fff; font-weight: 800; font-size: 13px;
-      width: 30px; height: 30px; border-radius: 6px; display: grid; place-items: center;
+      width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center;
       flex: none; letter-spacing: -.5px;
+      box-shadow: 0 4px 14px color-mix(in srgb, var(--role-accent) 45%, transparent);
     }
     .brand-name { font-size: 14px; font-weight: 600; white-space: nowrap; }
 
-    nav { flex: 1; padding: 10px 8px; overflow-y: auto; }
-    .nav-item {
-      display: flex; align-items: center; gap: 12px; padding: 10px 12px;
-      border-radius: 6px; color: #b7bac2; font-size: 14px; margin-bottom: 2px;
-      white-space: nowrap; transition: background .12s, color .12s;
+    .nav-section {
+      display: block; padding: 16px 20px 8px; font-size: 10.5px; letter-spacing: .09em;
+      text-transform: uppercase; color: #63656f; font-weight: 700;
     }
-    .nav-item:hover { background: rgba(255,255,255,.06); color: #fff; }
-    .nav-item.active { background: var(--role-accent); color: #fff; }
+    nav { flex: 1; padding: 4px 12px; overflow-y: auto; }
+    .nav-item {
+      position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+      border-radius: 8px; color: #a9acb6; font-size: 14px; margin-bottom: 3px;
+      white-space: nowrap; transition: background .14s, color .14s;
+    }
+    .collapsed .nav-item { justify-content: center; padding: 10px; }
+    .nav-item:hover { background: rgba(255,255,255,.05); color: #fff; }
+    .nav-item.active { background: color-mix(in srgb, var(--role-accent) 16%, transparent); color: #fff; }
+    .nav-item.active::before {
+      content: ''; position: absolute; left: -12px; top: 50%; transform: translateY(-50%);
+      width: 3px; height: 20px; border-radius: 0 3px 3px 0; background: var(--role-accent);
+    }
+    .nav-item.active .ico { color: var(--role-accent); }
     .ico { width: 20px; height: 20px; fill: currentColor; flex: none; }
 
-    .collapse {
-      margin: 8px; height: 34px; border: 0; border-radius: 6px;
-      background: rgba(255,255,255,.06); color: #b7bac2;
-      display: grid; place-items: center;
+    .side-foot { padding: 10px; border-top: 1px solid rgba(255,255,255,.06); }
+    .mini-user { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; }
+    .collapsed .mini-user { justify-content: center; padding: 8px 0; }
+    .avatar.sm {
+      width: 32px; height: 32px; border-radius: 50%; background: var(--role-accent); color: #fff;
+      font-size: 12px; font-weight: 600; display: grid; place-items: center; flex: none;
     }
-    .collapse:hover { background: rgba(255,255,255,.12); color: #fff; }
+    .mu-text { display: flex; flex-direction: column; min-width: 0; }
+    .mu-name { font-size: 13px; color: #fff; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mu-role { font-size: 11px; color: #7d808b; white-space: nowrap; }
+
+    .collapse {
+      width: 100%; margin-top: 8px; height: 36px; border: 0; border-radius: 8px;
+      background: rgba(255,255,255,.05); color: #a9acb6;
+      display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px;
+      cursor: pointer; transition: background .14s, color .14s;
+    }
+    .collapse:hover { background: rgba(255,255,255,.1); color: #fff; }
 
     .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
     .topbar {
