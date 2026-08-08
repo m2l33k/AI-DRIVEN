@@ -7,7 +7,7 @@ import { RoleShell, NavItem } from '../../../shared/layout/role-shell';
   imports: [RoleShell],
   template: `
     <hw-role-shell brand="CloudOps Console" roleName="Network Operator"
-                   userName="Karim Ben Salah" accent="#3491fa" [navItems]="nav" />
+                   accent="#3491fa" [navItems]="nav" />
   `,
 })
 export class OperatorLayout {

@@ -7,7 +7,7 @@ import { RoleShell, NavItem } from '../../../shared/layout/role-shell';
   imports: [RoleShell],
   template: `
     <hw-role-shell brand="CloudOps Console" roleName="Platform Admin"
-                   userName="Admin User" accent="#c7000b" [navItems]="nav" />
+                   accent="#c7000b" [navItems]="nav" />
   `,
 })
 export class AdminLayout {

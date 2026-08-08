@@ -40,7 +40,7 @@ public class KeycloakService {
 			form.add("client_secret", props.clientSecret());
 			form.add("username", username);
 			form.add("password", password);
-			form.add("scope", "openid roles");
+			form.add("scope", "openid profile email roles");
 		});
 	}
 
