@@ -106,6 +106,10 @@ npm run build    # production build (verified clean)
 - **`shared/ui/page-header`**: clickable **Home › <page>** breadcrumb (Home → `auth.homeRoute()`).
 - **`roles/admin/roles`**: static Keycloak mirror — role **profile cards** (image banner + avatar),
   16×4 **permission matrix** (computed from role data), per-role **detail popup**.
+- **`roles/admin/monitoring`** ("System Health"): live actuator health of gateway/auth/roaming/eureka
+  (via `proxy.conf.json` `/infra-health/*` → each service's `:port/actuator/health` in dev) with an
+  overall status banner, plus link cards to Grafana (3000), Prometheus (9090), Eureka (8761), Tempo,
+  Loki (Grafana Explore), Swagger, Keycloak admin. New admin nav item "System Health".
 - **`roles/admin/dashboard`**: live from `GET /api/users` — stat cards (Total / New this month /
   Active / Active rate), **user-growth curve** (cumulative by month from `createdTimestamp`),
   Users-by-status donut, recent-users table. `shared/charts/line-chart` gained a `[smooth]`

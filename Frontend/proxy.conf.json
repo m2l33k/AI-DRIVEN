@@ -3,5 +3,34 @@
     "target": "http://localhost:9000",
     "secure": false,
     "changeOrigin": true
+  },
+  "/actuator": {
+    "target": "http://localhost:9000",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/infra-health/gateway": {
+    "target": "http://localhost:9000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/infra-health/gateway": "/actuator/health" }
+  },
+  "/infra-health/auth": {
+    "target": "http://localhost:9001",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/infra-health/auth": "/actuator/health" }
+  },
+  "/infra-health/roaming": {
+    "target": "http://localhost:9002",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/infra-health/roaming": "/actuator/health" }
+  },
+  "/infra-health/eureka": {
+    "target": "http://localhost:8761",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/infra-health/eureka": "/actuator/health" }
   }
 }

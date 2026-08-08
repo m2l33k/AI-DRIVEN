@@ -12,6 +12,8 @@ const PUBLIC = [
   '/api/auth/reset-password',
   '/api/auth/first-login/change-password',
   '/api/auth/verify-email',
+  '/actuator',      // public infra metrics/health (no bearer → avoids stale-token 401)
+  '/infra-health',  // dev-proxy health pings
 ];
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {

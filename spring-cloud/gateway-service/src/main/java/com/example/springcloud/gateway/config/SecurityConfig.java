@@ -73,6 +73,9 @@ public class SecurityConfig {
                         // Verify-email landing page (browser opens the emailed link, GET)
                         .pathMatchers(HttpMethod.GET, "/api/auth/verify-email").permitAll()
 
+                        // --- Platform metrics overview (from Prometheus) ---
+                        .pathMatchers(HttpMethod.GET, "/api/metrics/**").hasAuthority("PERM_platform-config:read")
+
                         // --- IAM: users (PLATFORM_ADMIN) ---
                         .pathMatchers(HttpMethod.GET, "/api/users/**").hasAuthority("PERM_users:read")
                         .pathMatchers("/api/users/**").hasAuthority("PERM_users:write")

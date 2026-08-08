@@ -33,12 +33,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Frontend-Architecture.md",
+                "file": "Session-Log.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Frontend-Architecture"
+              "title": "Session-Log"
             }
           }
         ]
@@ -119,7 +119,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Frontend-Architecture.md",
+                "file": "Session-Log.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -209,22 +209,26 @@
   },
   "active": "6fac48bc53ddcdb7",
   "lastOpenFiles": [
+    "Roles-and-Permissions.md",
+    "Roaming-Analysis-Service.md",
+    "README.md",
+    "Project-Overview.md",
+    "Next-Steps.md",
+    "Git-Workflow-and-History.md",
+    "Frontend-Components.md",
+    "Frontend-Architecture.md",
+    "Backend-and-Infra.md",
     "Auth-Service.md",
     "Next-Steps.md.tmp.22828.5f85fb436a68",
-    "Backend-and-Infra.md",
     "Backend-and-Infra.md.tmp.22828.65df2a20cae7",
     "Session-Log.md.tmp.22828.673d8ff1649c",
     "README.md.tmp.22828.38bfaeb86e45",
     "Auth-Service.md.tmp.22828.fc3f313b8b82",
-    "Roaming-Analysis-Service.md",
-    "Next-Steps.md",
-    "Roles-and-Permissions.md",
     "Git-Workflow-and-History.md.tmp.17412.584c63f9a529",
     "Backend-and-Infra.md.tmp.17412.9b19737e1bea",
     "Session-Log.md.tmp.17412.7af09b1d6507",
     "Backend-and-Infra.md.tmp.17412.03574933f6c9",
     "README.md.tmp.17412.10cc70b4d95a",
-    "Session-Log.md",
-    "Frontend-Architecture.md"
+    "Session-Log.md"
   ]
 }

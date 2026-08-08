@@ -1,5 +1,7 @@
 app:
   jwk-set-uri: ${APP_KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/auth-management/protocol/openid-connect/certs}
+prometheus:
+  base-url: ${PROMETHEUS_BASE_URL:http://localhost:9090}
 server:
   port: 9000
   netty:
@@ -149,3 +151,5 @@ spring:
         jwt:
           issuer-uri: http://keycloak:8080/realms/auth-management
           jwk-set-uri: http://keycloak:8080/realms/auth-management/protocol/openid-connect/certs
+prometheus:
+  base-url: http://prometheus:9090
