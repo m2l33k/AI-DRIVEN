@@ -1,4 +1,4 @@
-import { Component, inject, input, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet, Router } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 
@@ -60,11 +60,39 @@ export interface NavItem {
               <span class="avatar">{{ userInitials() }}</span>
               @if (!collapsed()) { <span class="uname">{{ displayName() }}</span> }
             </div>
-            <button class="icon-btn logout" (click)="logout()" aria-label="Sign out">
+            <button class="icon-btn" (click)="openChangePw()" aria-label="Change password" title="Change password">
+              <svg viewBox="0 0 24 24" class="ico"><path d="M12 1a5 5 0 00-5 5v3H6a2 2 0 00-2 2v9a2 2 0 002 2h12a2 2 0 002-2v-9a2 2 0 00-2-2h-1V6a5 5 0 00-5-5zm3 8H9V6a3 3 0 016 0v3z"/></svg>
+            </button>
+            <button class="icon-btn logout" (click)="logout()" aria-label="Sign out" title="Sign out">
               <svg viewBox="0 0 24 24" class="ico"><path d="M16 17l5-5-5-5v3H9v4h7v3zM4 5h8V3H4a2 2 0 00-2 2v14a2 2 0 002 2h8v-2H4V5z"/></svg>
             </button>
           </div>
         </header>
+
+        @if (showChangePw()) {
+          <div class="overlay" (click)="showChangePw.set(false)">
+            <div class="pw-modal hw-card" (click)="$event.stopPropagation()">
+              <h3>Change password</h3>
+              @if (pwError()) { <div class="note err">{{ pwError() }}</div> }
+              @if (pwOk()) { <div class="note ok">{{ pwOk() }}</div> }
+              <label>Current password</label>
+              <input class="hw-input" type="password" [value]="cur()"
+                     (input)="cur.set($any($event.target).value)" />
+              <label>New password</label>
+              <input class="hw-input" type="password" [value]="nw()"
+                     (input)="nw.set($any($event.target).value)" placeholder="At least 8 characters" />
+              <label>Confirm new password</label>
+              <input class="hw-input" type="password" [value]="nw2()"
+                     (input)="nw2.set($any($event.target).value)" />
+              @if (nw2() && nw() !== nw2()) { <span class="err">Passwords do not match.</span> }
+              <div class="pw-actions">
+                <button class="hw-btn" (click)="showChangePw.set(false)">Cancel</button>
+                <button class="hw-btn hw-btn--primary" [disabled]="!canChangePw() || pwLoading()"
+                        (click)="changePassword()">{{ pwLoading() ? 'Saving…' : 'Update password' }}</button>
+              </div>
+            </div>
+          </div>
+        }
 
         <main class="content">
           <router-outlet />
@@ -139,6 +167,16 @@ export interface NavItem {
     .logout:hover { color: var(--hw-danger); }
 
     .content { flex: 1; overflow-y: auto; padding: 24px; }
+
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: grid; place-items: center; z-index: 60; }
+    .pw-modal { width: 100%; max-width: 400px; padding: 26px 28px; }
+    .pw-modal h3 { margin: 0 0 16px; font-size: 18px; color: var(--hw-text); }
+    .pw-modal label { display: block; font-size: 12px; font-weight: 500; margin: 12px 0 6px; color: var(--hw-text-2); }
+    .pw-modal .err { display: block; color: var(--hw-danger); font-size: 12px; margin-top: 6px; }
+    .note { padding: 9px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 6px; }
+    .note.err { background: rgba(245,63,63,.1); color: var(--hw-danger); }
+    .note.ok { background: rgba(0,168,112,.1); color: var(--hw-success); }
+    .pw-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
   `],
 })
 export class RoleShell {
@@ -161,5 +199,40 @@ export class RoleShell {
   logout() {
     this.auth.logout();
     this.router.navigate(['/login']);
+  }
+
+  // ---- Change own password (PUT /api/auth/password) ----
+  showChangePw = signal(false);
+  cur = signal('');
+  nw = signal('');
+  nw2 = signal('');
+  pwLoading = signal(false);
+  pwError = signal('');
+  pwOk = signal('');
+
+  canChangePw = computed(() =>
+    !!this.cur() && this.nw().length >= 8 && this.nw() === this.nw2());
+
+  openChangePw() {
+    this.cur.set(''); this.nw.set(''); this.nw2.set('');
+    this.pwError.set(''); this.pwOk.set('');
+    this.showChangePw.set(true);
+  }
+
+  changePassword() {
+    this.pwError.set('');
+    this.pwOk.set('');
+    this.pwLoading.set(true);
+    this.auth.changePassword(this.cur(), this.nw()).subscribe({
+      next: () => {
+        this.pwLoading.set(false);
+        this.pwOk.set('Password updated.');
+        this.cur.set(''); this.nw.set(''); this.nw2.set('');
+      },
+      error: (err) => {
+        this.pwLoading.set(false);
+        this.pwError.set(err.error?.error || 'Could not update password. Check your current password.');
+      },
+    });
   }
 }

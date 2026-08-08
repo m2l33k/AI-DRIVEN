@@ -17,7 +17,7 @@ import { CreateUserRequest, UserSummary } from '../../../core/models';
 
     <div class="hw-card toolbar">
       <input class="hw-input search" placeholder="Search by name, username or email…"
-             [value]="query()" (input)="query.set($any($event.target).value)" />
+             [value]="query()" (input)="query.set($any($event.target).value); page.set(1)" />
       <button class="hw-btn" (click)="load()">Refresh</button>
     </div>
 
@@ -30,7 +30,7 @@ import { CreateUserRequest, UserSummary } from '../../../core/models';
           @if (loading()) {
             <tr><td colspan="5" class="empty">Loading…</td></tr>
           } @else {
-            @for (u of filtered(); track u.id) {
+            @for (u of paged(); track u.id) {
               <tr>
                 <td><div class="who"><span class="av">{{ initials(u) }}</span>{{ fullName(u) }}</div></td>
                 <td>{{ u.username }}</td>
@@ -48,6 +48,19 @@ import { CreateUserRequest, UserSummary } from '../../../core/models';
           }
         </tbody>
       </table>
+
+      @if (!loading() && filtered().length) {
+        <div class="pager">
+          <span class="count">
+            {{ rangeStart() }}–{{ rangeEnd() }} of {{ filtered().length }}
+          </span>
+          <div class="pbtns">
+            <button class="mini" [disabled]="page() === 1" (click)="page.set(page() - 1)">Prev</button>
+            <span class="pnum">Page {{ page() }} of {{ totalPages() }}</span>
+            <button class="mini" [disabled]="page() >= totalPages()" (click)="page.set(page() + 1)">Next</button>
+          </div>
+        </div>
+      }
     </div>
 
     @if (showCreate()) {
@@ -103,6 +116,12 @@ import { CreateUserRequest, UserSummary } from '../../../core/models';
     .mini:hover { border-color: var(--hw-red); color: var(--hw-red); }
     .mini.danger:hover { border-color: var(--hw-danger); color: var(--hw-danger); }
     .empty { text-align: center; color: var(--hw-text-3); padding: 32px; }
+    .pager { display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; border-top: 1px solid var(--hw-border); }
+    .pager .count { font-size: 12px; color: var(--hw-text-3); }
+    .pbtns { display: flex; align-items: center; gap: 12px; }
+    .pnum { font-size: 12px; color: var(--hw-text-2); }
+    .mini:disabled { opacity: .5; cursor: default; border-color: var(--hw-border); color: var(--hw-text-3); }
     .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: grid; place-items: center; z-index: 50; }
     .modal { width: 100%; max-width: 520px; padding: 26px 28px; }
     .modal h3 { margin: 0 0 4px; font-size: 18px; }
@@ -117,6 +136,8 @@ export class AdminUsers implements OnInit {
   private users = inject(UsersService);
 
   query = signal('');
+  page = signal(1);
+  readonly pageSize = 10;
   loading = signal(false);
   saving = signal(false);
   banner = signal('');
@@ -137,13 +158,25 @@ export class AdminUsers implements OnInit {
       || u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
   });
 
+  totalPages = computed(() => Math.max(1, Math.ceil(this.filtered().length / this.pageSize)));
+  paged = computed(() => {
+    const start = (Math.min(this.page(), this.totalPages()) - 1) * this.pageSize;
+    return this.filtered().slice(start, start + this.pageSize);
+  });
+  rangeStart = computed(() => (this.filtered().length ? (this.page() - 1) * this.pageSize + 1 : 0));
+  rangeEnd = computed(() => Math.min(this.page() * this.pageSize, this.filtered().length));
+
   ngOnInit() { this.load(); }
 
   load() {
     this.loading.set(true);
     this.error.set('');
     this.users.list().subscribe({
-      next: (list) => { this.all.set(list); this.loading.set(false); },
+      next: (list) => {
+        this.all.set(list);
+        this.loading.set(false);
+        if (this.page() > this.totalPages()) this.page.set(this.totalPages());
+      },
       error: () => { this.loading.set(false); this.error.set('Failed to load users.'); },
     });
   }
