@@ -6,6 +6,17 @@
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "accessTokenLifespan": 900,
+  "smtpServer": {
+    "host": "smtp.gmail.com",
+    "port": "587",
+    "starttls": "true",
+    "ssl": "false",
+    "auth": "true",
+    "from": "${KC_SMTP_USER}",
+    "fromDisplayName": "5GC Platform",
+    "user": "${KC_SMTP_USER}",
+    "password": "${KC_SMTP_PASSWORD}"
+  },
   "roles": {
     "client": {
       "platform-client": [

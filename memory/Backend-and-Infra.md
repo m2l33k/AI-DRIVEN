@@ -1,7 +1,7 @@
 ---
 title: Backend and Infra
 tags: [backend, infra, observability]
-updated: 2026-08-07
+updated: 2026-08-08
 ---
 
 # Backend and Infra
@@ -23,7 +23,8 @@ updated: 2026-08-07
   Gateway, WebFlux). Gateway uses the Eureka discovery locator + explicit routes per service,
   and aggregates each service's Swagger under `/<service-id>/v3/api-docs`.
 - `microservices/` — business microservices:
-  - `auth-service` (port 9001) — Keycloak-backed auth & user management.
+  - `auth-service` (port 9001) — Keycloak-backed auth & user management; state-aware login,
+    first-login password change, OTP self-service reset, emailed temp passwords. See [[Auth-Service]].
   - `roaming-analysis-service` (port 9002) — roaming events + risk scoring. See [[Roaming-Analysis-Service]].
 - `util/` — shared library module.
 - `api-specs/` — OpenAPI contracts.
@@ -46,6 +47,10 @@ updated: 2026-08-07
 - Realm config: `keycloak/platform-realm.json`.
 - Client: `platform-client` (confidential, standard + direct-access grants).
 - Roles & permissions → see [[Roles-and-Permissions]].
+- Full auth API / flows → [[Auth-Service]].
+- **Two separate SMTP setups:** (1) auth-service's own mail (`MAIL_USERNAME`/`MAIL_PASSWORD`,
+  Gmail App Password, from repo-root `.env`) sends OTP + temp-password emails; (2) Keycloak's
+  **realm SMTP** (realm settings) is what actually sends the `send-verify-email` link — still TODO.
 
 ## Observability (from commit `5ab6c0b`, `96edc40`)
 - **Prometheus** — scrapes gateway + eureka.

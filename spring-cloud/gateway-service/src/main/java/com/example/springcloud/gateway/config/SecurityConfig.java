@@ -66,9 +66,10 @@ public class SecurityConfig {
                         .pathMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**").permitAll()
                         .pathMatchers("/*/v3/api-docs", "/*/v3/api-docs/**").permitAll()
 
-                        // Auth service public endpoints (self-service password reset flow)
+                        // Auth service public endpoints (login state flow + self-service password reset)
                         .pathMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/forgot-password",
-                                "/api/auth/verify-otp", "/api/auth/reset-password").permitAll()
+                                "/api/auth/verify-otp", "/api/auth/reset-password",
+                                "/api/auth/first-login/change-password").permitAll()
 
                         // --- IAM: users (PLATFORM_ADMIN) ---
                         .pathMatchers(HttpMethod.GET, "/api/users/**").hasAuthority("PERM_users:read")

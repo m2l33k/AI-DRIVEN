@@ -3,6 +3,8 @@ package io.javatab.microservices.auth.keycloak;
 import io.javatab.microservices.auth.config.KeycloakProperties;
 import io.javatab.microservices.auth.web.dto.CreateUserRequest;
 import io.javatab.microservices.auth.web.dto.UserSummary;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -11,6 +13,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,6 +26,8 @@ import java.util.function.Consumer;
  */
 @Service
 public class KeycloakService {
+
+	private static final Logger log = LoggerFactory.getLogger(KeycloakService.class);
 
 	private final KeycloakProperties props;
 	private final RestClient rest = RestClient.create();
@@ -43,8 +48,13 @@ public class KeycloakService {
 		});
 	}
 
-	/** Create a user and assign a realm role. Admin-only (enforced at controller/gateway). */
-	public void createUser(CreateUserRequest r) {
+	/**
+	 * Create a user, assign a realm role, and set a generated temporary password. The account is
+	 * left with two required actions — {@code VERIFY_EMAIL} then {@code UPDATE_PASSWORD} — and
+	 * Keycloak is asked to send its verification email. Returns the temporary password so the
+	 * caller can email it. Admin-only (enforced at controller/gateway).
+	 */
+	public String createUser(CreateUserRequest r) {
 		String admin = adminToken();
 		// Validate the role first so we never leave a half-created user if it is invalid.
 		Map<String, Object> roleRep = findRealmRole(r.role(), admin);
@@ -58,12 +68,55 @@ public class KeycloakService {
 						"firstName", r.firstName() == null ? "" : r.firstName(),
 						"lastName", r.lastName() == null ? "" : r.lastName(),
 						"enabled", true,
-						"emailVerified", true))
+						"emailVerified", false))
 				.retrieve().toBodilessEntity();
 
 		String id = userId(r.username(), admin);
-		setPassword(id, r.password(), false, admin);
+		String temp = generateTempPassword();
+		setPassword(id, temp, true, admin);
+		setRequiredActions(id, List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"), admin);
 		assignRealmRole(id, roleRep, admin);
+		sendVerifyEmail(id, admin);
+		return temp;
+	}
+
+	/** Ask Keycloak to (re)send its verification email. Non-fatal: logs if realm SMTP is unset. */
+	private void sendVerifyEmail(String id, String admin) {
+		try {
+			rest.put().uri(adminBase() + "/users/" + id + "/send-verify-email")
+					.header("Authorization", "Bearer " + admin)
+					.retrieve().toBodilessEntity();
+		} catch (RestClientResponseException e) {
+			log.error("Keycloak could not send the verification email for user {} (realm SMTP configured?): {}",
+					id, e.getResponseBodyAsString());
+		}
+	}
+
+	/** Current account state used by the login flow to decide EMAIL_VERIFICATION vs PASSWORD_CHANGE. */
+	public UserState getUserState(String username) {
+		String admin = adminToken();
+		Map<String, Object> rep = getUserRep(userId(username, admin), admin);
+		boolean emailVerified = Boolean.TRUE.equals(rep.get("emailVerified"));
+		@SuppressWarnings("unchecked")
+		List<String> actions = (List<String>) rep.getOrDefault("requiredActions", List.of());
+		return new UserState(emailVerified, List.copyOf(actions));
+	}
+
+	/**
+	 * Complete the first-login password change: set a permanent password and clear the
+	 * {@code UPDATE_PASSWORD} required action, leaving any others (e.g. VERIFY_EMAIL) untouched.
+	 */
+	public void completeFirstLoginPasswordChange(String username, String newPassword) {
+		String admin = adminToken();
+		String id = userId(username, admin);
+		setPassword(id, newPassword, false, admin);
+
+		Map<String, Object> rep = getUserRep(id, admin);
+		@SuppressWarnings("unchecked")
+		List<String> current = (List<String>) rep.getOrDefault("requiredActions", List.of());
+		List<String> remaining = new ArrayList<>(current);
+		remaining.remove("UPDATE_PASSWORD");
+		setRequiredActions(id, remaining, admin);
 	}
 
 	/** List users (brief representation). Requires users:read. */
@@ -99,10 +152,15 @@ public class KeycloakService {
 	public String resetForgottenPassword(String username) {
 		String admin = adminToken();
 		String id = userId(username, admin);
-		String temp = "Temp-" + UUID.randomUUID().toString().substring(0, 8) + "!";
+		String temp = generateTempPassword();
 		setPassword(id, temp, true, admin);
 		setRequiredActions(id, List.of("UPDATE_PASSWORD"), admin);
 		return temp;
+	}
+
+	/** Generate a random temporary password that satisfies typical complexity policies. */
+	private String generateTempPassword() {
+		return "Temp-" + UUID.randomUUID().toString().substring(0, 8) + "!";
 	}
 
 	/** Find a user's id by exact email match, if one exists. Used by the OTP reset flow. */
@@ -179,6 +237,13 @@ public class KeycloakService {
 			return Optional.empty();
 		}
 		return Optional.ofNullable((String) users.get(0).get("id"));
+	}
+
+	private Map<String, Object> getUserRep(String id, String admin) {
+		return rest.get().uri(adminBase() + "/users/" + id)
+				.header("Authorization", "Bearer " + admin)
+				.retrieve()
+				.body(new ParameterizedTypeReference<Map<String, Object>>() {});
 	}
 
 	private void setPassword(String id, String value, boolean temporary, String admin) {

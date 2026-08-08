@@ -39,7 +39,14 @@ services:
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
-    command: [ "start-dev" ]
+      # Reuse the same Gmail account as auth-service for realm SMTP (verify-email links).
+      # These fill the ${...} placeholders in platform-realm.json on import.
+      KC_SMTP_USER: ${MAIL_USERNAME:-}
+      KC_SMTP_PASSWORD: ${MAIL_PASSWORD:-}
+    # --import-realm loads platform-realm.json on a fresh instance (skipped if the realm exists).
+    command: [ "start-dev", "--import-realm" ]
+    volumes:
+      - ../keycloak/platform-realm.json:/opt/keycloak/data/import/platform-realm.json:ro
     networks:
       - shared-network
 

@@ -11,6 +11,7 @@ Key notes:
 - `memory/Frontend-Architecture.md`
 - `memory/Frontend-Components.md`
 - `memory/Backend-and-Infra.md`
+- `memory/Auth-Service.md`
 - `memory/Roaming-Analysis-Service.md`
 - `memory/Git-Workflow-and-History.md`
 - `memory/Session-Log.md`

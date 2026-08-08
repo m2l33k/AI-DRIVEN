@@ -19,19 +19,36 @@ public class MailService {
 	}
 
 	public void sendOtp(String to, String code) {
-		SimpleMailMessage msg = new SimpleMailMessage();
-		if (from != null && !from.isBlank()) {
-			msg.setFrom(from);
-		}
-		msg.setTo(to);
-		msg.setSubject("Your password reset code");
-		msg.setText("""
+		send(to, "Your password reset code", """
 				Use the following one-time code to reset your password:
 
 				    %s
 
 				This code expires in 10 minutes. If you did not request a password reset, you can safely ignore this email.
 				""".formatted(code));
+	}
+
+	public void sendTemporaryPassword(String to, String username, String tempPassword) {
+		send(to, "Your account has been created", """
+				An account has been created for you.
+
+				    Username:            %s
+				    Temporary password:  %s
+
+				First, verify your email using the separate verification link we just sent.
+				Then log in with the credentials above — you will be asked to set a new password before
+				you can access the application.
+				""".formatted(username, tempPassword));
+	}
+
+	private void send(String to, String subject, String body) {
+		SimpleMailMessage msg = new SimpleMailMessage();
+		if (from != null && !from.isBlank()) {
+			msg.setFrom(from);
+		}
+		msg.setTo(to);
+		msg.setSubject(subject);
+		msg.setText(body);
 		mailSender.send(msg);
 	}
 }

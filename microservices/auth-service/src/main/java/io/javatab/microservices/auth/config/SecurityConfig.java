@@ -35,7 +35,8 @@ public class SecurityConfig {
 				.csrf(csrf -> csrf.disable())
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/api/auth/login", "/api/auth/forgot-password",
-								"/api/auth/verify-otp", "/api/auth/reset-password").permitAll()
+								"/api/auth/verify-otp", "/api/auth/reset-password",
+								"/api/auth/first-login/change-password").permitAll()
 						.requestMatchers("/actuator/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 						.anyRequest().authenticated())
 				.oauth2ResourceServer(oauth2 -> oauth2

@@ -1,7 +1,7 @@
 ---
 title: Memory Vault — Home
 tags: [index, moc]
-updated: 2026-08-07
+updated: 2026-08-08
 ---
 
 # 🗄️ Memory Vault
@@ -19,6 +19,7 @@ Every note is Markdown with `[[wiki-links]]`, so use the Graph View to navigate.
 - [[Frontend-Architecture]] — Angular app: stack, structure, routing, design system
 - [[Frontend-Components]] — detailed, file-by-file breakdown of every UI component
 - [[Backend-and-Infra]] — microservices, Keycloak, observability, infra tooling
+  - [[Auth-Service]] — login state machine, first-login, OTP reset, user mgmt (port 9001)
   - [[Roaming-Analysis-Service]] — roaming events + risk scoring API (port 9002)
 - [[Git-Workflow-and-History]] — branches, what was deleted, commit rules ⚠️
 - [[Session-Log]] — chronological log of what we did each session

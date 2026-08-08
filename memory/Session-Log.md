@@ -1,13 +1,35 @@
 ---
 title: Session Log
 tags: [log, journal]
-updated: 2026-08-07
+updated: 2026-08-08
 ---
 
 # Session Log
 
 Chronological record of what we did. Newest first. Add an entry whenever you finish
 something meaningful.
+
+## 2026-08-08
+
+### Auth Service — password flows + state-aware login (full detail: [[Auth-Service]])
+- **Self-service reset (OTP):** `/forgot-password` (email → 6-digit OTP via Gmail SMTP),
+  `/verify-otp` (→ single-use reset token), `/reset-password` (token + new permanent password).
+  In-memory `OtpService` + `ResetTokenService`. Added `spring-boot-starter-mail` + `MailService`;
+  `spring.mail.*` reads `MAIL_USERNAME`/`MAIL_PASSWORD` (Gmail App Password) from a gitignored
+  repo-root `.env` loaded by `run.sh`; compose passes them through. `.env.example` added.
+- **Create user:** no longer takes a password — generates a temporary one, sets required actions
+  `[VERIFY_EMAIL, UPDATE_PASSWORD]`, calls Keycloak `send-verify-email` (non-fatal), emails the
+  temp password. Admin direct reset moved to `POST /api/users/{username}/reset-password`.
+- **State-aware login:** `/login` now returns `LoginResponse.status` = `SUCCESS` (with tokens) /
+  `EMAIL_VERIFICATION_REQUIRED` / `PASSWORD_CHANGE_REQUIRED` (+ `firstLoginToken`). New
+  `AuthService` interprets Keycloak's "Account is not fully set up" via `UserState` (Admin API).
+  New `/first-login/change-password` (token + newPassword) sets a permanent password and clears
+  `UPDATE_PASSWORD`. New `FirstLoginTokenService`.
+- **Security wiring:** whitelisted the new public paths in **both** the gateway
+  (`gateway-service` WebFlux `SecurityConfig`) and auth-service `SecurityConfig`. Learned the
+  gateway 401 gotcha (public path must be permitted at the gateway too; stale Swagger token also
+  causes 401 on permitAll paths).
+- Verified: `mvnw -pl microservices/auth-service,spring-cloud/gateway-service compile` → success.
 
 ## 2026-08-07
 

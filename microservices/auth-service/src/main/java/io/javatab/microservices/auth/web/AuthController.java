@@ -1,9 +1,12 @@
 package io.javatab.microservices.auth.web;
 
 import io.javatab.microservices.auth.keycloak.KeycloakService;
+import io.javatab.microservices.auth.service.AuthService;
 import io.javatab.microservices.auth.service.PasswordResetService;
+import io.javatab.microservices.auth.web.dto.FirstLoginChangePasswordRequest;
 import io.javatab.microservices.auth.web.dto.ForgotPasswordRequest;
 import io.javatab.microservices.auth.web.dto.LoginRequest;
+import io.javatab.microservices.auth.web.dto.LoginResponse;
 import io.javatab.microservices.auth.web.dto.ResetPasswordRequest;
 import io.javatab.microservices.auth.web.dto.UpdatePasswordRequest;
 import io.javatab.microservices.auth.web.dto.VerifyOtpRequest;
@@ -28,17 +31,33 @@ import java.util.Map;
 public class AuthController {
 
 	private final KeycloakService keycloak;
+	private final AuthService auth;
 	private final PasswordResetService passwordReset;
 
-	public AuthController(KeycloakService keycloak, PasswordResetService passwordReset) {
+	public AuthController(KeycloakService keycloak, AuthService auth, PasswordResetService passwordReset) {
 		this.keycloak = keycloak;
+		this.auth = auth;
 		this.passwordReset = passwordReset;
 	}
 
-	@Operation(summary = "Log in", description = "Exchange email/password for Keycloak tokens.")
+	@Operation(summary = "Log in",
+			description = "Validates credentials against Keycloak and returns an account-state status: "
+					+ "SUCCESS (with tokens), EMAIL_VERIFICATION_REQUIRED, or PASSWORD_CHANGE_REQUIRED "
+					+ "(with a first-login token for /first-login/change-password).")
 	@PostMapping("/login")
-	public Map<String, Object> login(@Valid @RequestBody LoginRequest request) {
-		return keycloak.login(request.email(), request.password());
+	public LoginResponse login(@Valid @RequestBody LoginRequest request) {
+		return auth.login(request.email(), request.password());
+	}
+
+	@Operation(summary = "First-login password change",
+			description = "Redeems the first-login token from /login and sets a new password, completing "
+					+ "the UPDATE_PASSWORD required action in Keycloak.")
+	@PostMapping("/first-login/change-password")
+	public ResponseEntity<Map<String, String>> firstLoginChangePassword(
+			@Valid @RequestBody FirstLoginChangePasswordRequest request) {
+		auth.completeFirstLogin(request.firstLoginToken(), request.newPassword());
+		return ResponseEntity.ok(Map.of(
+				"message", "Password changed. You can now log in with your new password."));
 	}
 
 	@Operation(summary = "Forgot password (request OTP)",
