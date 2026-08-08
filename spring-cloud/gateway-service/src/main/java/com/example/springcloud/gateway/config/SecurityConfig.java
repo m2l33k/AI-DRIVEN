@@ -70,6 +70,8 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/forgot-password",
                                 "/api/auth/verify-otp", "/api/auth/reset-password",
                                 "/api/auth/first-login/change-password").permitAll()
+                        // Verify-email landing page (browser opens the emailed link, GET)
+                        .pathMatchers(HttpMethod.GET, "/api/auth/verify-email").permitAll()
 
                         // --- IAM: users (PLATFORM_ADMIN) ---
                         .pathMatchers(HttpMethod.GET, "/api/users/**").hasAuthority("PERM_users:read")

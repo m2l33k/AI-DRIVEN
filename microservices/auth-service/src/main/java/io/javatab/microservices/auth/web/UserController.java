@@ -2,6 +2,7 @@ package io.javatab.microservices.auth.web;
 
 import io.javatab.microservices.auth.keycloak.KeycloakService;
 import io.javatab.microservices.auth.mail.MailService;
+import io.javatab.microservices.auth.service.EmailVerificationService;
 import io.javatab.microservices.auth.web.dto.CreateUserRequest;
 import io.javatab.microservices.auth.web.dto.UserSummary;
 import io.swagger.v3.oas.annotations.Operation;
@@ -34,10 +35,12 @@ public class UserController {
 
 	private final KeycloakService keycloak;
 	private final MailService mail;
+	private final EmailVerificationService emailVerification;
 
-	public UserController(KeycloakService keycloak, MailService mail) {
+	public UserController(KeycloakService keycloak, MailService mail, EmailVerificationService emailVerification) {
 		this.keycloak = keycloak;
 		this.mail = mail;
+		this.emailVerification = emailVerification;
 	}
 
 	@Operation(summary = "List users",
@@ -57,6 +60,8 @@ public class UserController {
 	@PostMapping
 	public ResponseEntity<Map<String, String>> createUser(@Valid @RequestBody CreateUserRequest request) {
 		String tempPassword = keycloak.createUser(request);
+		// Verification email (own flow, no Keycloak UI); logs on failure, does not block creation.
+		emailVerification.sendVerificationEmail(request.username(), request.email());
 		try {
 			mail.sendTemporaryPassword(request.email(), request.username(), tempPassword);
 		} catch (MailException e) {
@@ -68,7 +73,7 @@ public class UserController {
 					"temporaryPassword", tempPassword));
 		}
 		return ResponseEntity.status(HttpStatus.CREATED)
-				.body(Map.of("message", "User created; a temporary password has been emailed.",
+				.body(Map.of("message", "User created; temporary password and verification email sent.",
 						"username", request.username()));
 	}
 

@@ -35,6 +35,10 @@ keycloak:
   admin-username: ${KEYCLOAK_ADMIN_USERNAME:admin}
   admin-password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
 
+# Base URL of our own email-verification endpoint; the token is appended as ?token=...
+app:
+  verify-email-url: ${VERIFY_EMAIL_URL:http://localhost:9000/api/auth/verify-email}
+
 eureka:
   client:
     service-url:

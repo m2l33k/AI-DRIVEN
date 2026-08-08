@@ -23,6 +23,7 @@ required actions, sessions, and tokens. See [[Backend-and-Infra]] · [[Roles-and
 | POST | `/api/auth/forgot-password` | public | Email a 6-digit OTP if the email maps to a user (no enumeration) |
 | POST | `/api/auth/verify-otp` | public | Verify OTP → returns a single-use `resetToken` |
 | POST | `/api/auth/reset-password` | public | Redeem `resetToken` + `newPassword` (permanent) |
+| GET | `/api/auth/verify-email?token=` | public | Our own verify link → marks email verified in Keycloak + HTML page |
 | PUT | `/api/auth/password` | bearer | Change own password (verifies current) |
 | GET | `/api/users` | `PERM_users:read` | List realm users |
 | POST | `/api/users` | `PERM_users:write` | Create user + emailed temp password (see below) |
@@ -50,10 +51,19 @@ that, inspects the account via Admin API (`UserState` = emailVerified + required
 
 ## Account creation flow
 `KeycloakService.createUser`: creates the user with `emailVerified=false`, sets a **temporary**
-password, adds required actions `[VERIFY_EMAIL, UPDATE_PASSWORD]`, assigns the realm role, and calls
-Admin API `send-verify-email` (non-fatal — logs if realm SMTP is unset). Returns the temp password;
-`UserController` emails it via `MailService`. Login then drives: verify email → change password →
-normal login.
+password, adds required actions `[VERIFY_EMAIL, UPDATE_PASSWORD]`, assigns the realm role, returns
+the temp password. `UserController` then sends **two emails via our own `MailService`**: the temp
+password, and a verification link (`EmailVerificationService`). Login drives: verify email → change
+password → normal login.
+
+## Email verification — our own flow (no Keycloak UI)
+Keycloak's `send-verify-email` shows Keycloak's themed pages, so we don't use it. Instead:
+`EmailVerificationService.sendVerificationEmail` issues a 24h single-use token
+(`EmailVerificationTokenService`) and emails `${app.verify-email-url}?token=...` (default
+`http://localhost:9000/api/auth/verify-email`). `GET /api/auth/verify-email` consumes the token,
+calls `KeycloakService.markEmailVerified` (Admin API sets `emailVerified=true` + drops
+`VERIFY_EMAIL`), and renders our own confirmation page. **Keycloak realm SMTP is now unused** for
+this (we send it) — it's still configured but only matters if you later use Keycloak-native emails.
 
 ## Self-service reset (OTP) flow
 1. `/forgot-password` {email} → `OtpService` (in-memory, 6-digit, 10-min TTL, ≤5 attempts) + email.
@@ -70,12 +80,10 @@ normal login.
 - Config in `application.yml` `spring.mail.*` reading `MAIL_USERNAME` / `MAIL_PASSWORD` (Gmail App
   Password) from env. Repo-root `.env` (gitignored) is loaded by `run.sh` for local + docker;
   compose passes the vars through to the container. **App password must have no spaces.**
-- Keycloak's **verify-email** is sent by Keycloak itself via **realm SMTP** — now wired to the
-  **same Gmail account**: `platform-realm.json` has an `smtpServer` block with `${KC_SMTP_USER}` /
-  `${KC_SMTP_PASSWORD}` placeholders; `docker-compose-infra.yml` passes `KC_SMTP_*` from `MAIL_*`
-  and imports the realm (`--import-realm`, fresh instances only). For an **already-running** realm,
-  run `keycloak/configure-smtp.ps1` (Windows) or `keycloak/configure-smtp.sh` (WSL/bash, needs
-  `jq`) — both set it live via the Admin API, reading `.env`.
+- Both account-creation emails (temp password + verification link) are sent by **our** SMTP.
+- Keycloak realm SMTP was wired to the same Gmail (`platform-realm.json` `smtpServer` placeholders +
+  `docker-compose-infra.yml` `KC_SMTP_*` + `keycloak/configure-smtp.{ps1,sh}`), but is **no longer
+  required** now that we own the verification flow — keep it only for future Keycloak-native emails.
 
 ## Gotchas learned
 - Temp/required-action accounts **cannot** use the direct password grant until cleared — that's the

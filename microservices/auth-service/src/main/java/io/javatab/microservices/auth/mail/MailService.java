@@ -41,6 +41,18 @@ public class MailService {
 				""".formatted(username, tempPassword));
 	}
 
+	public void sendVerificationLink(String to, String username, String link) {
+		send(to, "Verify your email address", """
+				Hi %s,
+
+				Please verify your email address by opening the link below:
+
+				    %s
+
+				This link expires in 24 hours.
+				""".formatted(username, link));
+	}
+
 	private void send(String to, String subject, String body) {
 		SimpleMailMessage msg = new SimpleMailMessage();
 		if (from != null && !from.isBlank()) {

@@ -3,8 +3,6 @@ package io.javatab.microservices.auth.keycloak;
 import io.javatab.microservices.auth.config.KeycloakProperties;
 import io.javatab.microservices.auth.web.dto.CreateUserRequest;
 import io.javatab.microservices.auth.web.dto.UserSummary;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -26,8 +24,6 @@ import java.util.function.Consumer;
  */
 @Service
 public class KeycloakService {
-
-	private static final Logger log = LoggerFactory.getLogger(KeycloakService.class);
 
 	private final KeycloakProperties props;
 	private final RestClient rest = RestClient.create();
@@ -76,20 +72,28 @@ public class KeycloakService {
 		setPassword(id, temp, true, admin);
 		setRequiredActions(id, List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"), admin);
 		assignRealmRole(id, roleRep, admin);
-		sendVerifyEmail(id, admin);
 		return temp;
 	}
 
-	/** Ask Keycloak to (re)send its verification email. Non-fatal: logs if realm SMTP is unset. */
-	private void sendVerifyEmail(String id, String admin) {
-		try {
-			rest.put().uri(adminBase() + "/users/" + id + "/send-verify-email")
-					.header("Authorization", "Bearer " + admin)
-					.retrieve().toBodilessEntity();
-		} catch (RestClientResponseException e) {
-			log.error("Keycloak could not send the verification email for user {} (realm SMTP configured?): {}",
-					id, e.getResponseBodyAsString());
-		}
+	/**
+	 * Mark the account's email verified and clear the {@code VERIFY_EMAIL} required action.
+	 * Called by our own verification endpoint, so Keycloak's UI is never involved.
+	 */
+	public void markEmailVerified(String username) {
+		String admin = adminToken();
+		String id = userId(username, admin);
+
+		Map<String, Object> rep = getUserRep(id, admin);
+		@SuppressWarnings("unchecked")
+		List<String> current = (List<String>) rep.getOrDefault("requiredActions", List.of());
+		List<String> remaining = new ArrayList<>(current);
+		remaining.remove("VERIFY_EMAIL");
+
+		rest.put().uri(adminBase() + "/users/" + id)
+				.header("Authorization", "Bearer " + admin)
+				.contentType(MediaType.APPLICATION_JSON)
+				.body(Map.of("emailVerified", true, "requiredActions", remaining))
+				.retrieve().toBodilessEntity();
 	}
 
 	/** Current account state used by the login flow to decide EMAIL_VERIFICATION vs PASSWORD_CHANGE. */
