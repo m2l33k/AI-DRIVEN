@@ -113,6 +113,8 @@ public class RoamingAnalysisService {
 		return new RoamingEventDto(
 				e.id(), e.timestamp(), e.direction(), e.partnerPlmn(), e.country(),
 				e.subscribers(), e.signalingErrors(), e.newDeviceRatio(), e.impossibleTravel(),
+				e.dataVolumeGb(), e.avgLatencyMs(), e.throughputMbps(), e.droppedSessionRatio(),
+				e.revenueEur(), e.costEur(),
 				score, RiskLevel.fromScore(score));
 	}
 }

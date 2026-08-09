@@ -13,7 +13,9 @@ Feeds the frontend Security Analyst → Roaming Events page (see [[Frontend-Comp
 - **Base package:** `io.javatab.microservices.roaming`
 - **Port:** `9002` (eureka 8761, gateway 9000, auth 9001)
 - **artifactId:** `roaming-analysis-service`, version `1.0.0-SNAPSHOT`, Java 17, Spring Boot 4.0.3
-- **Status:** ✅ compiles (`mvnw -pl microservices/roaming-analysis-service compile`). In-memory data, no DB yet.
+- **Status:** ✅ compiles. **Persisted in MySQL** (JPA/Hibernate `ddl-auto=update`), seeded on first
+  start. Now has real-time monitoring, anomaly detection, forecasting, QoS/experience, and
+  commercial (agreement/cost/revenue) analytics.
 
 ## Security
 Resource server (JWT via Keycloak realm `auth-management`, client `platform-client`).
@@ -28,6 +30,13 @@ Same authority mapping as auth-service: realm roles → `ROLE_*`, client perms �
 | GET | `/events/{id}` | Single event (404 if missing) |
 | GET | `/summary` | Dashboard aggregates: totals, direction split, risk breakdown, hourly volume series |
 | GET | `/partners` | Per-partner-PLMN roll-up, ordered by avg risk |
+| GET | `/live?windowMinutes=` | ✅ Real-time monitor: active events/subs/rate/risk/revenue + recent |
+| GET | `/anomalies` | ✅ Anomaly detection: flagged events + reasons + severity |
+| GET | `/forecast?hoursAhead=` | ✅ Predict traffic: linear-regression forecast of subs/hour |
+| GET | `/experience` | ✅ Customer experience: per-partner QoS experience score (worst first) |
+| GET | `/qos` | ✅ QoS overview: avg latency/throughput/drop + score + worst partners |
+| GET | `/optimization` | ✅ Optimize agreements + cut costs: per-partner margin + recommendation |
+| GET | `/revenue` | ✅ Increase revenue: revenue/cost/margin/ARPU + top partners |
 
 Reachable via gateway at the same paths; Swagger aggregated under
 `/roaming-analysis-service/v3/api-docs`.
@@ -53,9 +62,22 @@ Clamped to [0,100]. Deliberately simple/explainable — placeholder for a real r
   plus docs route + Swagger aggregation entry.
 - `Dockerfile` (layered, port 9002) + `kubernetes/deployment.yml` & `service.yml`.
 
+## Persistence (MySQL)
+- `RoamingEvent` is now a JPA `@Entity` (table `roaming_events`) with record-style accessors; extra
+  columns: `data_volume_gb`, `avg_latency_ms`, `throughput_mbps`, `dropped_session_ratio`,
+  `revenue_eur`, `cost_eur`. `RoamingEventRepository extends JpaRepository`. `RoamingDataSeeder`
+  (`CommandLineRunner`) seeds ~12 events (QoS/commercial derived from signals) when the table is empty.
+- Config `spring.datasource` → **MySQL**; local `jdbc:mysql://localhost:3307/roaming_db` (user/pass
+  `roaming`/`roaming`), docker profile → `roaming-mysql:3306`. `ddl-auto=update`.
+- **Docker:** `roaming-mysql` (mysql:8.4) added to `docker-compose-infra.yml`, host port **3307**,
+  named volume `roaming-mysql-data`. Deps added: `spring-boot-starter-data-jpa` + `mysql-connector-j`.
+- New analytics live in `service/RoamingInsightsService` (+ `web/dto/*Dto`); heuristic/statistical,
+  explainable — placeholder for real ML.
+
 ## TODO / next
-- Replace in-memory repo with JPA + Postgres (or a streaming source).
-- Wire the frontend Roaming Events page to `/api/roaming/*`.
+- Wire the frontend Roaming Events page + Security dashboard to `/api/roaming/*` (esp. `/live`,
+  `/anomalies`, `/forecast`, `/optimization`).
+- Swap heuristics for real ML models (forecast, anomaly detection) when ready.
 - Tests were intentionally omitted (project currently has no tests).
 
 ## Related notes

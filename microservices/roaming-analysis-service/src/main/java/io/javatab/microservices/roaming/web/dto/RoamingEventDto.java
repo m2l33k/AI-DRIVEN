@@ -16,6 +16,12 @@ public record RoamingEventDto(
 		int signalingErrors,
 		double newDeviceRatio,
 		boolean impossibleTravel,
+		double dataVolumeGb,
+		double avgLatencyMs,
+		double throughputMbps,
+		double droppedSessionRatio,
+		double revenueEur,
+		double costEur,
 		int riskScore,
 		RiskLevel riskLevel
 ) {

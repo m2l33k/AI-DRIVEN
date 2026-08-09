@@ -16,6 +16,7 @@ updated: 2026-08-08
 | Gateway | 9000 |
 | auth-service | 9001 |
 | roaming-analysis-service | 9002 |
+| roaming MySQL | 3307 (host) / 3306 (docker `roaming-mysql`) |
 | Keycloak | 8081 (local) / 8080 (docker) |
 
 ## Microservices / Spring Cloud

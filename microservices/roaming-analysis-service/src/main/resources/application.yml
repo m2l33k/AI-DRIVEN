@@ -7,6 +7,18 @@ spring:
     name: roaming-analysis-service
   lifecycle:
     timeout-per-shutdown-phase: 15s
+  datasource:
+    url: ${ROAMING_DB_URL:jdbc:mysql://localhost:3307/roaming_db?createDatabaseIfNotExist=true&serverTimezone=UTC}
+    username: ${ROAMING_DB_USERNAME:roaming}
+    password: ${ROAMING_DB_PASSWORD:roaming}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+    open-in-view: false
   security:
     oauth2:
       resourceserver:
@@ -49,6 +61,10 @@ spring:
   config:
     activate:
       on-profile: docker
+  datasource:
+    url: jdbc:mysql://roaming-mysql:3306/roaming_db?createDatabaseIfNotExist=true&serverTimezone=UTC
+    username: roaming
+    password: roaming
   security:
     oauth2:
       resourceserver:

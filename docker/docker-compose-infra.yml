@@ -31,6 +31,28 @@ services:
     networks:
       - shared-network
 
+  roaming-mysql:
+    image: "mysql:8.4"
+    container_name: "roaming-mysql"
+    mem_limit: 512m
+    ports:
+      - "3307:3306"
+    environment:
+      - MYSQL_DATABASE=roaming_db
+      - MYSQL_USER=roaming
+      - MYSQL_PASSWORD=roaming
+      - MYSQL_ROOT_PASSWORD=root
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroaming", "-proaming" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - roaming-mysql-data:/var/lib/mysql
+    networks:
+      - shared-network
+
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     container_name: keycloak
@@ -57,3 +79,4 @@ volumes:
   prometheus-data:
   grafana-data:
   loki-data:
+  roaming-mysql-data:

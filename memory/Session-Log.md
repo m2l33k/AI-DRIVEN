@@ -11,6 +11,16 @@ something meaningful.
 
 ## 2026-08-08
 
+### Roaming service — MySQL persistence + business analytics (detail: [[Roaming-Analysis-Service]])
+- Converted `RoamingEvent` to a **JPA entity** (MySQL, table `roaming_events`) with new QoS/commercial
+  columns; `RoamingEventRepository` → `JpaRepository`; `RoamingDataSeeder` seeds on first start.
+  Added `spring-boot-starter-data-jpa` + `mysql-connector-j`; datasource in application.yml
+  (local `localhost:3307`, docker `roaming-mysql:3306`). **Docker:** `roaming-mysql` (mysql:8.4) in
+  `docker-compose-infra.yml`, host port 3307, volume `roaming-mysql-data`.
+- New `RoamingInsightsService` + 7 endpoints covering all 8 asks: `/live` (real-time), `/anomalies`,
+  `/forecast` (linear regression), `/experience`, `/qos`, `/optimization` (agreements + cost),
+  `/revenue`. Heuristic/statistical, explainable. `mvnw compile` → clean.
+
 ### Admin monitoring + gateway metrics endpoint (detail: [[Frontend-Architecture]] · [[Backend-and-Infra]])
 - New admin **System Health** page (`roles/admin/monitoring`): service health (`/infra-health/*`
   dev-proxy → `:port/actuator/health`), **live gateway JVM metrics** (poll `/actuator/metrics/*`,
