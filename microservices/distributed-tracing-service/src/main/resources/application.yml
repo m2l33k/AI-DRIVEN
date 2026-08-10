@@ -7,6 +7,18 @@ spring:
     name: distributed-tracing-service
   lifecycle:
     timeout-per-shutdown-phase: 15s
+  datasource:
+    url: ${TRACING_DB_URL:jdbc:postgresql://localhost:5435/tracing_db}
+    username: ${TRACING_DB_USERNAME:tracing}
+    password: ${TRACING_DB_PASSWORD:tracing}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
 
 eureka:
   client:
@@ -43,6 +55,10 @@ spring:
   config:
     activate:
       on-profile: docker
+  datasource:
+    url: jdbc:postgresql://tracing-postgres:5432/tracing_db
+    username: tracing
+    password: tracing
 eureka:
   client:
     service-url:

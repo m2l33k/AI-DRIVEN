@@ -72,6 +72,128 @@ services:
     networks:
       - shared-network
 
+  # --- Per-service databases (database-per-service pattern) ---
+
+  anomaly-postgres:
+    image: "postgres:17.4"
+    container_name: "anomaly-postgres"
+    mem_limit: 256m
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=anomaly
+      - POSTGRES_PASSWORD=anomaly
+      - POSTGRES_DB=anomaly_db
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - anomaly-postgres-data:/var/lib/postgresql/data
+    networks:
+      - shared-network
+
+  ratelimit-postgres:
+    image: "postgres:17.4"
+    container_name: "ratelimit-postgres"
+    mem_limit: 256m
+    ports:
+      - "5434:5432"
+    environment:
+      - POSTGRES_USER=ratelimit
+      - POSTGRES_PASSWORD=ratelimit
+      - POSTGRES_DB=ratelimit_db
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - ratelimit-postgres-data:/var/lib/postgresql/data
+    networks:
+      - shared-network
+
+  tracing-postgres:
+    image: "postgres:17.4"
+    container_name: "tracing-postgres"
+    mem_limit: 256m
+    ports:
+      - "5435:5432"
+    environment:
+      - POSTGRES_USER=tracing
+      - POSTGRES_PASSWORD=tracing
+      - POSTGRES_DB=tracing_db
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - tracing-postgres-data:/var/lib/postgresql/data
+    networks:
+      - shared-network
+
+  fault-postgres:
+    image: "postgres:17.4"
+    container_name: "fault-postgres"
+    mem_limit: 256m
+    ports:
+      - "5436:5432"
+    environment:
+      - POSTGRES_USER=fault
+      - POSTGRES_PASSWORD=fault
+      - POSTGRES_DB=fault_db
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - fault-postgres-data:/var/lib/postgresql/data
+    networks:
+      - shared-network
+
+  # --- Redis (only for services that need it) ---
+
+  ratelimit-redis:
+    image: "redis:7.4"
+    container_name: "ratelimit-redis"
+    mem_limit: 256m
+    ports:
+      - "6379:6379"
+    command: [ "redis-server", "--appendonly", "yes" ]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ratelimit-redis-data:/data
+    networks:
+      - shared-network
+
+  anomaly-redis:
+    image: "redis:7.4"
+    container_name: "anomaly-redis"
+    mem_limit: 256m
+    ports:
+      - "6380:6379"
+    command: [ "redis-server", "--appendonly", "yes" ]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - anomaly-redis-data:/data
+    networks:
+      - shared-network
+
 networks:
   shared-network:
     driver: bridge
@@ -80,3 +202,9 @@ volumes:
   grafana-data:
   loki-data:
   roaming-mysql-data:
+  anomaly-postgres-data:
+  ratelimit-postgres-data:
+  tracing-postgres-data:
+  fault-postgres-data:
+  ratelimit-redis-data:
+  anomaly-redis-data:

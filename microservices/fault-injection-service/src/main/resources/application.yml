@@ -7,6 +7,18 @@ spring:
     name: fault-injection-service
   lifecycle:
     timeout-per-shutdown-phase: 15s
+  datasource:
+    url: ${FAULT_DB_URL:jdbc:postgresql://localhost:5436/fault_db}
+    username: ${FAULT_DB_USERNAME:fault}
+    password: ${FAULT_DB_PASSWORD:fault}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
 
 eureka:
   client:
@@ -43,6 +55,10 @@ spring:
   config:
     activate:
       on-profile: docker
+  datasource:
+    url: jdbc:postgresql://fault-postgres:5432/fault_db
+    username: fault
+    password: fault
 eureka:
   client:
     service-url:
