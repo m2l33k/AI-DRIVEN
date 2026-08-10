@@ -1,7 +1,7 @@
 ---
 title: Backend and Infra
 tags: [backend, infra, observability]
-updated: 2026-08-08
+updated: 2026-08-10
 ---
 
 # Backend and Infra
@@ -10,12 +10,18 @@ updated: 2026-08-08
 > template below); observability internals still to be dug into.
 
 ## Ports
+Full table (incl. observability + data + URLs) → [[Ports-and-URLs]].
+
 | Component | Port |
 |-----------|------|
 | Eureka server | 8761 |
 | Gateway | 9000 |
 | auth-service | 9001 |
 | roaming-analysis-service | 9002 |
+| anomaly-detection-service | 9003 |
+| rate-limiting-service | 9004 |
+| distributed-tracing-service | 9005 |
+| fault-injection-service | 9006 |
 | roaming MySQL | 3307 (host) / 3306 (docker `roaming-mysql`) |
 | Keycloak | 8081 (local) / 8080 (docker) |
 
@@ -31,6 +37,8 @@ updated: 2026-08-08
   - `auth-service` (port 9001) — Keycloak-backed auth & user management; state-aware login,
     first-login password change, OTP self-service reset, emailed temp passwords. See [[Auth-Service]].
   - `roaming-analysis-service` (port 9002) — roaming events + risk scoring. See [[Roaming-Analysis-Service]].
+  - **4 empty placeholder services** (ports 9003–9006, health-check only) — `anomaly-detection`,
+    `rate-limiting`, `distributed-tracing`, `fault-injection`. See [[Platform-Services]].
 - `util/` — shared library module.
 - `api-specs/` — OpenAPI contracts.
 - Maven multi-module build (root `pom.xml` lists modules; Spring Boot 4.0.3, Java 17,

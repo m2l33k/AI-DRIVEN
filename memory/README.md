@@ -1,7 +1,7 @@
 ---
 title: Memory Vault — Home
 tags: [index, moc]
-updated: 2026-08-08
+updated: 2026-08-10
 ---
 
 # 🗄️ Memory Vault
@@ -14,13 +14,25 @@ Every note is Markdown with `[[wiki-links]]`, so use the Graph View to navigate.
 
 ## 🗺️ Map of content
 
+**Big picture**
 - [[Project-Overview]] — what this system is, the big picture
+- [[Architecture-Decisions]] — the *why* behind the design (ADRs) — read before changing things
+- [[Glossary]] — 5G/telecom + platform terms (PLMN, NF, RBAC, `PERM_*`…)
+- [[Diagrams]] — where the visual model lives (`Noted/diagram/`) and which is current
+
+**Roles & frontend**
 - [[Roles-and-Permissions]] — the 4 Keycloak roles and what each can do
 - [[Frontend-Architecture]] — Angular app: stack, structure, routing, design system
 - [[Frontend-Components]] — detailed, file-by-file breakdown of every UI component
+
+**Backend & infra**
 - [[Backend-and-Infra]] — microservices, Keycloak, observability, infra tooling
+- [[Ports-and-URLs]] — quick reference: every port, URL, and key endpoint
   - [[Auth-Service]] — login state machine, first-login, OTP reset, user mgmt (port 9001)
   - [[Roaming-Analysis-Service]] — roaming events + risk scoring API (port 9002)
+  - [[Platform-Services]] — 4 new placeholder services: anomaly/rate-limit/tracing/fault (9003–9006)
+
+**Process**
 - [[Git-Workflow-and-History]] — branches, what was deleted, commit rules ⚠️
 - [[Session-Log]] — chronological log of what we did each session
 - [[Next-Steps]] — open threads and the backlog

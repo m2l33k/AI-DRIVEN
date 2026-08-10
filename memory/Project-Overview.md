@@ -1,7 +1,7 @@
 ---
 title: Project Overview
 tags: [overview, architecture]
-updated: 2026-08-07
+updated: 2026-08-10
 ---
 
 # Project Overview
@@ -18,7 +18,8 @@ a role-based Angular console on top.
 
 | Area | Tech | Location |
 |------|------|----------|
-| Microservices | Spring Boot | `microservices/`, `spring-cloud/` |
+| Business microservices | Spring Boot | `microservices/` (auth 9001, roaming 9002, + 4 placeholders 9003–9006 — see [[Platform-Services]]) |
+| Platform microservices | Spring Boot | `spring-cloud/` (eureka 8761, gateway 9000) |
 | API gateway | Spring Cloud Gateway | `spring-cloud/gateway-service` |
 | Service discovery | Eureka | `spring-cloud/` |
 | Auth / IAM | Keycloak | `keycloak/platform-realm.json` |
@@ -35,6 +36,9 @@ signalling/roaming threats, admins manage users & platform config, and auditors 
 read-only visibility including audit logs. See [[Roles-and-Permissions]].
 
 ## Related notes
+- [[Architecture-Decisions]] — the why behind the design
+- [[Glossary]] — domain + platform terms
 - [[Frontend-Architecture]]
-- [[Backend-and-Infra]]
+- [[Backend-and-Infra]] · [[Ports-and-URLs]] · [[Platform-Services]]
 - [[Roles-and-Permissions]]
+- [[Diagrams]]

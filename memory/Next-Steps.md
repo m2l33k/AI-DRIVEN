@@ -1,7 +1,7 @@
 ---
 title: Next Steps
 tags: [todo, backlog]
-updated: 2026-08-08
+updated: 2026-08-10
 ---
 
 # Next Steps
@@ -42,12 +42,26 @@ Open threads and backlog. Check items off / move them to [[Session-Log]] when do
 - [ ] Decide whether created users verify email via Keycloak's link or a custom flow.
 
 ## Roaming Analysis Service (see [[Roaming-Analysis-Service]])
-- [ ] Replace in-memory repo with JPA + Postgres (or a streaming/event source).
-- [ ] Wire the frontend Roaming Events page to `/api/roaming/*`.
+- [x] Replace in-memory repo with JPA + **MySQL** (`roaming-mysql` :3307), seeded on first start.
+- [ ] Wire the frontend Roaming Events page to `/api/roaming/*` (esp. `/live`, `/anomalies`, `/forecast`).
+- [ ] Swap heuristics for real ML (forecast, anomaly detection).
 - [ ] Add integration tests once the project reintroduces a test strategy.
 
+## New placeholder services (see [[Platform-Services]])
+Currently health-check only. Give each real logic + a `SecurityConfig` (copy roaming's) and move
+its route off the public whitelist when protected endpoints land.
+- [ ] **anomaly-detection-service** (9003) — real-time anomaly detection; likely centralises the
+      roaming service's heuristic `/anomalies` and swaps in ML.
+- [ ] **rate-limiting-service** (9004) — throttling / abuse protection (Redis token bucket; could
+      back gateway rate-limit filters).
+- [ ] **distributed-tracing-service** (9005) — decide: add a real **Jaeger** container to
+      `docker-compose-observability.yml` (OTLP sink, augment/replace Tempo) or drop the placeholder.
+      See ADR-01 in [[Architecture-Decisions]].
+- [ ] **fault-injection-service** (9006) — chaos testing (latency/errors/NF outages).
+
 ## Docs / memory
-- [ ] Flesh out [[Backend-and-Infra]] once we explore the microservices.
+- [ ] Regenerate `Noted/diagram/` PlantUML + images to include the 4 new services (9003–9006).
+      See [[Diagrams]].
 
 ## Related notes
 - [[Frontend-Architecture]]

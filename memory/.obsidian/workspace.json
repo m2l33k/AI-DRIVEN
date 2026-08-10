@@ -33,12 +33,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Session-Log.md",
+                "file": "Backend-and-Infra.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Session-Log"
+              "title": "Backend-and-Infra"
             }
           }
         ]
@@ -119,7 +119,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Session-Log.md",
+                "file": "Backend-and-Infra.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -209,6 +209,16 @@
   },
   "active": "6fac48bc53ddcdb7",
   "lastOpenFiles": [
+    "Auth-Service.md",
+    "Diagrams.md.tmp.26128.79b96cbfd1fd",
+    "Diagrams.md",
+    "Next-Steps.md",
+    "Glossary.md",
+    "Glossary.md.tmp.26128.243909225c3e",
+    "Architecture-Decisions.md",
+    "Architecture-Decisions.md.tmp.26128.371635191c14",
+    "Backend-and-Infra.md",
+    "Session-Log.md",
     "Roaming-Analysis-Service.md.tmp.22828.0f0566dbf9d5",
     "Frontend-Architecture.md.tmp.22828.8ef938524d26",
     "Next-Steps.md.tmp.22828.7282b3822cc8",
@@ -217,19 +227,11 @@
     "Roaming-Analysis-Service.md",
     "README.md",
     "Project-Overview.md",
-    "Next-Steps.md",
     "Git-Workflow-and-History.md",
     "Frontend-Components.md",
     "Frontend-Architecture.md",
-    "Backend-and-Infra.md",
-    "Auth-Service.md",
     "Next-Steps.md.tmp.22828.5f85fb436a68",
     "Backend-and-Infra.md.tmp.22828.65df2a20cae7",
-    "Session-Log.md.tmp.22828.673d8ff1649c",
-    "README.md.tmp.22828.38bfaeb86e45",
-    "Auth-Service.md.tmp.22828.fc3f313b8b82",
-    "Git-Workflow-and-History.md.tmp.17412.584c63f9a529",
-    "Backend-and-Infra.md.tmp.17412.9b19737e1bea",
-    "Session-Log.md"
+    "Session-Log.md.tmp.22828.673d8ff1649c"
   ]
 }
