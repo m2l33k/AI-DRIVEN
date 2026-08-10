@@ -11,6 +11,24 @@ something meaningful.
 
 ## 2026-08-10
 
+### Four new empty placeholder microservices (health-check only) (detail: [[Backend-and-Infra]])
+- Added 4 empty services mirroring the service template, each with **only** a health endpoint
+  (`GET /api/<slug>/health` → `{status:UP, service, timestamp}`) plus actuator/eureka/springdoc:
+  - `anomaly-detection-service` :9003 → `/api/anomaly` (pkg `io.javatab.microservices.anomaly`)
+  - `rate-limiting-service` :9004 → `/api/protection` (pkg `...ratelimit`)
+  - `distributed-tracing-service` :9005 → `/api/tracing` (pkg `...tracing`; Jaeger facade placeholder)
+  - `fault-injection-service` :9006 → `/api/fault` (pkg `...faultinjection`)
+- **No security/JPA** in these modules (kept lean) — deps: web, eureka-client, actuator,
+  micrometer-prometheus, springdoc. Each has `Dockerfile` (layered) + `kubernetes/deployment.yml`
+  & `service.yml`.
+- Wiring: registered all 4 in root `pom.xml`; added gateway routes + docs routes + Swagger
+  aggregation entries (both default + `docker` profiles); whitelisted the 4 health paths as
+  **public** in the gateway `SecurityConfig` (WebFlux); added all 4 to `docker-compose-base.yml`
+  (fluentd logging, shared-network).
+- Verified: `mvnw compile` on the 4 services + gateway → **EXIT=0**.
+- Note: Jaeger itself (tracing backend) is not yet added to the observability compose — the
+  `distributed-tracing-service` is only a placeholder facade for now.
+
 ### Infrastructure diagrams + service catalogue (detail: [[Backend-and-Infra]])
 - Added a new **`Noted/diagram/`** folder with PlantUML infra design:
   - `infrastructure.puml` — end-to-end Docker `shared-network` topology (client → gateway →

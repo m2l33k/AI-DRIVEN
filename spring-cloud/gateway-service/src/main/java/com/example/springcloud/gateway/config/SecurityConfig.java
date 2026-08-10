@@ -73,6 +73,10 @@ public class SecurityConfig {
                         // Verify-email landing page (browser opens the emailed link, GET)
                         .pathMatchers(HttpMethod.GET, "/api/auth/verify-email").permitAll()
 
+                        // Health checks for the (empty) platform services — public liveness probes
+                        .pathMatchers(HttpMethod.GET, "/api/anomaly/health", "/api/protection/health",
+                                "/api/tracing/health", "/api/fault/health").permitAll()
+
                         // --- Platform metrics overview (from Prometheus) — any authenticated user ---
                         .pathMatchers(HttpMethod.GET, "/api/metrics/**").authenticated()
 

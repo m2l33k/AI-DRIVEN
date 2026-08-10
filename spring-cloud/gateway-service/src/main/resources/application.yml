@@ -44,6 +44,46 @@ spring:
                 - Path=/roaming-analysis-service/v3/api-docs
               filters:
                 - RewritePath=/roaming-analysis-service/(?<segment>.*), /$\{segment}
+            - id: anomaly-detection-service
+              uri: lb://anomaly-detection-service
+              predicates:
+                - Path=/api/anomaly/**
+            - id: anomaly-detection-service-docs
+              uri: lb://anomaly-detection-service
+              predicates:
+                - Path=/anomaly-detection-service/v3/api-docs
+              filters:
+                - RewritePath=/anomaly-detection-service/(?<segment>.*), /$\{segment}
+            - id: rate-limiting-service
+              uri: lb://rate-limiting-service
+              predicates:
+                - Path=/api/protection/**
+            - id: rate-limiting-service-docs
+              uri: lb://rate-limiting-service
+              predicates:
+                - Path=/rate-limiting-service/v3/api-docs
+              filters:
+                - RewritePath=/rate-limiting-service/(?<segment>.*), /$\{segment}
+            - id: distributed-tracing-service
+              uri: lb://distributed-tracing-service
+              predicates:
+                - Path=/api/tracing/**
+            - id: distributed-tracing-service-docs
+              uri: lb://distributed-tracing-service
+              predicates:
+                - Path=/distributed-tracing-service/v3/api-docs
+              filters:
+                - RewritePath=/distributed-tracing-service/(?<segment>.*), /$\{segment}
+            - id: fault-injection-service
+              uri: lb://fault-injection-service
+              predicates:
+                - Path=/api/fault/**
+            - id: fault-injection-service-docs
+              uri: lb://fault-injection-service
+              predicates:
+                - Path=/fault-injection-service/v3/api-docs
+              filters:
+                - RewritePath=/fault-injection-service/(?<segment>.*), /$\{segment}
 
 eureka:
   client:
@@ -113,6 +153,14 @@ springdoc:
         url: /auth-service/v3/api-docs
       - name: roaming-analysis-service
         url: /roaming-analysis-service/v3/api-docs
+      - name: anomaly-detection-service
+        url: /anomaly-detection-service/v3/api-docs
+      - name: rate-limiting-service
+        url: /rate-limiting-service/v3/api-docs
+      - name: distributed-tracing-service
+        url: /distributed-tracing-service/v3/api-docs
+      - name: fault-injection-service
+        url: /fault-injection-service/v3/api-docs
 ---
 app:
   jwk-set-uri: http://keycloak:8080/realms/auth-management/protocol/openid-connect/certs
@@ -145,6 +193,46 @@ spring:
                 - Path=/roaming-analysis-service/v3/api-docs
               filters:
                 - RewritePath=/roaming-analysis-service/(?<segment>.*), /$\{segment}
+            - id: anomaly-detection-service
+              uri: lb://anomaly-detection-service
+              predicates:
+                - Path=/api/anomaly/**
+            - id: anomaly-detection-service-docs
+              uri: lb://anomaly-detection-service
+              predicates:
+                - Path=/anomaly-detection-service/v3/api-docs
+              filters:
+                - RewritePath=/anomaly-detection-service/(?<segment>.*), /$\{segment}
+            - id: rate-limiting-service
+              uri: lb://rate-limiting-service
+              predicates:
+                - Path=/api/protection/**
+            - id: rate-limiting-service-docs
+              uri: lb://rate-limiting-service
+              predicates:
+                - Path=/rate-limiting-service/v3/api-docs
+              filters:
+                - RewritePath=/rate-limiting-service/(?<segment>.*), /$\{segment}
+            - id: distributed-tracing-service
+              uri: lb://distributed-tracing-service
+              predicates:
+                - Path=/api/tracing/**
+            - id: distributed-tracing-service-docs
+              uri: lb://distributed-tracing-service
+              predicates:
+                - Path=/distributed-tracing-service/v3/api-docs
+              filters:
+                - RewritePath=/distributed-tracing-service/(?<segment>.*), /$\{segment}
+            - id: fault-injection-service
+              uri: lb://fault-injection-service
+              predicates:
+                - Path=/api/fault/**
+            - id: fault-injection-service-docs
+              uri: lb://fault-injection-service
+              predicates:
+                - Path=/fault-injection-service/v3/api-docs
+              filters:
+                - RewritePath=/fault-injection-service/(?<segment>.*), /$\{segment}
   security:
     oauth2:
       resourceserver:

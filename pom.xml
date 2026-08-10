@@ -24,5 +24,9 @@
         <module>spring-cloud/gateway-service</module>
         <module>microservices/auth-service</module>
         <module>microservices/roaming-analysis-service</module>
+        <module>microservices/anomaly-detection-service</module>
+        <module>microservices/rate-limiting-service</module>
+        <module>microservices/distributed-tracing-service</module>
+        <module>microservices/fault-injection-service</module>
     </modules>
 </project>

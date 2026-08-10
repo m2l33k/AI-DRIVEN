@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rate-limiting-service
+  labels:
+    app: rate-limiting-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rate-limiting-service
+  template:
+    metadata:
+      labels:
+        app: rate-limiting-service
+    spec:
+      containers:
+        - name: rate-limiting-service
+          image: rate-limiting-service
+          imagePullPolicy: IfNotPresent
+          lifecycle:
+            preStop:
+              exec:
+                command: [ "sh", "-c", "sleep 5" ]
+          ports:
+            - containerPort: 9004
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              value: http://eureka-server:8761/eureka/

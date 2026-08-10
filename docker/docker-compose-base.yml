@@ -34,6 +34,74 @@ services:
     networks:
       - shared-network
 
+  anomaly-detection-service:
+    build: ../microservices/anomaly-detection-service
+    mem_limit: 512m
+    ports:
+      - "9003:9003"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+    networks:
+      - shared-network
+
+  rate-limiting-service:
+    build: ../microservices/rate-limiting-service
+    mem_limit: 512m
+    ports:
+      - "9004:9004"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+    networks:
+      - shared-network
+
+  distributed-tracing-service:
+    build: ../microservices/distributed-tracing-service
+    mem_limit: 512m
+    ports:
+      - "9005:9005"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+    networks:
+      - shared-network
+
+  fault-injection-service:
+    build: ../microservices/fault-injection-service
+    mem_limit: 512m
+    ports:
+      - "9006:9006"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: 127.0.0.1:24224
+    networks:
+      - shared-network
+
   gateway-service:
     build: ../spring-cloud/gateway-service
     mem_limit: 512m

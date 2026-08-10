@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rate-limiting-service
+  labels:
+    app: rate-limiting-service
+spec:
+  type: ClusterIP
+  selector:
+    app: rate-limiting-service
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 9004
