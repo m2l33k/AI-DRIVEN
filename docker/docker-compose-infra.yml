@@ -53,6 +53,29 @@ services:
     networks:
       - shared-network
 
+  # Dedicated Postgres so Keycloak data (users, realm changes) survives restarts and
+  # `infra.sh down` (only wiped by `down -v`). Replaces the ephemeral embedded H2.
+  keycloak-postgres:
+    image: "postgres:17.4"
+    container_name: "keycloak-postgres"
+    mem_limit: 256m
+    ports:
+      - "5437:5432"
+    environment:
+      - POSTGRES_USER=keycloak
+      - POSTGRES_PASSWORD=keycloak
+      - POSTGRES_DB=keycloak_db
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - keycloak-postgres-data:/var/lib/postgresql/data
+    networks:
+      - shared-network
+
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     container_name: keycloak
@@ -61,12 +84,20 @@ services:
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
+      # Persist to the dedicated Postgres instead of the container-local H2.
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak_db
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
       # Reuse the same Gmail account as auth-service for realm SMTP (verify-email links).
       # These fill the ${...} placeholders in platform-realm.json on import.
       KC_SMTP_USER: ${MAIL_USERNAME:-}
       KC_SMTP_PASSWORD: ${MAIL_PASSWORD:-}
-    # --import-realm loads platform-realm.json on a fresh instance (skipped if the realm exists).
+    # --import-realm loads platform-realm.json on a fresh DB (skipped once the realm exists).
     command: [ "start-dev", "--import-realm" ]
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
     volumes:
       - ../keycloak/platform-realm.json:/opt/keycloak/data/import/platform-realm.json:ro
     networks:
@@ -202,6 +233,7 @@ volumes:
   grafana-data:
   loki-data:
   roaming-mysql-data:
+  keycloak-postgres-data:
   anomaly-postgres-data:
   ratelimit-postgres-data:
   tracing-postgres-data:

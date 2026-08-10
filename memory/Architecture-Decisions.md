@@ -9,6 +9,20 @@ updated: 2026-08-10
 The **why** behind the design — the non-obvious choices, and their trade-offs. Read this before
 proposing a change so you don't undo a deliberate decision. Newest first.
 
+## ADR-10 · Keycloak persisted to its own Postgres (not H2)
+**Decision:** Keycloak runs `start-dev` but with `KC_DB=postgres` pointing at a dedicated
+`keycloak-postgres` container (host 5437, DB `keycloak_db`, named volume `keycloak-postgres-data`).
+Added `depends_on: keycloak-postgres (healthy)`.
+**Why:** `start-dev` defaults to **embedded H2 inside the container** — so users and runtime realm
+changes were lost on `infra.sh down` (the container has no data volume). Postgres + volume makes
+that data survive restarts and `down` (only wiped by `down -v`), consistent with ADR-09.
+**Config-as-code safety net:** `keycloak/export-realm.{ps1,sh}` exports the running realm (incl.
+users) to `keycloak/platform-realm.json`, which is re-imported on a fresh DB (`--import-realm`) —
+so realm structure survives even `down -v` / fresh clones. **Caveat:** the export hardcodes SMTP
+values; restore the `${KC_SMTP_*}` placeholders before committing (don't commit secrets).
+**Trade-off:** one more container; realm-config is code but runtime *users* still depend on the
+Postgres volume unless also captured in the realm JSON.
+
 ## ADR-09 · Database-per-service (dedicated Postgres; Redis where needed)
 **Decision:** each of the four [[Platform-Services|placeholder services]] owns a **dedicated
 Postgres container** (`anomaly/ratelimit/tracing/fault-postgres`, host ports 5433–5436). Redis is

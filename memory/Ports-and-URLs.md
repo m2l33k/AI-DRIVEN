@@ -28,6 +28,7 @@ row here. Local = running on the host; docker = the container name on `shared-ne
 | Component | Local | Docker | Notes |
 |-----------|-------|--------|-------|
 | Keycloak | `8081` | `keycloak:8080` | realm `auth-management`, client `platform-client` |
+| keycloak Postgres | `5437` | `keycloak-postgres:5432` | DB `keycloak_db`, user/pass `keycloak` — persists Keycloak data |
 | roaming MySQL | `3307` | `roaming-mysql:3306` | DB `roaming_db`, user/pass `roaming`/`roaming` |
 | anomaly Postgres | `5433` | `anomaly-postgres:5432` | DB `anomaly_db`, user/pass `anomaly` |
 | ratelimit Postgres | `5434` | `ratelimit-postgres:5432` | DB `ratelimit_db`, user/pass `ratelimit` |

@@ -82,6 +82,14 @@ this (we send it) — it's still configured but only matters if you later use Ke
 - **`listUsers`** maps Keycloak's `createdTimestamp` into `UserSummary` (used by the admin dashboard's
   user-growth curve). Brief representation includes it.
 
+## Keycloak persistence (added 2026-08-10)
+Keycloak is now backed by a **dedicated Postgres** (`keycloak-postgres`, host 5437, DB
+`keycloak_db`) with a named volume — **not** the old ephemeral embedded H2. So users + realm
+changes survive `infra.sh down` (only `down -v` wipes them). See ADR-10 in [[Architecture-Decisions]].
+**Config-as-code:** run `keycloak/export-realm.{ps1,sh}` after realm changes to dump the realm
+(incl. users) into `platform-realm.json` (re-imported on a fresh DB). Caveat: restore the
+`${KC_SMTP_*}` placeholders after export before committing. See [[Ports-and-URLs]].
+
 ## Email (our SMTP, separate from Keycloak's)
 - `spring-boot-starter-mail` + `mail/MailService` (`sendOtp`, `sendTemporaryPassword`).
 - Config in `application.yml` `spring.mail.*` reading `MAIL_USERNAME` / `MAIL_PASSWORD` (Gmail App

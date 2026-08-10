@@ -11,6 +11,17 @@ something meaningful.
 
 ## 2026-08-10
 
+### Keycloak now persisted to Postgres (stop losing users/realm changes) (detail: [[Auth-Service]] · ADR-10)
+- **Problem:** `start-dev` used embedded **H2 inside the container** (no volume) → users + runtime
+  realm changes were lost on `infra.sh down`.
+- **Fix:** added dedicated **`keycloak-postgres`** (host 5437, DB `keycloak_db`, volume
+  `keycloak-postgres-data`); wired Keycloak with `KC_DB=postgres` + `KC_DB_URL/USERNAME/PASSWORD`
+  + `depends_on: keycloak-postgres (healthy)`. Now data survives restarts + `down` (not `down -v`).
+- **Config-as-code:** added `keycloak/export-realm.ps1` + `.sh` — `kc.sh export` (incl. users) →
+  `platform-realm.json`, re-imported on a fresh DB. Caveat noted: export hardcodes SMTP, restore
+  `${KC_SMTP_*}` placeholders before committing.
+- Verified: `docker compose -f docker-compose-infra.yml config` → valid.
+
 ### Per-service databases for the 4 placeholders (detail: [[Platform-Services]] · ADR-09 in [[Architecture-Decisions]])
 - **Database-per-service:** gave each new service its **own dedicated Postgres** container
   (`anomaly-postgres` 5433, `ratelimit-postgres` 5434, `tracing-postgres` 5435, `fault-postgres`
