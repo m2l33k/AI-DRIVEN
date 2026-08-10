@@ -25,6 +25,9 @@ something meaningful.
   `fluent-bit` :24224), and the Angular 22 `Frontend/`.
 - The pre-existing `Noted/uml/` diagrams (deployment/component) predate the roaming service and
   MySQL — the new `Noted/diagram/` set is the current source of truth for infra.
+- User exported the rendered diagrams to **`Noted/Assets/`**: `infra 5GC.png` (infrastructure
+  topology) + `service infra.svg` (service catalogue). Both are embedded in
+  `Noted/diagram/README.md` (paths URL-encoded, `%20` for the spaces).
 
 ## 2026-08-08
 

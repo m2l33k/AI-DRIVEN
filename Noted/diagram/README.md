@@ -10,6 +10,14 @@ management platform and the full list of services in the design.
 | [`infrastructure.puml`](infrastructure.puml) | End-to-end infra / deployment topology on the Docker `shared-network`: client → gateway → microservices → identity → data stores → observability. |
 | [`services.puml`](services.puml) | Service catalogue — every service/container, grouped by tier, with ports and source paths. |
 
+## Rendered diagrams
+
+### Infrastructure — deployment topology
+![Infrastructure](../Assets/infra%205GC.png)
+
+### Service catalogue
+![Services](../Assets/service%20infra.svg)
+
 ## How to render
 
 - **VS Code**: PlantUML extension → `Alt+D` to preview.
