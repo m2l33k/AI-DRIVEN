@@ -1,0 +1,101 @@
+@startuml infrastructure
+' =====================================================================
+'  5G Core Telecom Management Platform — Infrastructure / Deployment
+'  Reflects docker/docker-compose-*.yml + spring-cloud + microservices
+' =====================================================================
+title 5G Core Platform — Infrastructure Design (Docker Compose topology)
+
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam componentStyle rectangle
+skinparam rectangle {
+  BorderColor #444444
+}
+
+actor "Operator / Analyst /\nAdmin / Auditor" as User
+
+package "Client Tier" {
+  [Angular 22 Console\n(Frontend/)] as SPA
+  [Browser / curl / Bruno] as Tools
+}
+
+node "Docker network: shared-network" as net {
+
+  package "Edge (Spring Cloud)" {
+    component "gateway-service\n:9000\nSpring Cloud Gateway (WebFlux)\nOAuth2 RS + RBAC\nGET /api/metrics/overview" as GW
+    component "eureka-server\n:8761\nService Discovery" as EUREKA
+  }
+
+  package "Business Microservices" {
+    component "auth-service\n:9001\nKeycloak-backed auth\n& user management" as AUTH
+    component "roaming-analysis-service\n:9002\n5G roaming events\n+ risk scoring / analytics" as ROAM
+  }
+
+  component "util\n(shared library)" as UTIL
+
+  package "Identity" {
+    component "keycloak\n:8081 -> 8080\nrealm: auth-management\nclient: platform-client" as KC
+  }
+
+  package "Data Stores" {
+    database "roaming-mysql\n:3307 -> 3306\n(roaming_db)" as MYSQL
+    database "postgres :5432\n(legacy / optional)" as PG
+    database "mongodb :27017\n(legacy / optional)" as MONGO
+  }
+
+  package "Observability Stack" {
+    component "prometheus\n:9090\n(metrics scrape)" as PROM
+    component "grafana\n:3000\n(dashboards)" as GRAF
+    component "loki\n:3100\n(logs)" as LOKI
+    component "tempo\n:4317/4318/3200\n(traces, OTLP)" as TEMPO
+    component "fluent-bit\n:24224\n(log shipping)" as FB
+  }
+}
+
+' ---- User / client flows ----
+User --> SPA
+User --> Tools
+SPA --> GW : HTTPS + Bearer JWT
+Tools --> GW : :9000
+SPA ..> KC : login redirect / token
+Tools ..> KC : :8081 (admin)
+User --> GRAF : :3000
+
+' ---- Gateway routing ----
+GW --> AUTH : lb://auth-service\n/api/auth, /api/users
+GW --> ROAM : lb://roaming-analysis-service\n/api/roaming/**
+GW ..> EUREKA : register / discover
+AUTH ..> EUREKA : register
+ROAM ..> EUREKA : register
+
+' ---- Identity ----
+GW --> KC : validate JWT (JWK set)
+AUTH --> KC : password grant\n+ Admin REST API
+ROAM --> KC : validate JWT (JWK set)
+
+' ---- Shared lib ----
+AUTH ..> UTIL : uses
+ROAM ..> UTIL : uses
+
+' ---- Persistence ----
+ROAM --> MYSQL : JPA / Hibernate
+
+' ---- Observability ----
+GW ..> FB : logs (fluentd driver)
+AUTH ..> FB : logs
+ROAM ..> FB : logs
+EUREKA ..> FB : logs
+FB --> LOKI : push logs
+GW --> TEMPO : OTLP traces
+AUTH --> TEMPO : OTLP traces
+ROAM --> TEMPO : OTLP traces
+PROM --> GW : scrape /actuator/prometheus
+PROM --> AUTH : scrape /actuator/prometheus
+PROM --> ROAM : scrape /actuator/prometheus
+PROM --> EUREKA : scrape /actuator/prometheus
+GW --> PROM : GET /api/metrics/overview\n(query PromQL)
+GRAF --> PROM : query metrics
+GRAF --> LOKI : query logs
+GRAF --> TEMPO : query traces
+
+@enduml

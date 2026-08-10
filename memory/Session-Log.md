@@ -9,6 +9,23 @@ updated: 2026-08-08
 Chronological record of what we did. Newest first. Add an entry whenever you finish
 something meaningful.
 
+## 2026-08-10
+
+### Infrastructure diagrams + service catalogue (detail: [[Backend-and-Infra]])
+- Added a new **`Noted/diagram/`** folder with PlantUML infra design:
+  - `infrastructure.puml` — end-to-end Docker `shared-network` topology (client → gateway →
+    microservices → identity → data stores → observability), reflecting the real
+    `docker/docker-compose-*.yml`.
+  - `services.puml` — full service catalogue grouped by tier, with ports + source paths.
+  - `README.md` — render instructions + a table listing **all services in the design**.
+- Services in the design (see the diagram README): `eureka-server` :8761, `gateway-service` :9000,
+  `auth-service` :9001, `roaming-analysis-service` :9002, `util` (lib), `keycloak` :8081→8080,
+  `roaming-mysql` :3307→3306 (active), `postgres` :5432 + `mongodb` :27017 (legacy/optional),
+  observability (`prometheus` :9090, `grafana` :3000, `loki` :3100, `tempo` :4317/4318/3200,
+  `fluent-bit` :24224), and the Angular 22 `Frontend/`.
+- The pre-existing `Noted/uml/` diagrams (deployment/component) predate the roaming service and
+  MySQL — the new `Noted/diagram/` set is the current source of truth for infra.
+
 ## 2026-08-08
 
 ### Roaming service — MySQL persistence + business analytics (detail: [[Roaming-Analysis-Service]])

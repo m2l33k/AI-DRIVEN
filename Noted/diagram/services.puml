@@ -1,0 +1,41 @@
+@startuml services
+' =====================================================================
+'  Services catalogue — every service/container in the design
+' =====================================================================
+title 5G Core Platform — Service Catalogue
+
+skinparam shadowing false
+skinparam defaultTextAlignment left
+skinparam componentStyle rectangle
+
+package "Application Services (Java / Spring Boot 4, Java 17)" #E8F0FE {
+  component "eureka-server\nspring-cloud/eureka-server\nport 8761 — service discovery" as EUREKA
+  component "gateway-service\nspring-cloud/gateway-service\nport 9000 — API gateway, RBAC, metrics" as GW
+  component "auth-service\nmicroservices/auth-service\nport 9001 — auth + user mgmt (Keycloak)" as AUTH
+  component "roaming-analysis-service\nmicroservices/roaming-analysis-service\nport 9002 — roaming events + risk/analytics" as ROAM
+  component "util\nutil/\nshared library (no port)" as UTIL
+}
+
+package "Identity" #FEF7E0 {
+  component "keycloak\nport 8081->8080\nrealm auth-management / platform-client" as KC
+}
+
+package "Data Stores" #E6F4EA {
+  database "roaming-mysql\nport 3307->3306 (mysql:8.4)\nDB roaming_db — active" as MYSQL
+  database "postgres\nport 5432 (postgres:17.4)\nlegacy / optional" as PG
+  database "mongodb\nport 27017 (mongo:6.0.4)\nlegacy / optional" as MONGO
+}
+
+package "Observability" #FCE8E6 {
+  component "prometheus  :9090" as PROM
+  component "grafana     :3000" as GRAF
+  component "loki        :3100" as LOKI
+  component "tempo       :4317/4318/3200" as TEMPO
+  component "fluent-bit  :24224" as FB
+}
+
+package "Client" #F3E8FD {
+  component "Frontend\nFrontend/ — Angular 22 console" as SPA
+}
+
+@enduml

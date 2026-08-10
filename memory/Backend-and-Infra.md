@@ -68,6 +68,12 @@ updated: 2026-08-08
 - `Tiltfile` — local dev orchestration.
 - Scripts: `run.sh`, `infra.sh`, `build-images.sh`, `create-project.sh`.
 
+## Infra diagrams (source of truth)
+- **`Noted/diagram/`** — current PlantUML infra design (added 2026-08-10):
+  `infrastructure.puml` (deployment topology), `services.puml` (service catalogue),
+  `README.md` (render steps + full service table). Reflects roaming-analysis-service + MySQL.
+- `Noted/uml/` — older deployment/component diagrams (predate roaming service/MySQL).
+
 ## Related notes
 - [[Project-Overview]]
 - [[Git-Workflow-and-History]]

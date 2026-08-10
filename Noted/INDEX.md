@@ -7,7 +7,8 @@ Complete documentation for the **Auth Management System** Spring Cloud microserv
 | Path | What it is |
 |------|-----------|
 | [`README.md`](README.md) | **Deep-dive documentation** — architecture, modules, full auth/RBAC workflow, running the platform, end-to-end curl walkthrough, and how to extend it |
-| [`uml/`](uml/) | **UML diagrams** (PlantUML `.puml` + a GitHub-renderable Mermaid mirror) |
+| [`diagram/`](diagram/) | **Infrastructure design** (PlantUML) — `infrastructure.puml`, `services.puml`, and a full service-catalogue README. Current source of truth for infra. |
+| [`uml/`](uml/) | **UML diagrams** (PlantUML `.puml` + a GitHub-renderable Mermaid mirror) — older, predates the roaming service |
 | [`uml/README.md`](uml/README.md) | Index of the diagrams and how to render them |
 | [`uml/diagrams.mermaid.md`](uml/diagrams.mermaid.md) | All diagrams in Mermaid — renders inline on GitHub |
 | [`report/report.md`](report/report.md) | **Project report** with the **"Starter"** chapter (objectives, design, decisions, trade-offs) |
