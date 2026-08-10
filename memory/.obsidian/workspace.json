@@ -205,6 +205,11 @@
   },
   "active": "323760985b7783df",
   "lastOpenFiles": [
+    "Next-Steps.md.tmp.26128.aff25d314427",
+    "Session-Log.md.tmp.26128.d06bdcc335f0",
+    "Architecture-Decisions.md.tmp.26128.8f94df4c5872",
+    "Ports-and-URLs.md.tmp.26128.a9b5d6468c3e",
+    "Platform-Services.md.tmp.26128.33cfc91981d2",
     "Roles-and-Permissions.md",
     "Session-Log.md",
     "Ports-and-URLs.md",
@@ -223,13 +228,9 @@
     "Roaming-Analysis-Service.md.tmp.22828.0f0566dbf9d5",
     "Frontend-Architecture.md.tmp.22828.8ef938524d26",
     "Next-Steps.md.tmp.22828.7282b3822cc8",
-    "Backend-and-Infra.md.tmp.22828.05083c6905c9",
     "Roaming-Analysis-Service.md",
     "README.md",
     "Project-Overview.md",
-    "Git-Workflow-and-History.md",
-    "Next-Steps.md.tmp.22828.5f85fb436a68",
-    "Backend-and-Infra.md.tmp.22828.65df2a20cae7",
-    "Session-Log.md.tmp.22828.673d8ff1649c"
+    "Git-Workflow-and-History.md"
   ]
 }

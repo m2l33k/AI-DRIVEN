@@ -29,7 +29,13 @@ row here. Local = running on the host; docker = the container name on `shared-ne
 |-----------|-------|--------|-------|
 | Keycloak | `8081` | `keycloak:8080` | realm `auth-management`, client `platform-client` |
 | roaming MySQL | `3307` | `roaming-mysql:3306` | DB `roaming_db`, user/pass `roaming`/`roaming` |
-| Postgres | `5432` | `postgres:5432` | legacy / optional |
+| anomaly Postgres | `5433` | `anomaly-postgres:5432` | DB `anomaly_db`, user/pass `anomaly` |
+| ratelimit Postgres | `5434` | `ratelimit-postgres:5432` | DB `ratelimit_db`, user/pass `ratelimit` |
+| tracing Postgres | `5435` | `tracing-postgres:5432` | DB `tracing_db`, user/pass `tracing` |
+| fault Postgres | `5436` | `fault-postgres:5432` | DB `fault_db`, user/pass `fault` |
+| ratelimit Redis | `6379` | `ratelimit-redis:6379` | rate-limit counters |
+| anomaly Redis | `6380` | `anomaly-redis:6379` | real-time windows |
+| Postgres (shared) | `5432` | `postgres:5432` | legacy / optional (`course_db`) |
 | MongoDB | `27017` | `mongodb:27017` | legacy / optional |
 
 ## Observability

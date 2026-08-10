@@ -11,6 +11,18 @@ something meaningful.
 
 ## 2026-08-10
 
+### Per-service databases for the 4 placeholders (detail: [[Platform-Services]] · ADR-09 in [[Architecture-Decisions]])
+- **Database-per-service:** gave each new service its **own dedicated Postgres** container
+  (`anomaly-postgres` 5433, `ratelimit-postgres` 5434, `tracing-postgres` 5435, `fault-postgres`
+  5436; DBs `<name>_db`, user/pass = name). Added **Redis** only where needed: `anomaly-redis`
+  (6380) + `ratelimit-redis` (6379). All in `docker/docker-compose-infra.yml` (+ named volumes).
+- Deps per service: `spring-boot-starter-data-jpa` + `postgresql`; anomaly & rate-limiting also
+  `spring-boot-starter-data-redis`. `application.yml` datasource (+redis) with default → localhost
+  and `docker` profile → container hostnames. JPA `ddl-auto=update`, no entities yet.
+- **No cross-file `depends_on`** (DBs in infra compose, services in base compose, started
+  separately) — start `./infra.sh up` first. Verified: `mvnw compile` on all 4 → **EXIT=0**;
+  `docker compose -f docker-compose-infra.yml config` → valid.
+
 ### Four new empty placeholder microservices (health-check only) (detail: [[Backend-and-Infra]])
 - Added 4 empty services mirroring the service template, each with **only** a health endpoint
   (`GET /api/<slug>/health` → `{status:UP, service, timestamp}`) plus actuator/eureka/springdoc:

@@ -23,6 +23,26 @@ logic lands. See the roadmap per service below.
 Each health endpoint returns `{ "status": "UP", "service": "<name>", "timestamp": "<ISO>" }`.
 Actuator (`/actuator/health`, `/actuator/prometheus`) is also exposed.
 
+## Per-service datastores (database-per-service, added 2026-08-10)
+Each service owns a **dedicated Postgres** container; Redis added only where needed. Defined in
+`docker/docker-compose-infra.yml` (bring up with `./infra.sh up` **before** the services). JPA
+`ddl-auto=update` — no entities yet, so no tables are created until real logic lands. Redis is
+lazy (Lettuce), so it won't block startup; Postgres **is** required at startup.
+
+| Service | Postgres (container / host port / db / user·pass) | Redis (container / host port) |
+|---------|--------------------------------------------------|-------------------------------|
+| anomaly-detection | `anomaly-postgres` / 5433 / `anomaly_db` / `anomaly` | `anomaly-redis` / 6380 |
+| rate-limiting | `ratelimit-postgres` / 5434 / `ratelimit_db` / `ratelimit` | `ratelimit-redis` / 6379 |
+| distributed-tracing | `tracing-postgres` / 5435 / `tracing_db` / `tracing` | — (traces go to a backend) |
+| fault-injection | `fault-postgres` / 5436 / `fault_db` / `fault` | — |
+
+- Deps added: `spring-boot-starter-data-jpa` + `org.postgresql:postgresql`; anomaly & rate-limiting
+  also get `spring-boot-starter-data-redis`.
+- Config: default profile → `localhost:<host-port>`; `docker` profile → `<container>:5432` /
+  `<redis>:6379`. Overridable via env (`ANOMALY_DB_URL`, `RATELIMIT_REDIS_HOST`, …).
+- **Not wired for k8s yet** — would need Postgres/Redis StatefulSets + datasource env in the
+  deployment manifests. Follow-up.
+
 ## What's in each module (the empty skeleton)
 ```
 pom.xml                         web + eureka-client + actuator + micrometer-prometheus + springdoc

@@ -9,6 +9,19 @@ updated: 2026-08-10
 The **why** behind the design — the non-obvious choices, and their trade-offs. Read this before
 proposing a change so you don't undo a deliberate decision. Newest first.
 
+## ADR-09 · Database-per-service (dedicated Postgres; Redis where needed)
+**Decision:** each of the four [[Platform-Services|placeholder services]] owns a **dedicated
+Postgres container** (`anomaly/ratelimit/tracing/fault-postgres`, host ports 5433–5436). Redis is
+added **only** to anomaly (real-time windows) and rate-limiting (counters) — separate containers
+(6380 / 6379). All live in `docker-compose-infra.yml`.
+**Why:** follows the existing `roaming-mysql` precedent and the textbook microservices pattern —
+no shared schema, independent scaling/ownership. Redis is need-based, not blanket.
+**Trade-offs:** more containers (~256m each) — heavier on a dev laptop; could collapse to one
+Postgres instance with 4 DBs if resources bite. **Cross-file `depends_on` is not used** (DBs are
+in infra compose, services in base compose, brought up separately via `./infra.sh` then
+`run.sh docker`) — so start infra first. Postgres is required at startup; Redis is lazy (Lettuce).
+Not yet wired for Kubernetes.
+
 ## ADR-08 · Empty placeholder services carry no security/JPA
 **Decision:** the four new [[Platform-Services|placeholder services]] (anomaly, rate-limiting,
 tracing, fault-injection) ship with only web + eureka + actuator + springdoc; health paths are
@@ -16,6 +29,9 @@ public at the gateway.
 **Why:** they have no protected data yet — a JWT gate on a liveness probe adds friction for zero
 value. **Trade-off:** when real endpoints arrive, add `SecurityConfig` (copy the roaming service's)
 and move the routes off the public whitelist.
+
+> ⚠️ ADR-08 is now partially superseded by **ADR-09**: the services *do* carry JPA + a Postgres DB
+> (and Redis for two of them). They still carry **no security** — health remains public.
 
 ## ADR-07 · Permission-based RBAC, enforced at the edge *and* in services
 **Decision:** authorize on `PERM_*` authorities (Keycloak client roles on `platform-client`),

@@ -48,8 +48,12 @@ Open threads and backlog. Check items off / move them to [[Session-Log]] when do
 - [ ] Add integration tests once the project reintroduces a test strategy.
 
 ## New placeholder services (see [[Platform-Services]])
-Currently health-check only. Give each real logic + a `SecurityConfig` (copy roaming's) and move
-its route off the public whitelist when protected endpoints land.
+Currently health-check only, but each now has its **own Postgres** (anomaly/ratelimit/tracing/
+fault, 5433–5436) and Redis where needed (anomaly 6380, ratelimit 6379) — ADR-09. Give each real
+logic + a `SecurityConfig` (copy roaming's) and move its route off the public whitelist when
+protected endpoints land.
+- [ ] Wire the new Postgres/Redis into **Kubernetes** (StatefulSets + datasource env in the
+      deployment manifests) — currently docker-compose only.
 - [ ] **anomaly-detection-service** (9003) — real-time anomaly detection; likely centralises the
       roaming service's heuristic `/anomalies` and swaps in ML.
 - [ ] **rate-limiting-service** (9004) — throttling / abuse protection (Redis token bucket; could
