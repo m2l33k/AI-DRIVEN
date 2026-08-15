@@ -38,7 +38,8 @@ Frontend/src/app/
 │   ├── charts/   line-chart.ts · bar-chart.ts · donut-chart.ts · gauge-chart.ts
 │   ├── ui/       stat-card.ts · page-header.ts
 │   └── layout/   role-shell.ts   (config-driven sidebar + topbar; nested submenus)
-├── auth/         login/ · reset-password/
+├── auth/         login/ · reset-password/ · first-login/
+├── messaging/    messages.ts   (direct-message page, shared by all roles)
 ├── errors/       not-found/ (404) · server-error/ (500)
 └── roles/        one folder per role → layout/ + dashboard/ + feature pages
     ├── admin/               dashboard · users · roles · monitoring (System Health) · metrics (API Metrics)
@@ -65,7 +66,9 @@ Frontend/src/app/
 | `/error/500` | 500 page |
 | `**` | 404 |
 
-`/` → redirects to `/login`. Each role root redirects to its `dashboard`.
+`/` → redirects to `/login`. Each role root redirects to its `dashboard`. A **`messages`** child
+route exists under all four role trees (`/{role}/messages`) — the shared DM page; the shell's
+"Messages" item links to it relatively.
 
 ## Conventions
 - Components use **inline `template` + `styles`** (kept file count manageable).

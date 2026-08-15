@@ -11,6 +11,18 @@ something meaningful.
 
 ## 2026-08-15
 
+### Messaging frontend + user-directory endpoint (detail: [[Messaging-Service]] · [[Auth-Service]])
+- **Frontend Messages page wired** to `/api/messages/*`: `core/messages.service.ts` + `messaging/
+  messages.ts` (two-pane: conversation list + chat thread + compose + live user-search dropdown, 8s
+  polling). `messages` route under all 4 role trees; the shell's **"Messages"** item is now a
+  `routerLink` with a **live unread badge** (20s poll of `/unread-count`).
+- **Recipient picker was empty for non-admins** because `/api/users` needs `users:read` (admin/auditor
+  only). Fix: new **`GET /api/users/directory`** in auth-service — `{username, name}`, **any
+  authenticated user**, no `users:read` (uses the service's own admin token, not the caller's perms).
+  Gateway allows `GET /api/users/directory` → authenticated (ordered before the `users:read` rule).
+  Frontend search now uses it → works for every role.
+- Verified: auth-service + gateway compile (EXIT=0); `ng build` clean.
+
 ### messaging-service — new microservice: direct messaging between users (detail: [[Messaging-Service]])
 - Built a full **messaging-service** (port 9007, dedicated `messaging-postgres` :5438) per the service
   template: `Message` @Entity, `MessageRepository` (JPA + `@Query`/`@Modifying`), `MessageService`,

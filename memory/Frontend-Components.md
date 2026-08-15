@@ -111,6 +111,15 @@ See [[Frontend-Architecture]] for the big picture.
 - `audit-logs/audit-logs.ts` — searchable/filterable immutable log table (timestamp, actor,
   action, resource, outcome, IP).
 
+## Messaging (all roles) — `messaging/`
+- `messaging/messages.ts` → `app-messages` (2026-08-15, **live** → `/api/messages/*`). Two-pane DM
+  page: conversation list (peer, last-message preview, unread badge) + chat thread (bubbles mine/
+  theirs) + compose + a **live user-search dropdown** (from `/api/users/directory`). 8s polling.
+  Reachable via the shell's "Messages" item (a `routerLink`, live unread badge polling
+  `/unread-count`); a `messages` route is registered under **every** role tree.
+- `core/messages.service.ts` — client (`conversations`, `thread`, `send`, `markRead`, `directory`) +
+  `unread` signal. `core/i18n.service.ts` — language state + `t()` (see role-shell language switcher).
+
 ## Root & routing
 - `app.ts` — `<router-outlet />` only.
 - `app.routes.ts` — lazy routes (see [[Frontend-Architecture]] routing table).

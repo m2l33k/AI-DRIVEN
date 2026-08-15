@@ -29,9 +29,9 @@ Open threads and backlog. Check items off / move them to [[Session-Log]] when do
       `detection-rules:write` via `hasPermission`) + decision tester (2026-08-15).
 - [ ] Wire the remaining **mock data pages** to gateway APIs (NFs, security alerts, detection rules,
       audit logs, core config, security dashboard).
-- [ ] **Messages page** — wire the shell's "Messages" button to `/api/messages/*` (conversation list +
-      thread + compose, recipient picker from `/api/users`, live unread badge via `/unread-count`).
-      Backend done 2026-08-15 (see [[Messaging-Service]]).
+- [x] **Messages page** — wired to `/api/messages/*` (conversation list + thread + compose + live
+      user-search dropdown + live unread badge). Added `GET /api/users/directory` (any authenticated
+      user) for the recipient search. Done 2026-08-15. See [[Messaging-Service]].
 - [ ] Global HTTP error handling → route to `/error/500`; 404 already handled by `**`.
 - [ ] Optional: token refresh using the stored `refresh_token`.
 

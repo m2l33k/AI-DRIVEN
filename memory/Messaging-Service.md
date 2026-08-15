@@ -58,12 +58,23 @@ config/     SecurityConfig (JWT → ROLE_/PERM_) · OpenApiConfig (@SecuritySche
 - `docker/prometheus/prometheus.yml`: scrape target `host.docker.internal:9007`.
 - `Dockerfile` (layered, EXPOSE 9007) + `kubernetes/deployment.yml` & `service.yml`.
 
+## Frontend — DONE (2026-08-15)
+- **`core/messages.service.ts`** — typed client (`conversations`, `thread`, `send`, `markRead`,
+  `directory`) + a live **`unread`** signal.
+- **`messaging/messages.ts`** — two-pane page: conversation list + chat thread (bubbles mine/theirs)
+  + compose + a **live user-search dropdown**. 8s polling refreshes conversations/thread/unread.
+- **Routing:** `messages` child route under **all four** role trees (messaging is for every user).
+- **Sidebar:** the shell's "Messages" item is now `routerLink="messages"` with a **live unread badge**
+  (20s poll of `/unread-count` via `takeUntilDestroyed`), i18n-labelled.
+- **Recipient picker fix:** `/api/users` needs `users:read` (admin/auditor only) → the search now uses
+  the new **`GET /api/users/directory`** (any authenticated user; see [[Auth-Service]]). Gateway allows
+  `GET /api/users/directory` → authenticated (before the `users:read` rule).
+- Verified: auth-service + gateway compile; `ng build` clean.
+
 ## TODO / next
-- **Frontend Messages page** — wire the shell's existing "Messages" button to a page: conversation
-  list + thread + compose (recipient picker from `/api/users`), live unread badge (poll
-  `/unread-count`). See [[Next-Steps]].
 - Optional: real-time via WebSocket/STOMP (currently polling-friendly REST); group chats; delete;
-  typing indicators. Move sender identity checks to a shared filter if more services need it.
+  typing indicators; exclude disabled users from the directory. Move sender-identity checks to a
+  shared filter if more services need it.
 
 ## Related notes
 - [[Backend-and-Infra]] · [[Auth-Service]] (user directory `/api/users`) · [[Ports-and-URLs]] ·

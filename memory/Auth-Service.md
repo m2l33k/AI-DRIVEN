@@ -35,6 +35,7 @@ required actions, sessions, and tokens. See [[Backend-and-Infra]] · [[Roles-and
 | GET | `/api/auth/verify-email?token=` | public | Our own verify link → marks email verified in Keycloak + HTML page |
 | PUT | `/api/auth/password` | bearer | Change own password (verifies current) |
 | GET | `/api/users` | `PERM_users:read` | List realm users |
+| GET | `/api/users/directory` | **any authenticated** | Lightweight `{username, name}` list for recipient pickers (messaging) — no `users:read`. Gateway allows it before the `users:read` rule. (2026-08-15) |
 | POST | `/api/users` | `PERM_users:write` | Create user + emailed temp password (see below) |
 | POST | `/api/users/{username}/reset-password` | `PERM_users:write` | Admin direct reset → temp password |
 | DELETE | `/api/users/{username}` | `PERM_users:write` | Delete user |

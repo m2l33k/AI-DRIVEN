@@ -41,6 +41,9 @@ client `platform-client`). These 4 realm roles drive the whole [[Frontend-Archit
 
 ## Notable permission
 - `audit:delete` — defined but **granted to nobody by design** (audit logs are immutable).
+- **`/api/users/directory`** (2026-08-15) — a `{username, name}` directory readable by **any
+  authenticated user** (no `users:read`), for the messaging recipient search. `/api/messages/**` is
+  likewise open to any authenticated user (sender taken from the JWT). See [[Messaging-Service]].
 
 ## Full permission set (client `platform-client`)
 `users:read/write`, `roles:read/write`, `platform-config:read/write`, `nf:read/restart`,
