@@ -1,7 +1,7 @@
 ---
 title: Next Steps
 tags: [todo, backlog]
-updated: 2026-08-14
+updated: 2026-08-15
 ---
 
 # Next Steps
@@ -23,8 +23,12 @@ Open threads and backlog. Check items off / move them to [[Session-Log]] when do
       bar/donut charts) pages; gateway `GET /api/metrics/overview`. Removed `admin/platform-config`.
 - [x] **Prometheus scraping for local runs:** `docker/prometheus/prometheus.yml` already targets
       `host.docker.internal` for gateway/eureka/auth; added roaming (9002).
-- [ ] Wire the remaining **data pages** to gateway APIs (NFs, security alerts, roaming events —
-      `/api/roaming/*`, audit logs, core config).
+- [x] **Roaming** wired to `/api/roaming/*` — sidebar group, 7 sub-pages, all 13 endpoints incl.
+      `/upload` + `/simulate`; new `hw-gauge-chart` + nested-menu `NavItem` (2026-08-15).
+- [x] **Rate Limiting** page wired to `/api/protection/*` — stats + policy CRUD (gated on
+      `detection-rules:write` via `hasPermission`) + decision tester (2026-08-15).
+- [ ] Wire the remaining **mock data pages** to gateway APIs (NFs, security alerts, detection rules,
+      audit logs, core config, security dashboard).
 - [ ] Global HTTP error handling → route to `/error/500`; 404 already handled by `**`.
 - [ ] Optional: token refresh using the stored `refresh_token`.
 
@@ -49,8 +53,10 @@ Open threads and backlog. Check items off / move them to [[Session-Log]] when do
       (fraud_flag, auth-failure bursts, impossible travel, QoS, margin/settlement).
 - [ ] **REDESIGN Phase 3:** add `/fraud`, `/handovers`, `/settlement`, `/attach`; delete the
       synthetic `RoamingEvent` + seeder.
-- [ ] Wire the frontend Roaming Events page to `/api/roaming/*` (esp. `/live`, `/anomalies`, `/forecast`).
-- [ ] Swap heuristics for real ML (forecast, anomaly detection).
+- [x] Wire the frontend to `/api/roaming/*` — **Roaming** sidebar group + 7 sub-pages (2026-08-15).
+- [x] **CSV analysis (`/upload`), simulation (`/simulate`), stronger anomaly detection**
+      (`AnomalyDetector` z-scores) — 2026-08-15. See [[Roaming-Analysis-Service]].
+- [ ] Swap heuristics for real ML (forecast, anomaly detection) — `AnomalyDetector` is the seam.
 - [ ] Add integration tests once the project reintroduces a test strategy.
 
 ## New placeholder services (see [[Platform-Services]])
@@ -66,10 +72,12 @@ protected endpoints land.
       token-bucket limiter (`/api/protection/check|policies|stats`), atomic Lua, JWT-guarded.
       Reuses `roaming-events:read` / `detection-rules:write` → **no Keycloak change**. Image
       `docker-rate-limiting-service:latest`. See [[Platform-Services]].
-      - [ ] Wire a gateway `RequestRateLimiter` filter to actually call `/check` on live traffic.
+      - [x] **Gateway enforcement on live traffic (2026-08-15):** `RateLimitGlobalFilter` calls the
+            limiter's internal `/internal/protection/check` and 429s on deny (ADR-11). Fixed the
+            Swagger Authorize scheme + the `PUT /policies` 400 (entity→DTO). Frontend page live.
       - [ ] Role B: attach-flood detection over roaming `attach_events` + persist `BlockEvent`s.
-      - [ ] Runtime smoke test: `./infra.sh up` then `up -d rate-limiting-service`; get a token as
-            `analyst-user` and hit `/api/protection/check` + `/stats` through the gateway.
+      - [ ] Runtime smoke test: `./infra.sh up` then `up -d rate-limiting-service`; token as
+            `analyst-user`, hit `/api/protection/*` + hammer a downstream route to see 429s + stats.
 - [ ] **distributed-tracing-service** (9005) — decide: add a real **Jaeger** container to
       `docker-compose-observability.yml` (OTLP sink, augment/replace Tempo) or drop the placeholder.
       See ADR-01 in [[Architecture-Decisions]].

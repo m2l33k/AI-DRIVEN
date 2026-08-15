@@ -50,11 +50,25 @@ client `platform-client`). These 4 realm roles drive the whole [[Frontend-Archit
 ## rate-limiting-service reuses existing perms (no realm change — 2026-08-14)
 The rate-limiting-service (`/api/protection/*`) deliberately **reuses existing permissions** so the
 realm JSON / Keycloak is untouched:
-- **reads** (`/check`, GET `/policies`, `/stats`) → **`roaming-events:read`** (SECURITY_ANALYST,
-  AUDITOR, PLATFORM_ADMIN already hold it).
-- **writes** (`PUT`/`DELETE /policies`) → **`detection-rules:write`** (SECURITY_ANALYST holds it).
-So `analyst-user` (SECURITY_ANALYST, pw `password`) can already call every protection endpoint.
+- **reads** (`/check`, GET `/policies`, `/stats`) → **`roaming-events:read`** (SECURITY_ANALYST +
+  AUDITOR hold it via realm composites).
+- **writes** (`PUT`/`DELETE /policies`) → **`detection-rules:write`** (**SECURITY_ANALYST only**).
+So `analyst-user` (SECURITY_ANALYST, pw `password`) can call every protection endpoint incl. writes.
 See [[Platform-Services]].
+
+> ⚠️ **PLATFORM_ADMIN cannot manage rate-limit policies** (verified 2026-08-15 via a real 403): the
+> admin's `platform-client` roles are only `users:*`, `roles:*`, `platform-config:*` — **not**
+> `roaming-events:read` or `detection-rules:write`. Rate limiting is a SECURITY_ANALYST concern by
+> design; use `analyst-user` to test. (Realm composite for SECURITY_ANALYST includes
+> `security-alerts:read`, `roaming-events:read`, `detection-rules:read`, `detection-rules:write`.)
+
+## Frontend gating + gateway enforcement (2026-08-15)
+- **Frontend gating:** `AuthService.hasPermission(p)` decodes the JWT's `platform-client` roles;
+  the Rate Limiting page only shows policy **create/edit/delete** when `detection-rules:write` is
+  present (defence-in-depth — the backend still enforces; a bypass gets a 403 surfaced in the UI).
+- **Gateway rate-limit enforcement:** the gateway's `RateLimitGlobalFilter` applies the policies to
+  **all** downstream traffic (ADR-11). This is *rate* limiting keyed by IMSI/operator/IP — orthogonal
+  to *RBAC*; it runs after JWT auth and returns **429** (not 403) when a bucket is exhausted.
 
 ## Demo users
 All have password `password`. `admin-user` → PLATFORM_ADMIN, plus one user per other role.

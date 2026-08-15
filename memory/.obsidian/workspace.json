@@ -27,32 +27,16 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Roles-and-Permissions.md",
+                "file": "Frontend-Architecture.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Roles-and-Permissions"
+              "title": "Frontend-Architecture"
             }
           }
         ],
         "currentTab": 1
-      },
-      {
-        "id": "603a531e6e7404c4",
-        "type": "tabs",
-        "children": [
-          {
-            "id": "6fac48bc53ddcdb7",
-            "type": "leaf",
-            "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
-            }
-          }
-        ]
       }
     ],
     "direction": "vertical"
@@ -130,6 +114,7 @@
             "state": {
               "type": "backlink",
               "state": {
+                "file": "Frontend-Architecture.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -217,36 +202,36 @@
       "bases:Create new base": false
     }
   },
-  "active": "6fac48bc53ddcdb7",
+  "active": "4eb6cb8adb3d18d8",
   "lastOpenFiles": [
-    "Roles-and-Permissions.md",
-    "README.md",
+    "Frontend-Components.md",
+    "Auth-Service.md",
+    "Diagrams.md",
+    "Platform-Services.md",
     "Proposal-Internship.md",
+    "README.md",
+    "Roles-and-Permissions.md",
+    "Frontend-Architecture.md",
+    "Architecture-Decisions.md",
+    "README.md.tmp.13612.188cc72f342c",
+    "Ports-and-URLs.md.tmp.13612.95e022656db3",
+    "Ports-and-URLs.md.tmp.13612.de9f06418435",
+    "Next-Steps.md.tmp.13612.353475edf20a",
+    "Roles-and-Permissions.md.tmp.13612.67f5fb885d5a",
+    "Frontend-Architecture.md.tmp.13612.5b8e8cf9dffe",
+    "Frontend-Components.md.tmp.13612.c8d6ca482a2a",
+    "Architecture-Decisions.md.tmp.13612.61d2aea052e2",
+    "Platform-Services.md.tmp.13612.88152550c919",
+    "Platform-Services.md.tmp.13612.572f6ec84f16",
     "Project-Overview.md",
     "Presentation.md",
     "Ports-and-URLs.md",
-    "Platform-Services.md",
     "Next-Steps.md",
     "Glossary.md",
     "Git-Workflow-and-History.md",
     "Session-Log.md",
-    "Roles-and-Permissions.md.tmp.29068.50c82eab0091",
-    "Platform-Services.md.tmp.29068.469a25dcfd3b",
-    "Next-Steps.md.tmp.29068.e9e70fda2d8d",
-    "Next-Steps.md.tmp.29068.ed228c0395d3",
-    "Roles-and-Permissions.md.tmp.29068.977f810ac4ac",
-    "Session-Log.md.tmp.29068.b51c38e7e2ab",
-    "Platform-Services.md.tmp.29068.0dda0885a64f",
     "Backend-and-Infra.md",
-    "README.md.tmp.29068.a406269dbf51",
-    "Proposal-Internship.md.tmp.29068.714810f53ede",
-    "Roaming-Analysis-Service.md.tmp.29068.a0a8a1658e4e",
-    "Frontend-Components.md",
-    "Frontend-Architecture.md",
     "Roaming-Analysis-Service.md",
-    "Scripts-and-Tooling.md",
-    "Architecture-Decisions.md",
-    "Diagrams.md",
-    "Auth-Service.md"
+    "Scripts-and-Tooling.md"
   ]
 }

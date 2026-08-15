@@ -1,13 +1,39 @@
 ---
 title: Architecture Decisions
 tags: [adr, architecture, rationale]
-updated: 2026-08-10
+updated: 2026-08-15
 ---
 
 # Architecture Decisions
 
 The **why** behind the design — the non-obvious choices, and their trade-offs. Read this before
 proposing a change so you don't undo a deliberate decision. Newest first.
+
+## ADR-12 · API DTOs are separate records; JPA entities are never the wire contract
+**Decision:** controllers accept/return **DTO records**, not JPA entities. Concretely, the
+rate-limiting `PUT /policies` uses `RateLimitPolicyDto` (not the `RateLimitPolicy` entity), and the
+roaming DTOs are all records.
+**Why:** the entities use **record-style accessors** (`capacity()`, not `getCapacity()`) with no
+setters, which Jackson can neither deserialize (→ 400 on write) nor serialize (→ empty `{}` on read).
+A validated DTO is the wire contract; the entity stays a persistence detail. Discovered via a real
+`PUT` 400 bug (2026-08-15). **Trade-off:** a small mapping layer (`Dto.from(entity)`), worth it for
+validation + a stable contract.
+
+## ADR-11 · Rate limiting enforced by a gateway GlobalFilter calling the limiter (not Gateway's RedisRateLimiter)
+**Decision:** the gateway runs a custom reactive **`RateLimitGlobalFilter`** that, before forwarding,
+calls the rate-limiting-service's **internal** decision endpoint (`POST /internal/protection/check`,
+unauthenticated, in-cluster only) and returns **429** when denied. Chosen over Spring Cloud Gateway's
+built-in `RequestRateLimiter`/`RedisRateLimiter`.
+**Why:** keeps the **Postgres policy table + `TokenBucketService` (Lua bucket) as the single source
+of truth** — the console's policy edits and `/stats` (allowed/blocked, top offenders) stay
+meaningful. The built-in filter would use its own separate Redis bucket, bypassing our policies.
+**Key resolution:** IMSI header → `imsi`, operator header → `operator`, else client IP → `ip` (maps
+to the seeded policies). **Fail-open** on limiter error and a master `protection.enforcement.enabled`
+flag, so the limiter can never take the platform down. The gateway carries **no user JWT** into the
+decision — hence the dedicated internal endpoint (never routed publicly), avoiding coupling
+enforcement to the caller's permissions.
+**Trade-offs:** one extra in-cluster hop per request (acceptable here; could be inlined against the
+same Redis later); the internal endpoint is unauthenticated but unreachable from outside the cluster.
 
 ## ADR-10 · Keycloak persisted to its own Postgres (not H2)
 **Decision:** Keycloak runs `start-dev` but with `KC_DB=postgres` pointing at a dedicated

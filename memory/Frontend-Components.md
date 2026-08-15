@@ -1,7 +1,7 @@
 ---
 title: Frontend Components
 tags: [frontend, components, reference]
-updated: 2026-08-07
+updated: 2026-08-15
 ---
 
 # Frontend Components (file-by-file)
@@ -12,9 +12,10 @@ See [[Frontend-Architecture]] for the big picture.
 ## Shared — charts (`shared/charts/`)
 | File | Selector | Inputs | Notes |
 |------|----------|--------|-------|
-| `line-chart.ts` | `hw-line-chart` | `data:number[]`, `labels:string[]`, `color`, `ariaLabel` | SVG area+line, grid, points; gradient fill |
+| `line-chart.ts` | `hw-line-chart` | `data:number[]`, `labels:string[]`, `color`, `ariaLabel`, `smooth` | SVG area+line, grid, points; gradient fill; `[smooth]` = Catmull-Rom curve |
 | `bar-chart.ts` | `hw-bar-chart` | `data`, `labels`, `color`, `ariaLabel` | Vertical bars, rounded corners |
 | `donut-chart.ts` | `hw-donut-chart` | `slices:DonutSlice[]`, `centerLabel`, `ariaLabel` | `DonutSlice = {label,value,color}`; legend + center total |
+| `gauge-chart.ts` | `hw-gauge-chart` | `value`, `max`, `label`, `color`, `higherIsBetter`, `ariaLabel` | **2026-08-15** — 270° radial 0-100 gauge; auto-grades red→amber→green (invert with `higherIsBetter=false` for latency-style metrics) |
 
 ## Shared — UI (`shared/ui/`)
 | File | Selector | Inputs |
@@ -25,7 +26,10 @@ See [[Frontend-Architecture]] for the big picture.
 ## Shared — layout (`shared/layout/`)
 - `role-shell.ts` → `hw-role-shell`. The reusable console chrome.
   - Inputs: `brand`, `roleName`, `accent`, `navItems:NavItem[]`, `userName`.
-  - `NavItem = { label, path, icon }` (icon = 24×24 SVG path data).
+  - `NavItem = { label, path?, icon, children?: NavItem[] }` (icon = 24×24 SVG path data).
+  - **Nested submenus (2026-08-15):** an item with `children` renders an **expandable group** —
+    chevron toggle, auto-opens when a child route is active (`router.url` match), active sub-item
+    highlight. Used by the security-analyst **Roaming** group. Collapsing the sidebar hides submenus.
   - Features: collapsible sidebar (signal `collapsed`), top bar with role badge,
     notifications, user avatar/initials, logout (routes to `/login`), `<router-outlet/>`.
 
@@ -63,12 +67,32 @@ See [[Frontend-Architecture]] for the big picture.
   params; "Apply to core" shows a success banner.
 
 ## Role: security-analyst (SECURITY_ANALYST) — `roles/security-analyst/`
-- `layout/security-layout.ts` — nav: Dashboard, Security Alerts, Roaming Events, Detection Rules. Accent `#00a870`.
+- `layout/security-layout.ts` — nav: Dashboard, Security Alerts, **Roaming** (group), Detection
+  Rules, **Rate Limiting**. Accent `#00a870`.
 - `dashboard/security-dashboard.ts` — alert stats, alerts-over-time line, severity donut,
-  attack-category bar, latest-critical-alerts table.
-- `security-alerts/security-alerts.ts` — tabbed table (All/Open/Ack/Resolved) with severity badges.
-- `roaming-events/roaming-events.ts` — roaming-volume line chart + events table (PLMN, risk).
-- `detection-rules/detection-rules.ts` — rules table with enable/disable **toggle switches**.
+  attack-category bar, latest-critical-alerts table. *(still mock)*
+- `security-alerts/security-alerts.ts` — tabbed table (All/Open/Ack/Resolved). *(still mock)*
+- `detection-rules/detection-rules.ts` — rules table with enable/disable **toggle switches**. *(mock)*
+- **`rate-limiting/rate-limiting.ts`** (2026-08-15, **live** → `/api/protection/*`) — `/stats` KPI
+  cards (5s poll) + policies table + top-offenders + **full CRUD** (create/edit/delete) gated on
+  `auth.hasPermission('detection-rules:write')` + a decision tester (**Send 1 / Burst ×20**, OK/429
+  chips, immediate stats refresh). Detailed backend errors via `describeError`.
+- **`roaming/` — the Roaming group (2026-08-15, live → `/api/roaming/*`)**, shared
+  **`roaming.service.ts`** (typed client for all 13 endpoints + interfaces). Sub-pages (each a lazy
+  route `security/roaming/<x>`, own charts):
+  - `roaming-overview.ts` — summary + live + forecast: 4 stat cards, volume line, risk donut,
+    direction donut, **avg-risk gauge**, forecast line, live mini-stats.
+  - `roaming-events-page.ts` — filters (direction/risk/PLMN) + top-partners **bar** + events table +
+    click-row **detail** (`/events/{id}`).
+  - `roaming-anomalies.ts` — severity stat cards + top-anomaly-score **bar** + severity **donut** +
+    table (anomalyScore, σ dev, reasons).
+  - `roaming-partners.ts` — avg-risk **bar** + peak-risk **donut** + table.
+  - `roaming-qos.ts` — **QoS gauge** + KPI cards + experience-score **bar** + experience table.
+  - `roaming-revenue.ts` — revenue KPIs + revenue **bar** + inbound/outbound **donut** + **margin
+    gauge** + optimization table.
+  - `roaming-tools.ts` — **CSV upload** (`/upload` → summary + forecast line) + **Simulate**
+    (`/simulate` → live snapshot).
+  - (Replaced the old single mock `roaming-events/roaming-events.ts`, now deleted.)
 
 ## Role: auditor (AUDITOR) — `roles/auditor/`
 - `layout/auditor-layout.ts` — nav: Dashboard, Audit Logs. Accent `#ff8f1f`.

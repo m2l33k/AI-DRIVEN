@@ -1,7 +1,7 @@
 ---
 title: Roaming Analysis Service
 tags: [backend, microservice, roaming, security]
-updated: 2026-08-14
+updated: 2026-08-15
 ---
 
 # Roaming Analysis Service
@@ -31,15 +31,44 @@ Same authority mapping as auth-service: realm roles → `ROLE_*`, client perms �
 | GET | `/summary` | Dashboard aggregates: totals, direction split, risk breakdown, hourly volume series |
 | GET | `/partners` | Per-partner-PLMN roll-up, ordered by avg risk |
 | GET | `/live?windowMinutes=` | ✅ Real-time monitor: active events/subs/rate/risk/revenue + recent |
-| GET | `/anomalies` | ✅ Anomaly detection: flagged events + reasons + severity |
+| GET | `/anomalies` | ✅ Anomaly detection: statistical + rule composite score (see AnomalyDetector) |
 | GET | `/forecast?hoursAhead=` | ✅ Predict traffic: linear-regression forecast of subs/hour |
 | GET | `/experience` | ✅ Customer experience: per-partner QoS experience score (worst first) |
 | GET | `/qos` | ✅ QoS overview: avg latency/throughput/drop + score + worst partners |
 | GET | `/optimization` | ✅ Optimize agreements + cut costs: per-partner margin + recommendation |
 | GET | `/revenue` | ✅ Increase revenue: revenue/cost/margin/ARPU + top partners |
+| POST | `/upload` | ✅ Analyse an uploaded CSV (multipart `file`, `?hoursAhead=`) → summary + anomalies + forecast; **not persisted** |
+| POST | `/simulate` | ✅ Generate synthetic events (`?count=&minutesSpread=&windowMinutes=`) → persisted (`SIM-` ids) + live snapshot |
 
 Reachable via gateway at the same paths; Swagger aggregated under
-`/roaming-analysis-service/v3/api-docs`.
+`/roaming-analysis-service/v3/api-docs`. **All 13 endpoints are wired into the frontend** — the
+Security-Analyst **Roaming** sidebar group (Overview/Events/Anomalies/Partners/QoS/Revenue/Tools),
+see [[Frontend-Components]].
+
+## 2026-08-15 — CSV analysis, simulation & stronger anomaly detection
+New code on the existing (still synthetic `RoamingEvent`) analytics — all additive, build green:
+- **`analysis/AnomalyDetector`** (`@Component`) — the powered-up `/anomalies`. Composite
+  **`anomalyScore` 0-100** = ½ `RiskAnalyzer` score + capped **population z-score deviations**
+  (per-metric mean/σ over the same list: latency, drop ratio, signalling errors, new-device ratio,
+  low throughput, unusual subscriber volume) + `+25` for impossible travel. Emits per-metric σ
+  reasons ("Latency 3.1σ above baseline …") alongside the fixed thresholds; severity by composite
+  (CRITICAL/WARNING/INFO). `AnomalyDto` gained `anomalyScore` + `baselineDeviation` (max |z|).
+  Reusable over **any** `List<RoamingEvent>` (DB / uploaded CSV / simulated batch).
+- **`ingest/RoamingEventCsvParser`** — parses an uploaded multipart CSV into in-memory events
+  (never persisted). Lenient: snake_case **or** camelCase headers via alias lookup, blank→default;
+  **derives** missing QoS/commercial columns from the raw signals (same formulas as the seeder), so
+  a minimal file works. Returns `CsvParseResult(fileName, events, parsed, skipped, columns)`.
+- **`service/RoamingSimulator`** (`@Component`) — generates realistic events over the last
+  `minutesSpread` minutes (≈18% injected anomalies: high-risk PLMNs, impossible travel, signalling
+  storms), **persisted** with `SIM-` id prefix so `/live` + `/anomalies` react. Capped at 500/run.
+- **Orchestration in `RoamingInsightsService`:** `analyzeCsv(file, hoursAhead)` → `CsvAnalysisDto`
+  (fileName, rowsParsed/Skipped, columns, summary, anomalies, forecast); `simulate(count, spread,
+  window)` → `SimulationResultDto` (generated, monitor `LiveMonitorDto`, sample). Anomalies now
+  delegate to `AnomalyDetector`.
+- **Refactors:** `RoamingAnalysisService.summary(List)` and `RoamingInsightsService.forecast(int,
+  List)` overloads (no-arg versions call them with `repository.findAll()`), so summary/forecast run
+  over an arbitrary event set (DB or CSV). `application.yml` → `spring.servlet.multipart` 25 MB.
+- New DTOs: `CsvAnalysisDto`, `SimulationResultDto` (+ `AnomalyDto` extended).
 
 ## Design / layers
 ```
@@ -140,9 +169,12 @@ package a trimmed copy under `src/main/resources/seed/` for docker. Idempotent p
 - [ ] Update this note + [[Session-Log]] + [[Next-Steps]] when landed; wire the frontend page.
 
 ## TODO / next
-- Wire the frontend Roaming Events page + Security dashboard to `/api/roaming/*` (esp. `/live`,
-  `/anomalies`, `/forecast`, `/optimization`).
-- Swap heuristics for real ML models (forecast, anomaly detection) when ready.
+- [x] Wire the frontend to `/api/roaming/*` — done 2026-08-15 (Roaming sidebar group, 7 sub-pages,
+  all 13 endpoints incl. `/upload` + `/simulate`). See [[Frontend-Components]].
+- Swap heuristics for real ML models (forecast, anomaly detection) when ready — `AnomalyDetector`
+  is the clean seam (population z-scores today → model scores later).
+- REDESIGN Phase 2/3 still open: re-point endpoints onto the 6 real `Data/Data` entities and delete
+  the synthetic `RoamingEvent`/seeder (see the Redesign section + [[Next-Steps]]).
 - Tests were intentionally omitted (project currently has no tests).
 
 ## Related notes

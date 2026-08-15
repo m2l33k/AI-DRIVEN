@@ -1,13 +1,14 @@
 ---
 title: Frontend Architecture
 tags: [frontend, angular, architecture]
-updated: 2026-08-08
+updated: 2026-08-15
 ---
 
 # Frontend Architecture
 
-The Angular console lives in `Frontend/`. **Auth + user management now wired to the backend**
-via the gateway (see "Backend integration" below); the role dashboards' data pages are still mock.
+The Angular console lives in `Frontend/`. **Auth + user management + the Security-Analyst Roaming
+and Rate Limiting pages are wired to the backend** via the gateway (see below); the remaining role
+data pages are still mock.
 
 ## Stack
 - **Angular 22** (standalone components, no NgModules)
@@ -34,15 +35,16 @@ See [[Frontend-Components]].
 ```
 Frontend/src/app/
 ├── shared/
-│   ├── charts/   line-chart.ts · bar-chart.ts · donut-chart.ts
+│   ├── charts/   line-chart.ts · bar-chart.ts · donut-chart.ts · gauge-chart.ts
 │   ├── ui/       stat-card.ts · page-header.ts
-│   └── layout/   role-shell.ts   (config-driven sidebar + topbar)
+│   └── layout/   role-shell.ts   (config-driven sidebar + topbar; nested submenus)
 ├── auth/         login/ · reset-password/
 ├── errors/       not-found/ (404) · server-error/ (500)
 └── roles/        one folder per role → layout/ + dashboard/ + feature pages
     ├── admin/               dashboard · users · roles · monitoring (System Health) · metrics (API Metrics)
     ├── network-operator/    dashboard · network-functions · core-config
-    ├── security-analyst/    dashboard · security-alerts · roaming-events · detection-rules
+    ├── security-analyst/    dashboard · security-alerts · detection-rules · rate-limiting ·
+    │                        roaming/ (overview · events · anomalies · partners · qos · revenue · tools)
     └── auditor/             dashboard · audit-logs
 ```
 
@@ -58,7 +60,7 @@ Frontend/src/app/
 | `/login`, `/reset-password` | Auth |
 | `/admin/**` | PLATFORM_ADMIN |
 | `/operator/**` | NETWORK_OPERATOR |
-| `/security/**` | SECURITY_ANALYST |
+| `/security/**` | SECURITY_ANALYST (incl. `rate-limiting`, `roaming/{overview,events,anomalies,partners,qos,revenue,tools}`) |
 | `/audit/**` | AUDITOR |
 | `/error/500` | 500 page |
 | `**` | 404 |
@@ -88,7 +90,11 @@ npm run build    # production build (verified clean)
     stale-token 401 gotcha); on 401 → logout + `/login`.
   - `guards.ts` — `authGuard` + `roleGuard(role)`; applied to `/admin /operator /security /audit`.
   - `users.service.ts` — list/create/delete/admin-reset against `/api/users`.
-  - `models.ts` — `LoginResponse`, `UserSummary`, `CreateUserRequest`, `CurrentUser`.
+  - `models.ts` — `LoginResponse`, `UserSummary`, `CreateUserRequest`, `CurrentUser`
+    (`CurrentUser.permissions` added 2026-08-15).
+  - **Permission-aware (2026-08-15):** `auth.service` also decodes
+    `resource_access.platform-client.roles` → `permissions` signal + `hasPermission(p)` (mirrors the
+    backend `PERM_*`). Used to gate write UI (e.g. rate-limit policy CRUD needs `detection-rules:write`).
 - **Screens wired:** `login` (real auth, routes by role; PASSWORD_CHANGE → `/first-login`;
   EMAIL_VERIFICATION → message), new `auth/first-login/`, `reset-password` (3-step OTP:
   email → otp → new password), `roles/admin/users/` (live table + create modal + reset + delete
@@ -127,9 +133,24 @@ npm run build    # production build (verified clean)
   Users-by-status donut, recent-users table. `shared/charts/line-chart` gained a `[smooth]`
   (Catmull-Rom) curve option. `anyComponentStyle` budget raised in `angular.json`.
 
+## Security-Analyst: Rate Limiting + Roaming wired (2026-08-15)
+- **Nested sidebar menus:** `NavItem` gained optional `children`; `RoleShell` renders expandable
+  groups (see [[Frontend-Components]]). Security nav is now Dashboard · Security Alerts · **Roaming**
+  (group) · Detection Rules · Rate Limiting.
+- **New chart:** `hw-gauge-chart` (270° radial 0-100, auto-graded) — 4th chart type.
+- **Rate Limiting** page (`security-analyst/rate-limiting/`) → live `/api/protection/*`: stats KPIs,
+  policy table + **CRUD gated on `hasPermission('detection-rules:write')`**, decision tester
+  (Send 1 / Burst ×20). Route `security/rate-limiting`.
+- **Roaming** group (`security-analyst/roaming/`) → live `/api/roaming/*` via a typed
+  `roaming.service.ts` (all 13 endpoints). 7 lazy sub-pages under `security/roaming/*`
+  (`roaming` → `overview`): Overview, Events, Anomalies, Partners, QoS & Experience, Revenue, Tools
+  — each rich with line/bar/donut/gauge charts. Replaces the old single mock `roaming-events` page.
+- `ng build` (dev) → clean; all roaming + rate-limiting chunks emitted.
+
 ## Integration TODO (remaining)
-- Other role dashboards + **data pages** (network functions, security alerts, roaming events
-  `/api/roaming/*`, audit logs, platform/core config) still render mock data.
+- Remaining **mock** pages: security dashboard, security-alerts, detection-rules; operator NFs +
+  core-config; auditor logs; admin misc. (Roaming + Rate Limiting are now **live**.)
+- Global HTTP error handling → route to `/error/500` (404 already handled by `**`).
 - Main nav icons are still filled glyphs (chrome icons are line-style); optional: convert them.
 - Optional: real "Users by role" needs backend role data (see [[Auth-Service]] TODO).
 

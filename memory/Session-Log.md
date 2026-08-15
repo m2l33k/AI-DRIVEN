@@ -1,13 +1,89 @@
 ---
 title: Session Log
 tags: [log, journal]
-updated: 2026-08-14
+updated: 2026-08-15
 ---
 
 # Session Log
 
 Chronological record of what we did. Newest first. Add an entry whenever you finish
 something meaningful.
+
+## 2026-08-15
+
+### roaming-analysis-service — CSV analysis, traffic simulation, stronger anomaly detection (detail: [[Roaming-Analysis-Service]])
+- **3 new capabilities on the existing (synthetic `RoamingEvent`) analytics**, all compiling
+  (`mvnw -o -f microservices/roaming-analysis-service/pom.xml compile` → EXIT=0):
+  - **`POST /api/roaming/upload`** (multipart CSV, `?hoursAhead=`) → `CsvAnalysisDto` = summary +
+    anomalies + forecast computed over the uploaded file. **Nothing persisted.** New
+    `ingest/RoamingEventCsvParser` — lenient (snake/camel headers, blank→default), derives missing
+    QoS/commercial columns from signals, so a minimal file (`direction, partner_plmn, country,
+    subscribers, signaling_errors, new_device_ratio, impossible_travel`) suffices. Returns
+    `CsvParseResult(fileName, events, parsed, skipped, columns)`.
+  - **`POST /api/roaming/simulate`** (`?count=&minutesSpread=&windowMinutes=`) → `SimulationResultDto`
+    = generated count + a fresh `/live` snapshot + sample. New `service/RoamingSimulator` generates
+    realistic events (≈18% injected anomalies: fraud PLMNs, impossible travel, signalling storms),
+    **persisted** with `SIM-` id prefix so `/live` + `/anomalies` react.
+  - **Stronger `/anomalies`** — new `analysis/AnomalyDetector` (component) replaces the inline rules.
+    Composite **`anomalyScore` (0-100)** = ½ fraud risk + capped population **z-score deviations**
+    (latency, drop ratio, signalling errors, new-device ratio, low throughput, unusual volume) + a
+    bump for impossible travel. `AnomalyDto` gained `anomalyScore` + `baselineDeviation` (max σ).
+    Works over any event list (DB, uploaded CSV, simulated batch).
+- Refactors to enable the above: `RoamingAnalysisService.summary(List)` overload,
+  `RoamingInsightsService.forecast(int,List)` overload; `RoamingInsightsService` now delegates
+  anomalies to `AnomalyDetector` and orchestrates `analyzeCsv` / `simulate`. `application.yml`
+  gained `spring.servlet.multipart` 25 MB limits.
+- **Frontend fully wired** (was mock). New `roaming.service.ts` (typed client for **all 13**
+  endpoints). Split into a **sidebar "Roaming" group** with 7 lazy sub-pages (see below).
+
+### rate-limiting-service — fixes + **gateway enforcement on real traffic** (detail: [[Platform-Services]])
+- **Swagger "Authorize" fix:** `OpenApiConfig` was missing `@SecurityScheme(name="bearerAuth", …)` —
+  lock icons showed but the button couldn't take a token. Added it (mirrors roaming's).
+- **PUT policy 400 bug fix:** `PUT /policies/{keyType}` bound the JSON to the JPA **entity**
+  (`RateLimitPolicy` has record-style accessors, no setters) → Jackson `FAIL_ON_UNKNOWN_PROPERTIES`
+  → 400, nothing saved; `GET /policies` also serialized `{}`. Added **`RateLimitPolicyDto`** (record,
+  validated `@Min(1)` / `@NotNull action`) used for both read & write, + **`ApiExceptionHandler`**
+  (`@RestControllerAdvice`) returning detailed 400s (`{error, fields{…}}` / `{error, details}`).
+- **403 clarified (not a bug):** user's token was **PLATFORM_ADMIN** which lacks
+  `detection-rules:write` (and `roaming-events:read`) — writes require SECURITY_ANALYST. Confirmed
+  via realm: `analyst-user`/`password`. `platform-client` = confidential, `directAccessGrantsEnabled`,
+  secret `platform-client-secret`.
+- **Gateway enforcement (Option 1) — the limiter now protects the other services.** New in
+  `gateway-service` (`com.example.springcloud.gateway.ratelimit`): `RateLimitGlobalFilter`
+  (reactive `GlobalFilter`, order `HIGHEST_PRECEDENCE+100`) keys each request by IMSI header →
+  `imsi`, operator header → `operator`, else client IP → `ip`; calls the limiter and short-circuits
+  **429** + `Retry-After` on deny; **fail-open** on error. `RateLimitClient` (load-balanced WebClient
+  → `lb://rate-limiting-service`), `RateLimitProperties` (`protection.enforcement.*`), `RateLimitConfig`
+  (`@LoadBalanced WebClient.Builder`). New **internal** decision endpoint on the limiter —
+  `InternalProtectionController` `POST /internal/protection/check` (unauthenticated, `/internal/**`
+  permitted in its `SecurityConfig`, never routed publicly) so the gateway needn't carry a user JWT.
+  Excluded from limiting: `/api/protection`, `/internal`, `/actuator`, `/swagger-ui`, `/eureka`,
+  `/api/auth`, any `*/v3/api-docs`. Both services compile (EXIT=0).
+
+### Frontend — permission-aware auth, nested sidebar, gauge chart, Rate Limiting + Roaming pages (detail: [[Frontend-Components]] · [[Frontend-Architecture]])
+- **`AuthService` now exposes permissions:** `CurrentUser.permissions` decoded from
+  `resource_access.platform-client.roles`; new `permissions` signal + `hasPermission(p)`. Used to
+  gate write UI (matches backend `PERM_*`).
+- **Nested sidebar menus:** `NavItem` gained optional `children?: NavItem[]`; `RoleShell` renders an
+  expandable group (chevron, auto-opens on active child, active sub-item highlight).
+- **New `hw-gauge-chart`** (`shared/charts/gauge-chart.ts`) — 270° radial 0-100 gauge, auto-grades
+  red→amber→green (invertible for latency-style metrics). 4th chart type alongside line/bar/donut.
+- **Rate Limiting page** (`security-analyst/rate-limiting/`, nav "Rate Limiting"): live `/stats`
+  KPIs (5s poll) + policies table + top-offenders + **full CRUD** (create/edit/delete) gated on
+  `hasPermission('detection-rules:write')` + a decision tester (**Send 1 / Burst ×20** with OK/429
+  chips, immediate stats refresh). Detailed backend errors surfaced (`describeError`). Route
+  `security/rate-limiting`.
+- **Roaming → sidebar group with 7 sub-pages** (replaces the old single mock `roaming-events` page;
+  folder moved to `security-analyst/roaming/`): **Overview** (volume line, risk donut, direction
+  donut, avg-risk gauge, forecast line, live stats), **Events** (top-partners bar + filter table +
+  detail), **Anomalies** (severity cards + top-score bar + severity donut + table), **Partners**
+  (avg-risk bar + peak-risk donut + table), **QoS & Experience** (QoS gauge + KPIs + experience bar
+  + table), **Revenue** (KPIs + revenue bar + inbound/outbound donut + margin gauge + optimization
+  table), **Tools** (CSV upload + simulate). Routes `security/roaming/*` (`roaming` → `overview`);
+  security nav "Roaming Analysis" → **"Roaming"** group.
+- Verified: `ng build --configuration development` → complete, all 7 roaming chunks + rate-limiting
+  chunk emitted, no errors. (Fixed 2 template snags: `number` pipe `string|null` → `?? ''`; a literal
+  `{keyType}` parsed as an ICU brace → `:keyType`.)
 
 ## 2026-08-14
 
