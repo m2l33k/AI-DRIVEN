@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Next-Steps.md",
+                "file": "Backend-and-Infra.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Next-Steps"
+              "title": "Backend-and-Infra"
             }
           }
         ],
@@ -114,7 +114,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Next-Steps.md",
+                "file": "Backend-and-Infra.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -204,6 +204,12 @@
   },
   "active": "4eb6cb8adb3d18d8",
   "lastOpenFiles": [
+    "Diagrams.md",
+    "Backend-and-Infra.md",
+    "Auth-Service.md",
+    "Architecture-Decisions.md",
+    "5GC-Core.md",
+    "Next-Steps.md",
     "Roles-and-Permissions.md.tmp.13612.22bfb809a228",
     "Ports-and-URLs.md.tmp.13612.b83488675054",
     "Messaging-Service.md",
@@ -217,24 +223,17 @@
     "Session-Log.md.tmp.13612.70ae066e6c85",
     "Backend-and-Infra.md.tmp.13612.975d92f09013",
     "Grafana-Dashboards.md",
-    "Grafana-Dashboards.md.tmp.13612.2ce49f717e13",
     "Frontend-Architecture.md",
-    "5GC-Core.md",
     "Frontend-Components.md",
-    "Auth-Service.md",
-    "Diagrams.md",
     "Platform-Services.md",
     "README.md",
     "Roles-and-Permissions.md",
-    "Architecture-Decisions.md",
     "Project-Overview.md",
     "Presentation.md",
     "Ports-and-URLs.md",
-    "Next-Steps.md",
     "Glossary.md",
     "Git-Workflow-and-History.md",
     "Session-Log.md",
-    "Backend-and-Infra.md",
     "Roaming-Analysis-Service.md",
     "Scripts-and-Tooling.md"
   ]

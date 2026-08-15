@@ -32,5 +32,35 @@
     "secure": false,
     "changeOrigin": true,
     "pathRewrite": { "^/infra-health/eureka": "/actuator/health" }
+  },
+  "/infra-health/anomaly": {
+    "target": "http://localhost:9003",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/infra-health/anomaly": "/actuator/health" }
+  },
+  "/infra-health/ratelimit": {
+    "target": "http://localhost:9004",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/infra-health/ratelimit": "/actuator/health" }
+  },
+  "/infra-health/tracing": {
+    "target": "http://localhost:9005",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/infra-health/tracing": "/actuator/health" }
+  },
+  "/infra-health/fault": {
+    "target": "http://localhost:9006",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/infra-health/fault": "/actuator/health" }
+  },
+  "/infra-health/messaging": {
+    "target": "http://localhost:9007",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/infra-health/messaging": "/actuator/health" }
   }
 }

@@ -142,10 +142,15 @@ export class AdminMonitoring implements OnInit, OnDestroy {
   private sub?: Subscription;
 
   services: Service[] = [
+    { key: 'eureka', name: 'Eureka Server', desc: 'Service discovery', port: 8761 },
     { key: 'gateway', name: 'API Gateway', desc: 'Spring Cloud Gateway', port: 9000 },
     { key: 'auth', name: 'Auth Service', desc: 'Keycloak-backed auth & users', port: 9001 },
     { key: 'roaming', name: 'Roaming Analysis', desc: 'Roaming events & risk scoring', port: 9002 },
-    { key: 'eureka', name: 'Eureka Server', desc: 'Service discovery', port: 8761 },
+    { key: 'anomaly', name: 'Anomaly Detection', desc: 'Real-time anomaly detection', port: 9003 },
+    { key: 'ratelimit', name: 'Rate Limiting', desc: 'Redis token-bucket protection', port: 9004 },
+    { key: 'tracing', name: 'Distributed Tracing', desc: 'Trace facade (placeholder)', port: 9005 },
+    { key: 'fault', name: 'Fault Injection', desc: 'Chaos / resilience testing', port: 9006 },
+    { key: 'messaging', name: 'Messaging', desc: 'Direct messages between users', port: 9007 },
   ];
 
   tools: Tool[] = [
