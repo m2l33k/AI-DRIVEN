@@ -4,9 +4,12 @@ import { AuthService } from '../../core/auth.service';
 
 export interface NavItem {
   label: string;
-  path: string;
+  /** Route path. Optional for a group that only contains children. */
+  path?: string;
   /** SVG path data (24x24 viewBox). */
   icon: string;
+  /** Optional sub-items rendered as an expandable submenu. */
+  children?: NavItem[];
 }
 
 /**
@@ -48,13 +51,34 @@ export interface NavItem {
           <!-- Main navigation -->
           @if (!collapsed()) { <span class="nav-section">Main</span> }
           <nav>
-            @for (item of navItems(); track item.path) {
-              <a [routerLink]="item.path" routerLinkActive="active"
-                 [routerLinkActiveOptions]="{ exact: false }" class="nav-item"
-                 [attr.title]="item.label" (click)="mobileOpen.set(false)">
-                <svg viewBox="0 0 24 24" class="ico"><path [attr.d]="item.icon" /></svg>
-                @if (!collapsed()) { <span class="lbl">{{ item.label }}</span> }
-              </a>
+            @for (item of navItems(); track item.label) {
+              @if (item.children && item.children.length) {
+                <button class="nav-item" [class.open]="groupOpen(item)"
+                        [attr.title]="item.label" (click)="toggleGroup(item)">
+                  <svg viewBox="0 0 24 24" class="ico"><path [attr.d]="item.icon" /></svg>
+                  @if (!collapsed()) {
+                    <span class="lbl">{{ item.label }}</span>
+                    <svg class="caret" [class.rot]="groupOpen(item)" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
+                  }
+                </button>
+                @if (groupOpen(item) && !collapsed()) {
+                  <div class="submenu">
+                    @for (c of item.children; track c.path) {
+                      <a [routerLink]="c.path" routerLinkActive="active" class="sub-item"
+                         (click)="mobileOpen.set(false)">
+                        <span class="subdot"></span><span class="lbl">{{ c.label }}</span>
+                      </a>
+                    }
+                  </div>
+                }
+              } @else {
+                <a [routerLink]="item.path" routerLinkActive="active"
+                   [routerLinkActiveOptions]="{ exact: false }" class="nav-item"
+                   [attr.title]="item.label" (click)="mobileOpen.set(false)">
+                  <svg viewBox="0 0 24 24" class="ico"><path [attr.d]="item.icon" /></svg>
+                  @if (!collapsed()) { <span class="lbl">{{ item.label }}</span> }
+                </a>
+              }
             }
           </nav>
 
@@ -224,6 +248,18 @@ export interface NavItem {
       color: #fff; box-shadow: 0 8px 20px rgba(193,21,54,.34);
     }
     .nav-item.active .ico, .nav-item.active .li { color: #fff; }
+    .caret { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .6; transition: transform .18s; }
+    .caret.rot { transform: rotate(90deg); }
+    .submenu { display: flex; flex-direction: column; gap: 2px; margin: 2px 0 4px 20px; padding-left: 10px; border-left: 1px solid rgba(120,60,70,.16); }
+    .sub-item {
+      display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 9px;
+      color: #6a565b; font-size: 13px; font-weight: 500; text-decoration: none; white-space: nowrap;
+      transition: background .14s, color .14s;
+    }
+    .sub-item:hover { background: rgba(193,21,54,.07); color: #2a1a1e; }
+    .sub-item .subdot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; opacity: .5; }
+    .sub-item.active { color: var(--crimson); font-weight: 700; background: rgba(193,21,54,.09); }
+    .sub-item.active .subdot { opacity: 1; }
     .ico { width: 20px; height: 20px; fill: currentColor; flex: none; }
     .li { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
     .lbl { flex: 1; }
@@ -341,9 +377,23 @@ export class RoleShell {
   collapsed = signal(false);
   mobileOpen = signal(false);
   profileMenu = signal(false);
+  /** Manually toggled submenu groups (by label). A group is also open when a child route is active. */
+  private openGroups = signal<Record<string, boolean>>({});
 
   private router = inject(Router);
   private auth = inject(AuthService);
+
+  toggleGroup(item: NavItem) {
+    if (this.collapsed()) { this.collapsed.set(false); }
+    this.openGroups.update((m) => ({ ...m, [item.label]: !this.groupOpen(item) }));
+  }
+
+  groupOpen(item: NavItem): boolean {
+    const manual = this.openGroups()[item.label];
+    if (manual !== undefined) { return manual; }
+    // Auto-open when the current URL matches one of the group's children.
+    return (item.children ?? []).some((c) => c.path && this.router.url.includes(c.path));
+  }
 
   displayName = () => this.userName() || this.auth.user()?.name || 'User';
   userEmail = () => this.auth.user()?.email || '';
