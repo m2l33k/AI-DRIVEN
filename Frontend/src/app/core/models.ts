@@ -35,4 +35,6 @@ export interface CurrentUser {
   name: string;
   email: string;
   roles: string[];
+  /** Fine-grained permissions from the JWT (resource_access.platform-client.roles), e.g. detection-rules:write. */
+  permissions: string[];
 }

@@ -18,7 +18,8 @@ import java.util.Map;
 /**
  * Resource-server security for rate-limiting-service.
  *
- * <p>Public: the liveness probe ({@code /api/protection/health}), docs and actuator. Everything
+ * <p>Public: the liveness probe ({@code /api/protection/health}), the in-cluster gateway decision
+ * endpoint ({@code /internal/**}, never routed publicly), docs and actuator. Everything
  * else needs a valid JWT. Realm roles become {@code ROLE_<NAME>}; {@code platform-client}
  * permissions become {@code PERM_<permission>} (e.g. {@code PERM_protection:read},
  * {@code PERM_protection:manage}) so method security can require them.</p>
@@ -35,7 +36,7 @@ public class SecurityConfig {
 		http
 				.csrf(csrf -> csrf.disable())
 				.authorizeHttpRequests(auth -> auth
-						.requestMatchers("/api/protection/health", "/actuator/**",
+						.requestMatchers("/api/protection/health", "/internal/**", "/actuator/**",
 								"/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 						.anyRequest().authenticated())
 				.oauth2ResourceServer(oauth2 -> oauth2

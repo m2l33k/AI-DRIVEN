@@ -5,6 +5,7 @@ import io.javatab.microservices.ratelimit.ratelimit.TokenBucketService;
 import io.javatab.microservices.ratelimit.repository.RateLimitPolicyRepository;
 import io.javatab.microservices.ratelimit.web.dto.ProtectionStatsDto;
 import io.javatab.microservices.ratelimit.web.dto.RateLimitCheckRequest;
+import io.javatab.microservices.ratelimit.web.dto.RateLimitPolicyDto;
 import io.javatab.microservices.ratelimit.web.dto.RateLimitResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -65,14 +66,19 @@ public class ProtectionController {
 	@Operation(summary = "List policies", security = @SecurityRequirement(name = "bearerAuth"))
 	@PreAuthorize("hasAuthority('PERM_roaming-events:read')")
 	@GetMapping("/policies")
-	public List<RateLimitPolicy> listPolicies() {
-		return policies.findAll();
+	public List<RateLimitPolicyDto> listPolicies() {
+		return policies.findAll().stream().map(RateLimitPolicyDto::from).toList();
 	}
 
-	@Operation(summary = "Create or replace a policy", security = @SecurityRequirement(name = "bearerAuth"))
+	@Operation(summary = "Create or replace a policy",
+			description = "Upserts the token-bucket policy for {keyType} (path). Body: capacity, refillTokens, "
+					+ "refillIntervalMs (all >= 1), action (THROTTLE|BLOCK), enabled, description. "
+					+ "Requires detection-rules:write.",
+			security = @SecurityRequirement(name = "bearerAuth"))
 	@PreAuthorize("hasAuthority('PERM_detection-rules:write')")
 	@PutMapping("/policies/{keyType}")
-	public RateLimitPolicy upsertPolicy(@PathVariable String keyType, @RequestBody RateLimitPolicy body) {
+	public RateLimitPolicyDto upsertPolicy(@PathVariable String keyType,
+			@Valid @RequestBody RateLimitPolicyDto body) {
 		RateLimitPolicy policy = policies.findById(keyType)
 				.map(existing -> {
 					existing.update(body.capacity(), body.refillTokens(), body.refillIntervalMs(),
@@ -81,7 +87,7 @@ public class ProtectionController {
 				})
 				.orElseGet(() -> new RateLimitPolicy(keyType, body.capacity(), body.refillTokens(),
 						body.refillIntervalMs(), body.action(), body.enabled(), body.description()));
-		return policies.save(policy);
+		return RateLimitPolicyDto.from(policies.save(policy));
 	}
 
 	@Operation(summary = "Delete a policy", security = @SecurityRequirement(name = "bearerAuth"))

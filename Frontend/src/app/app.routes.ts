@@ -48,6 +48,7 @@ export const routes: Routes = [
       { path: 'security-alerts', loadComponent: () => import('./roles/security-analyst/security-alerts/security-alerts').then((m) => m.SecurityAlerts) },
       { path: 'roaming-events', loadComponent: () => import('./roles/security-analyst/roaming-events/roaming-events').then((m) => m.RoamingEvents) },
       { path: 'detection-rules', loadComponent: () => import('./roles/security-analyst/detection-rules/detection-rules').then((m) => m.DetectionRules) },
+      { path: 'rate-limiting', loadComponent: () => import('./roles/security-analyst/rate-limiting/rate-limiting').then((m) => m.RateLimiting) },
     ],
   },
 

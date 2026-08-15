@@ -25,6 +25,7 @@ export class AuthService {
   readonly user = signal<CurrentUser | null>(this.decode(this.token()));
   readonly isAuthenticated = computed(() => this.user() !== null);
   readonly roles = computed(() => this.user()?.roles ?? []);
+  readonly permissions = computed(() => this.user()?.permissions ?? []);
 
   token(): string | null {
     return localStorage.getItem(TOKEN_KEY);
@@ -32,6 +33,11 @@ export class AuthService {
 
   hasRole(role: string): boolean {
     return this.roles().includes(role);
+  }
+
+  /** True if the current user's JWT carries the given fine-grained permission (e.g. detection-rules:write). */
+  hasPermission(permission: string): boolean {
+    return this.permissions().includes(permission);
   }
 
   /** Route the current user should land on based on their highest-precedence role. */
@@ -100,6 +106,7 @@ export class AuthService {
         name: payload.name ?? payload.preferred_username ?? '',
         email: payload.email ?? '',
         roles: payload.realm_access?.roles?.map((r: string) => r.toUpperCase()) ?? [],
+        permissions: payload.resource_access?.['platform-client']?.roles ?? [],
       };
     } catch {
       return null;
