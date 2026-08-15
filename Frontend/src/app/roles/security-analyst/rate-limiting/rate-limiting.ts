@@ -150,7 +150,6 @@ const EMPTY_POLICY: Policy = {
     <div class="hw-card panel">
       <div class="panel-head">
         <h3>Test a rate-limit decision</h3>
-        <span class="tag">POST /check · consumes real tokens</span>
       </div>
       <form class="check" (ngSubmit)="runCheck()">
         <label>Key type
