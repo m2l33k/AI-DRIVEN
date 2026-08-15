@@ -162,3 +162,39 @@ button {
   border-radius: var(--hw-radius);
   box-shadow: var(--hw-shadow-sm);
 }
+
+/* ---- Responsive tables: horizontally scrollable on small screens ----
+   Global so every `.tbl` across all pages benefits without markup changes. */
+@media (max-width: 720px) {
+  .tbl {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ---- Async UI states: loading spinner / empty / error (shared utilities) ---- */
+@keyframes hw-spin { to { transform: rotate(360deg); } }
+.hw-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2.5px solid var(--hw-border);
+  border-top-color: var(--hw-red);
+  border-radius: 50%;
+  animation: hw-spin 0.7s linear infinite;
+  flex: none;
+}
+.hw-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 44px 20px;
+  color: var(--hw-text-3);
+  font-size: 13px;
+  text-align: center;
+}
+.hw-state--error { color: var(--hw-danger); }
+.hw-state .hw-btn { margin-top: 4px; }

@@ -5,19 +5,20 @@ import { StatCard } from '../../../shared/ui/stat-card';
 import { LineChart } from '../../../shared/charts/line-chart';
 import { DonutChart, DonutSlice } from '../../../shared/charts/donut-chart';
 import { GaugeChart } from '../../../shared/charts/gauge-chart';
+import { AsyncState } from '../../../shared/ui/async-state';
 import { RoamingService, RoamingSummary, LiveMonitor, Forecast } from './roaming.service';
 
 @Component({
   selector: 'app-roaming-overview',
   standalone: true,
-  imports: [DecimalPipe, PageHeader, StatCard, LineChart, DonutChart, GaugeChart],
+  imports: [DecimalPipe, PageHeader, StatCard, LineChart, DonutChart, GaugeChart, AsyncState],
   template: `
     <hw-page-header title="Roaming · Overview"
       subtitle="Traffic, risk mix, live monitor and traffic forecast">
       <button class="hw-btn" (click)="load()">Refresh</button>
     </hw-page-header>
 
-    @if (error()) { <div class="hw-card banner-err">{{ error() }}</div> }
+    <hw-async-state [loading]="loading()" [error]="error()" (retry)="load()" />
 
     @if (summary(); as s) {
       <div class="stats">
@@ -69,7 +70,7 @@ import { RoamingService, RoamingSummary, LiveMonitor, Forecast } from './roaming
           <hw-line-chart [data]="forecastData()" [labels]="forecastLabels()" [smooth]="true" color="#722ed1" ariaLabel="Forecast" />
         </div>
       }
-    } @else if (!error()) { <div class="hw-card note">Loading…</div> }
+    }
   `,
   styles: [`
     .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
@@ -96,6 +97,7 @@ export class RoamingOverview implements OnInit {
   live = signal<LiveMonitor | null>(null);
   forecast = signal<Forecast | null>(null);
   error = signal<string | null>(null);
+  loading = signal(true);
 
   volumeData = computed(() => this.summary()?.volumeSeries.map((p) => p.subscribers) ?? []);
   volumeLabels = computed(() => this.summary()?.volumeSeries.map((p) => p.label) ?? []);
@@ -127,7 +129,11 @@ export class RoamingOverview implements OnInit {
 
   load() {
     this.error.set(null);
-    this.api.summary().subscribe({ next: (v) => this.summary.set(v), error: (e) => this.fail(e) });
+    this.loading.set(true);
+    this.api.summary().subscribe({
+      next: (v) => { this.summary.set(v); this.loading.set(false); },
+      error: (e) => { this.fail(e); this.loading.set(false); },
+    });
     this.api.live(60).subscribe({ next: (v) => this.live.set(v), error: () => {} });
     this.api.forecast(6).subscribe({ next: (v) => this.forecast.set(v), error: () => {} });
   }

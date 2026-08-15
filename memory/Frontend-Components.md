@@ -22,6 +22,9 @@ See [[Frontend-Architecture]] for the big picture.
 |------|----------|--------|
 | `stat-card.ts` | `hw-stat-card` | `label`, `value`, `unit`, `accent`, `delta:number\|null`, `deltaHint` — KPI card with trend arrow |
 | `page-header.ts` | `hw-page-header` | `title`, `subtitle` + `<ng-content>` for right-side actions |
+| `async-state.ts` | `hw-async-state` | **2026-08-15** — `loading`, `error`, `empty`, `loadingText`, `emptyText` + `(retry)` output. Shared loading-spinner / error-with-Retry / empty block; render above data content. Wired into all 6 roaming data pages. |
+
+**Global CSS utilities (`src/styles.css`, 2026-08-15):** responsive tables (`@media (max-width:720px) .tbl { display:block; overflow-x:auto }` — every `.tbl` scrolls on small screens, no markup change) · `.hw-spinner` + `@keyframes hw-spin` · `.hw-state` / `.hw-state--error` for the async-state block.
 
 ## Shared — layout (`shared/layout/`)
 - `role-shell.ts` → `hw-role-shell`. The reusable console chrome.
@@ -32,6 +35,13 @@ See [[Frontend-Architecture]] for the big picture.
     highlight. Used by the security-analyst **Roaming** group. Collapsing the sidebar hides submenus.
   - Features: collapsible sidebar (signal `collapsed`), top bar with role badge,
     notifications, user avatar/initials, logout (routes to `/login`), `<router-outlet/>`.
+  - **Language switcher (2026-08-15):** a flag-toggle button in the **topbar next to the notification
+    bell** (EN England-flag / 中文 China-flag SVGs, shows active flag + code). Backed by
+    `core/i18n.service.ts` — `lang` signal `'en'|'zh'`, `toggle()`, persists to localStorage, sets
+    `<html lang>`, and **`t(key)`** with an EN→中文 dictionary. The shell **chrome IS translated**
+    (all nav labels across roles, section headers, account items, role badge, Collapse/Sign out).
+    ⚠️ Page-body strings (feature pages, page headers) are still English — extend by wrapping them in
+    `i18n.t('…')` + adding phrases to the dict (no library needed).
 
 ## Auth (`auth/`)
 - `login/login.ts` → `app-login`. Split-screen: red brand panel + form.

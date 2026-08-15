@@ -3,19 +3,20 @@ import { FormsModule } from '@angular/forms';
 import { DecimalPipe, DatePipe } from '@angular/common';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { BarChart } from '../../../shared/charts/bar-chart';
+import { AsyncState } from '../../../shared/ui/async-state';
 import { RoamingService, RoamingEvent, EventFilter } from './roaming.service';
 
 @Component({
   selector: 'app-roaming-events-page',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, DatePipe, PageHeader, BarChart],
+  imports: [FormsModule, DecimalPipe, DatePipe, PageHeader, BarChart, AsyncState],
   template: `
     <hw-page-header title="Roaming · Events"
       subtitle="Inbound / outbound roaming events with risk scoring">
       <button class="hw-btn" (click)="loadEvents()">Refresh</button>
     </hw-page-header>
 
-    @if (error()) { <div class="hw-card banner-err">{{ error() }}</div> }
+    <hw-async-state [loading]="loading()" [error]="error()" (retry)="loadEvents()" />
 
     <div class="hw-card panel">
       <div class="filters">
@@ -111,6 +112,7 @@ export class RoamingEventsPage implements OnInit {
   events = signal<RoamingEvent[]>([]);
   selected = signal<RoamingEvent | null>(null);
   error = signal<string | null>(null);
+  loading = signal(true);
   filter: EventFilter = { direction: '', partnerPlmn: '', riskLevel: '' };
 
   private topPartners = computed(() => {
@@ -125,9 +127,10 @@ export class RoamingEventsPage implements OnInit {
 
   loadEvents() {
     this.error.set(null);
+    this.loading.set(true);
     this.api.events(this.filter).subscribe({
-      next: (data) => this.events.set(data),
-      error: (e) => this.fail(e),
+      next: (data) => { this.events.set(data); this.loading.set(false); },
+      error: (e) => { this.fail(e); this.loading.set(false); },
     });
   }
 

@@ -11,6 +11,19 @@ something meaningful.
 
 ## 2026-08-15
 
+### Frontend polish: responsive tables + loading/empty/error states (detail: [[Frontend-Components]])
+- **Responsive tables:** global rule in `src/styles.css` — `@media (max-width:720px) .tbl { display:block;
+  overflow-x:auto; white-space:nowrap }` → every table across all pages scrolls horizontally on small
+  screens, no per-component markup change.
+- **Loading/empty/error:** new shared **`shared/ui/async-state.ts`** (`hw-async-state`: loading spinner /
+  error-with-Retry / empty) + global `.hw-spinner`/`.hw-state` CSS. Wired into all **6 roaming
+  data pages** (overview, events, anomalies, partners, qos, revenue): added a `loading` signal (false
+  on first response/error), replaced the ad-hoc `banner-err` with `<hw-async-state … (retry)="load()">`.
+  Build clean (`ng build`).
+- **⚠️ i18n NOT actually implemented** despite the checkbox in [[Next-Steps]]. The app has **no**
+  `@angular/localize`/ngx-translate and no language picker (login has no lang hint in code). Needs a
+  real decision (ngx-translate runtime vs Angular compile-time) + string extraction — see below.
+
 ### Grafana: "Redis & Storage" dashboard + DB/Redis exporters (detail: [[Grafana-Dashboards]])
 - Built **`grafana-dashboard/Redis and Storage.json`** (uid `redis-and-storage`, 28 panels / 4 rows):
   Redis (both instances), PostgreSQL (keycloak + ratelimit), MySQL (roaming), and HikariCP app pools.

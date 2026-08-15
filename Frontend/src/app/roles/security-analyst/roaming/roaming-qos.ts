@@ -3,19 +3,20 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { StatCard } from '../../../shared/ui/stat-card';
 import { BarChart } from '../../../shared/charts/bar-chart';
 import { GaugeChart } from '../../../shared/charts/gauge-chart';
+import { AsyncState } from '../../../shared/ui/async-state';
 import { RoamingService, Qos, Experience } from './roaming.service';
 
 @Component({
   selector: 'app-roaming-qos',
   standalone: true,
-  imports: [PageHeader, StatCard, BarChart, GaugeChart],
+  imports: [PageHeader, StatCard, BarChart, GaugeChart, AsyncState],
   template: `
     <hw-page-header title="Roaming · QoS & Experience"
       subtitle="Quality of service and per-partner customer-experience scoring">
       <button class="hw-btn" (click)="load()">Refresh</button>
     </hw-page-header>
 
-    @if (error()) { <div class="hw-card banner-err">{{ error() }}</div> }
+    <hw-async-state [loading]="loading()" [error]="error()" (retry)="load()" />
 
     @if (qos(); as q) {
       <div class="grid g13">
@@ -82,6 +83,7 @@ export class RoamingQos implements OnInit {
   qos = signal<Qos | null>(null);
   experience = signal<Experience[]>([]);
   error = signal<string | null>(null);
+  loading = signal(true);
 
   barData = computed(() => this.experience().map((x) => x.experienceScore));
   barLabels = computed(() => this.experience().map((x) => x.partnerPlmn));
@@ -90,7 +92,11 @@ export class RoamingQos implements OnInit {
 
   load() {
     this.error.set(null);
-    this.api.qos().subscribe({ next: (v) => this.qos.set(v), error: (e) => this.fail(e) });
+    this.loading.set(true);
+    this.api.qos().subscribe({
+      next: (v) => { this.qos.set(v); this.loading.set(false); },
+      error: (e) => { this.fail(e); this.loading.set(false); },
+    });
     this.api.experience().subscribe({ next: (v) => this.experience.set(v), error: (e) => this.fail(e) });
   }
 

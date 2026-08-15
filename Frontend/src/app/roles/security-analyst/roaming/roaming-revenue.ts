@@ -5,19 +5,20 @@ import { StatCard } from '../../../shared/ui/stat-card';
 import { BarChart } from '../../../shared/charts/bar-chart';
 import { DonutChart, DonutSlice } from '../../../shared/charts/donut-chart';
 import { GaugeChart } from '../../../shared/charts/gauge-chart';
+import { AsyncState } from '../../../shared/ui/async-state';
 import { RoamingService, Revenue, Optimization } from './roaming.service';
 
 @Component({
   selector: 'app-roaming-revenue',
   standalone: true,
-  imports: [DecimalPipe, PageHeader, StatCard, BarChart, DonutChart, GaugeChart],
+  imports: [DecimalPipe, PageHeader, StatCard, BarChart, DonutChart, GaugeChart, AsyncState],
   template: `
     <hw-page-header title="Roaming · Revenue"
       subtitle="Revenue, cost, margin and per-partner agreement optimization">
       <button class="hw-btn" (click)="load()">Refresh</button>
     </hw-page-header>
 
-    @if (error()) { <div class="hw-card banner-err">{{ error() }}</div> }
+    <hw-async-state [loading]="loading()" [error]="error()" (retry)="load()" />
 
     @if (revenue(); as r) {
       <div class="stats">
@@ -93,6 +94,7 @@ export class RoamingRevenue implements OnInit {
   revenue = signal<Revenue | null>(null);
   optimization = signal<Optimization[]>([]);
   error = signal<string | null>(null);
+  loading = signal(true);
 
   barData = computed(() => this.revenue()?.topPartners.map((p) => Math.round(p.revenueEur)) ?? []);
   barLabels = computed(() => this.revenue()?.topPartners.map((p) => p.partnerPlmn) ?? []);
@@ -109,7 +111,11 @@ export class RoamingRevenue implements OnInit {
 
   load() {
     this.error.set(null);
-    this.api.revenue().subscribe({ next: (v) => this.revenue.set(v), error: (e) => this.fail(e) });
+    this.loading.set(true);
+    this.api.revenue().subscribe({
+      next: (v) => { this.revenue.set(v); this.loading.set(false); },
+      error: (e) => { this.fail(e); this.loading.set(false); },
+    });
     this.api.optimization().subscribe({ next: (v) => this.optimization.set(v), error: (e) => this.fail(e) });
   }
 

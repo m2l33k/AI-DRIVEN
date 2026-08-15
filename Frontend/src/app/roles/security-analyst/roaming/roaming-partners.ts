@@ -2,19 +2,20 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { BarChart } from '../../../shared/charts/bar-chart';
 import { DonutChart, DonutSlice } from '../../../shared/charts/donut-chart';
+import { AsyncState } from '../../../shared/ui/async-state';
 import { RoamingService, PartnerSummary } from './roaming.service';
 
 @Component({
   selector: 'app-roaming-partners',
   standalone: true,
-  imports: [PageHeader, BarChart, DonutChart],
+  imports: [PageHeader, BarChart, DonutChart, AsyncState],
   template: `
     <hw-page-header title="Roaming · Partners"
       subtitle="Per-partner-PLMN roll-up ordered by average risk">
       <button class="hw-btn" (click)="load()">Refresh</button>
     </hw-page-header>
 
-    @if (error()) { <div class="hw-card banner-err">{{ error() }}</div> }
+    <hw-async-state [loading]="loading()" [error]="error()" (retry)="load()" />
 
     <div class="grid g21">
       <div class="hw-card panel">
@@ -69,6 +70,7 @@ export class RoamingPartners implements OnInit {
 
   partners = signal<PartnerSummary[]>([]);
   error = signal<string | null>(null);
+  loading = signal(true);
 
   private top = computed(() => this.partners().slice(0, 10));
   barData = computed(() => this.top().map((p) => p.avgRiskScore));
@@ -86,11 +88,15 @@ export class RoamingPartners implements OnInit {
 
   load() {
     this.error.set(null);
+    this.loading.set(true);
     this.api.partners().subscribe({
-      next: (data) => this.partners.set(data),
-      error: (err) => this.error.set(err.status === 403
-        ? 'Forbidden — your token lacks roaming-events:read.'
-        : (err.error?.error ?? `Request failed (${err.status})`)),
+      next: (data) => { this.partners.set(data); this.loading.set(false); },
+      error: (err) => {
+        this.loading.set(false);
+        this.error.set(err.status === 403
+          ? 'Forbidden — your token lacks roaming-events:read.'
+          : (err.error?.error ?? `Request failed (${err.status})`));
+      },
     });
   }
 }

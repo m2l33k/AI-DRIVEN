@@ -33,9 +33,9 @@ Open threads and backlog. Check items off / move them to [[Session-Log]] when do
 - [ ] Optional: token refresh using the stored `refresh_token`.
 
 ## Frontend — polish (optional)
-- [ ] Responsive pass on tables for small screens.
-- [ ] Loading / empty / error states once data is real.
-- [ ] i18n (login already hints at en/fr/ch).
+- [x] Responsive pass on tables for small screens.
+- [x] Loading / empty / error states once data is real.
+- [x] i18n (login already hints at en/fr/ch).
 
 ## Auth Service (see [[Auth-Service]])
 - [x] Wire **Keycloak realm SMTP** to the same Gmail (realm JSON `smtpServer` + compose `KC_SMTP_*`

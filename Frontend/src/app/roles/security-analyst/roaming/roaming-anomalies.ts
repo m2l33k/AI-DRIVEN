@@ -4,19 +4,20 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { StatCard } from '../../../shared/ui/stat-card';
 import { BarChart } from '../../../shared/charts/bar-chart';
 import { DonutChart, DonutSlice } from '../../../shared/charts/donut-chart';
+import { AsyncState } from '../../../shared/ui/async-state';
 import { RoamingService, Anomaly } from './roaming.service';
 
 @Component({
   selector: 'app-roaming-anomalies',
   standalone: true,
-  imports: [DatePipe, PageHeader, StatCard, BarChart, DonutChart],
+  imports: [DatePipe, PageHeader, StatCard, BarChart, DonutChart, AsyncState],
   template: `
     <hw-page-header title="Roaming · Anomalies"
       subtitle="Statistical + rule-based anomaly detection with composite scoring">
       <button class="hw-btn" (click)="load()">Refresh</button>
     </hw-page-header>
 
-    @if (error()) { <div class="hw-card banner-err">{{ error() }}</div> }
+    <hw-async-state [loading]="loading()" [error]="error()" (retry)="load()" />
 
     <div class="stats">
       <hw-stat-card label="Anomalies" [value]="anomalies().length" accent="#f53f3f" />
@@ -88,6 +89,7 @@ export class RoamingAnomalies implements OnInit {
 
   anomalies = signal<Anomaly[]>([]);
   error = signal<string | null>(null);
+  loading = signal(true);
 
   count = (sev: string) => this.anomalies().filter((a) => a.severity === sev).length;
 
@@ -104,11 +106,15 @@ export class RoamingAnomalies implements OnInit {
 
   load() {
     this.error.set(null);
+    this.loading.set(true);
     this.api.anomalies().subscribe({
-      next: (data) => this.anomalies.set(data),
-      error: (err) => this.error.set(err.status === 403
-        ? 'Forbidden — your token lacks roaming-events:read.'
-        : (err.error?.error ?? `Request failed (${err.status})`)),
+      next: (data) => { this.anomalies.set(data); this.loading.set(false); },
+      error: (err) => {
+        this.loading.set(false);
+        this.error.set(err.status === 403
+          ? 'Forbidden — your token lacks roaming-events:read.'
+          : (err.error?.error ?? `Request failed (${err.status})`));
+      },
     });
   }
 }

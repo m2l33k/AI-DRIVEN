@@ -1,6 +1,7 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet, Router } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
+import { I18nService } from '../../core/i18n.service';
 
 export interface NavItem {
   label: string;
@@ -49,7 +50,7 @@ export interface NavItem {
 
         <div class="scroll">
           <!-- Main navigation -->
-          @if (!collapsed()) { <span class="nav-section">Main</span> }
+          @if (!collapsed()) { <span class="nav-section">{{ i18n.t('Main') }}</span> }
           <nav>
             @for (item of navItems(); track item.label) {
               @if (item.children && item.children.length) {
@@ -57,7 +58,7 @@ export interface NavItem {
                         [attr.title]="item.label" (click)="toggleGroup(item)">
                   <svg viewBox="0 0 24 24" class="ico"><path [attr.d]="item.icon" /></svg>
                   @if (!collapsed()) {
-                    <span class="lbl">{{ item.label }}</span>
+                    <span class="lbl">{{ i18n.t(item.label) }}</span>
                     <svg class="caret" [class.rot]="groupOpen(item)" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg>
                   }
                 </button>
@@ -66,7 +67,7 @@ export interface NavItem {
                     @for (c of item.children; track c.path) {
                       <a [routerLink]="c.path" routerLinkActive="active" class="sub-item"
                          (click)="mobileOpen.set(false)">
-                        <span class="subdot"></span><span class="lbl">{{ c.label }}</span>
+                        <span class="subdot"></span><span class="lbl">{{ i18n.t(c.label) }}</span>
                       </a>
                     }
                   </div>
@@ -76,28 +77,28 @@ export interface NavItem {
                    [routerLinkActiveOptions]="{ exact: false }" class="nav-item"
                    [attr.title]="item.label" (click)="mobileOpen.set(false)">
                   <svg viewBox="0 0 24 24" class="ico"><path [attr.d]="item.icon" /></svg>
-                  @if (!collapsed()) { <span class="lbl">{{ item.label }}</span> }
+                  @if (!collapsed()) { <span class="lbl">{{ i18n.t(item.label) }}</span> }
                 </a>
               }
             }
           </nav>
 
           <!-- Account / secondary -->
-          @if (!collapsed()) { <span class="nav-section">Account</span> }
+          @if (!collapsed()) { <span class="nav-section">{{ i18n.t('Account') }}</span> }
           <nav>
             <button class="nav-item" title="Notifications">
               <svg class="li" viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
-              @if (!collapsed()) { <span class="lbl">Notifications</span> <span class="badge">3</span> }
+              @if (!collapsed()) { <span class="lbl">{{ i18n.t('Notifications') }}</span> <span class="badge">3</span> }
               @else { <i class="dot"></i> }
             </button>
             <button class="nav-item" title="Messages">
               <svg class="li" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-              @if (!collapsed()) { <span class="lbl">Messages</span> <span class="badge alt">5</span> }
+              @if (!collapsed()) { <span class="lbl">{{ i18n.t('Messages') }}</span> <span class="badge alt">5</span> }
               @else { <i class="dot alt"></i> }
             </button>
             <button class="nav-item" (click)="openChangePw()" title="Change password">
               <svg class="li" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
-              @if (!collapsed()) { <span class="lbl">Change password</span> }
+              @if (!collapsed()) { <span class="lbl">{{ i18n.t('Change password') }}</span> }
             </button>
           </nav>
         </div>
@@ -106,8 +107,8 @@ export interface NavItem {
         <div class="profile" [class.menu-open]="profileMenu()">
           @if (profileMenu()) {
             <div class="pmenu">
-              <button (click)="openChangePw(); profileMenu.set(false)">Change password</button>
-              <button class="danger" (click)="logout()">Sign out</button>
+              <button (click)="openChangePw(); profileMenu.set(false)">{{ i18n.t('Change password') }}</button>
+              <button class="danger" (click)="logout()">{{ i18n.t('Sign out') }}</button>
             </div>
           }
           <div class="pcard" (click)="collapsed() ? logout() : profileMenu.set(!profileMenu())">
@@ -129,7 +130,7 @@ export interface NavItem {
           <svg class="li" viewBox="0 0 24 24">
             <path [attr.d]="collapsed() ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'" />
           </svg>
-          @if (!collapsed()) { <span>Collapse</span> }
+          @if (!collapsed()) { <span>{{ i18n.t('Collapse') }}</span> }
         </button>
       </aside>
 
@@ -137,12 +138,22 @@ export interface NavItem {
       <div class="main">
         <header class="topbar">
           <div class="crumbs">
-            <span class="role-badge">{{ roleName() }}</span>
+            <span class="role-badge">{{ i18n.t(roleName()) }}</span>
           </div>
           <div class="top-actions">
             <button class="icon-btn" aria-label="Notifications">
               <svg class="li" viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
               <i class="badge-dot"></i>
+            </button>
+            <button class="icon-btn lang-btn" (click)="i18n.toggle()"
+                    [attr.aria-label]="i18n.lang() === 'en' ? 'Switch to Chinese' : 'Switch to English'"
+                    [title]="i18n.lang() === 'en' ? 'Switch to 中文' : 'Switch to English'">
+              @if (i18n.lang() === 'en') {
+                <svg class="flag" viewBox="0 0 24 16"><rect width="24" height="16" fill="#fff"/><rect x="9.5" width="5" height="16" fill="#ce1124"/><rect y="5.5" width="24" height="5" fill="#ce1124"/></svg>
+              } @else {
+                <svg class="flag" viewBox="0 0 24 16"><rect width="24" height="16" fill="#de2910"/><text x="6" y="11" fill="#ffde00" font-size="9" text-anchor="middle">★</text></svg>
+              }
+              <span class="lang-code">{{ i18n.lang() === 'en' ? 'EN' : '中' }}</span>
             </button>
           </div>
         </header>
@@ -271,6 +282,13 @@ export interface NavItem {
     .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--crimson); position: absolute; top: 8px; right: 20px; }
     .dot.alt { background: #f59e0b; }
 
+    /* Language switcher (topbar, next to notifications) */
+    .flag { width: 20px; height: 13px; border-radius: 3px; flex: none; box-shadow: 0 0 0 1px rgba(0,0,0,.1); }
+    .lang-btn { width: auto; display: flex; align-items: center; gap: 6px; padding: 0 10px; }
+    .lang-btn .lang-code { font-size: 12px; font-weight: 700; color: #6a565b; }
+    .lang-btn:hover { background: rgba(193,21,54,.08); }
+    .lang-btn:hover .lang-code { color: var(--crimson); }
+
     /* Profile card */
     .profile { position: relative; margin: 6px 6px 0; }
     .pcard {
@@ -382,6 +400,7 @@ export class RoleShell {
 
   private router = inject(Router);
   private auth = inject(AuthService);
+  readonly i18n = inject(I18nService);
 
   toggleGroup(item: NavItem) {
     if (this.collapsed()) { this.collapsed.set(false); }
