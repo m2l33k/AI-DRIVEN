@@ -44,6 +44,9 @@ client `platform-client`). These 4 realm roles drive the whole [[Frontend-Archit
 - **`/api/users/directory`** (2026-08-15) — a `{username, name}` directory readable by **any
   authenticated user** (no `users:read`), for the messaging recipient search. `/api/messages/**` is
   likewise open to any authenticated user (sender taken from the JWT). See [[Messaging-Service]].
+- **`/ws/**`** — permitted (no Bearer) at the gateway + messaging-service; the **WebSocket handshake
+  authenticates itself** via a `?token=<JWT>` query param (ADR-14). Not RBAC-gated — the socket only
+  delivers notifications addressed to the token's user.
 
 ## Full permission set (client `platform-client`)
 `users:read/write`, `roles:read/write`, `platform-config:read/write`, `nf:read/restart`,

@@ -77,6 +77,9 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.GET, "/api/anomaly/health", "/api/protection/health",
                                 "/api/tracing/health", "/api/fault/health").permitAll()
 
+                        // WebSocket notifications — handshake authenticates via ?token= at the service.
+                        .pathMatchers("/ws/**").permitAll()
+
                         // --- Platform metrics overview (from Prometheus) — any authenticated user ---
                         .pathMatchers(HttpMethod.GET, "/api/metrics/**").authenticated()
 

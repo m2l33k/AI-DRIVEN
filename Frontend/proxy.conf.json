@@ -9,6 +9,12 @@
     "secure": false,
     "changeOrigin": true
   },
+  "/ws": {
+    "target": "ws://localhost:9007",
+    "secure": false,
+    "ws": true,
+    "changeOrigin": true
+  },
   "/infra-health/gateway": {
     "target": "http://localhost:9000",
     "secure": false,

@@ -11,6 +11,19 @@ something meaningful.
 
 ## 2026-08-15
 
+### WebSocket real-time notifications (detail: [[Messaging-Service]] · ADR-14)
+- **messaging-service:** added native WebSocket `/ws/notifications` (`spring-boot-starter-websocket`) —
+  `WebSocketConfig` + `JwtHandshakeInterceptor` (auth via `?token=`, validated by `JwtDecoder`) +
+  `NotificationSocketHandler` (`Map<user,sessions>`, `sendToUser`). `MessageService.send` pushes a
+  `MESSAGE` notification to the recipient. `/ws/**` permitted in its SecurityConfig.
+- **gateway:** route `/ws/**` → `lb:ws://messaging-service` (both profiles); `/ws/**` permitAll.
+- **frontend:** `core/notifications.service.ts` (native WebSocket, auto-reconnect, `items`/`unread`
+  signals); **topbar bell** = live count + dropdown of recent notifications (→ Messages, marks read on
+  open); connects on shell mount, disconnects on logout. Dev proxy `/ws` → `ws://localhost:9007`.
+- Chose **native WS + token-query-param** over STOMP/SockJS to avoid client libs (ADR-14).
+- Verified: messaging + gateway compile (EXIT=0); `ng build` clean. **Not** runtime-tested (no live
+  WS here) — restart messaging-service + gateway + `ng serve` to try it.
+
 ### Messaging frontend + user-directory endpoint (detail: [[Messaging-Service]] · [[Auth-Service]])
 - **Frontend Messages page wired** to `/api/messages/*`: `core/messages.service.ts` + `messaging/
   messages.ts` (two-pane: conversation list + chat thread + compose + live user-search dropdown, 8s

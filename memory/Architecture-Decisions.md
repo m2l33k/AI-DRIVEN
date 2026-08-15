@@ -9,6 +9,20 @@ updated: 2026-08-15
 The **why** behind the design — the non-obvious choices, and their trade-offs. Read this before
 proposing a change so you don't undo a deliberate decision. Newest first.
 
+## ADR-14 · Real-time notifications = native WebSocket with token-query-param auth (no STOMP/SockJS)
+**Decision:** live notifications use a **native WebSocket** endpoint (`/ws/notifications` in
+messaging-service), not STOMP/SockJS. The handshake authenticates via a **`?token=<JWT>`** query
+param (validated by the same `JwtDecoder` as REST), because browsers can't set an `Authorization`
+header on a WebSocket. The gateway proxies it via a `lb:ws://messaging-service` route; `/ws/**` is
+permitted at both the gateway and the service (the handshake self-authenticates).
+**Why:** avoids adding STOMP/SockJS libs on both ends (no `@stomp/stompjs`, no npm churn); the browser
+`WebSocket` API + a `TextWebSocketHandler` is enough for per-user push. Query-param token is the
+standard workaround for the missing header.
+**Trade-offs:** the JWT appears in the WS URL (acceptable for this platform; could move to a
+short-lived ticket later); manual session bookkeeping (`Map<user, sessions>`) instead of STOMP's
+user destinations; no built-in message ack/broker. **Dev:** the ng-serve proxy points `/ws` straight
+at messaging-service :9007 for reliability; prod goes through the gateway. See [[Messaging-Service]].
+
 ## ADR-13 · Use free5GC as the 5G Core substrate; this repo is the harness (don't build NFs from scratch)
 **Decision (2026-08-15):** adopt **free5GC** (open-source, Go) as the actual 5G Core (NRF/AMF/SMF/
 UPF/AUSF/UDM/UDR/PCF/NSSF) driven by **UERANSIM** (gNB/UE sim). We do **not** hand-build the NFs.

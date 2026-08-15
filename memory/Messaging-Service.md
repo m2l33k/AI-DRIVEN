@@ -58,6 +58,24 @@ config/     SecurityConfig (JWT → ROLE_/PERM_) · OpenApiConfig (@SecuritySche
 - `docker/prometheus/prometheus.yml`: scrape target `host.docker.internal:9007`.
 - `Dockerfile` (layered, EXPOSE 9007) + `kubernetes/deployment.yml` & `service.yml`.
 
+## Real-time notifications — WebSocket (DONE 2026-08-15)
+Native WebSocket (no STOMP/SockJS) endpoint **`/ws/notifications`** in messaging-service pushes live
+notifications; a new message → instant push to the recipient's open sessions.
+- **`config/WebSocketConfig`** (`@EnableWebSocket`) registers the handler at `/ws/notifications`.
+- **`ws/JwtHandshakeInterceptor`** — browsers can't set an `Authorization` header on WS, so the JWT is
+  passed as **`?token=<JWT>`** and validated with the resource server's `JwtDecoder` (401 on bad token);
+  `preferred_username` is stored in the session attributes.
+- **`ws/NotificationSocketHandler`** (`TextWebSocketHandler`) — `Map<username, Set<session>>` (multi-tab),
+  `sendToUser(username, NotificationDto)` (no-op if offline). `ws/NotificationDto` = `{type,from,preview,at}`.
+- **`MessageService.send`** pushes a `MESSAGE` notification to the recipient after saving.
+- **Security:** `/ws/**` permitted in messaging-service `SecurityConfig` (handshake self-authenticates)
+  and at the gateway; gateway route **`/ws/**` → `lb:ws://messaging-service`** (both profiles).
+- **pom:** added `spring-boot-starter-websocket`.
+- **Dev proxy:** `/ws` → `ws://localhost:9007` (direct to the service for reliable local testing; prod
+  uses the gateway ws route). ⚠️ Restart `ng serve` after the proxy change.
+- Verified by compile (messaging + gateway EXIT=0) + `ng build`; **not** runtime-tested (can't open a
+  live WS here). See ADR-14 in [[Architecture-Decisions]].
+
 ## Frontend — DONE (2026-08-15)
 - **`core/messages.service.ts`** — typed client (`conversations`, `thread`, `send`, `markRead`,
   `directory`) + a live **`unread`** signal.
@@ -66,15 +84,21 @@ config/     SecurityConfig (JWT → ROLE_/PERM_) · OpenApiConfig (@SecuritySche
 - **Routing:** `messages` child route under **all four** role trees (messaging is for every user).
 - **Sidebar:** the shell's "Messages" item is now `routerLink="messages"` with a **live unread badge**
   (20s poll of `/unread-count` via `takeUntilDestroyed`), i18n-labelled.
+- **Live notifications:** `core/notifications.service.ts` — native `WebSocket` to `/ws/notifications?token=`
+  (auto-reconnect 5s), `items` + `unread` signals. The **topbar bell** shows a live count + a dropdown of
+  recent notifications (→ Messages on click, marks read on open); connects when the shell mounts,
+  disconnects on logout.
 - **Recipient picker fix:** `/api/users` needs `users:read` (admin/auditor only) → the search now uses
   the new **`GET /api/users/directory`** (any authenticated user; see [[Auth-Service]]). Gateway allows
   `GET /api/users/directory` → authenticated (before the `users:read` rule).
 - Verified: auth-service + gateway compile; `ng build` clean.
 
 ## TODO / next
-- Optional: real-time via WebSocket/STOMP (currently polling-friendly REST); group chats; delete;
-  typing indicators; exclude disabled users from the directory. Move sender-identity checks to a
-  shared filter if more services need it.
+- [x] Real-time via **WebSocket** (native, `/ws/notifications`) — done 2026-08-15 (see above / ADR-14).
+- Optional: other notification sources (alerts, NF events) push to the same socket; use the live
+  push to update the messages thread/unread without the 8s poll; group chats; delete; typing
+  indicators; exclude disabled users from the directory; move the JWT off the WS URL to a short-lived
+  ticket. Move sender-identity checks to a shared filter if more services need it.
 
 ## Related notes
 - [[Backend-and-Infra]] · [[Auth-Service]] (user directory `/api/users`) · [[Ports-and-URLs]] ·

@@ -119,6 +119,9 @@ See [[Frontend-Architecture]] for the big picture.
   `/unread-count`); a `messages` route is registered under **every** role tree.
 - `core/messages.service.ts` — client (`conversations`, `thread`, `send`, `markRead`, `directory`) +
   `unread` signal. `core/i18n.service.ts` — language state + `t()` (see role-shell language switcher).
+- `core/notifications.service.ts` — **native WebSocket** client to `/ws/notifications?token=` (auto-
+  reconnect), `items` + `unread` signals. The role-shell **topbar bell** shows the live count + a
+  dropdown of recent notifications; connects on shell mount, disconnects on logout (see ADR-14).
 
 ## Root & routing
 - `app.ts` — `<router-outlet />` only.

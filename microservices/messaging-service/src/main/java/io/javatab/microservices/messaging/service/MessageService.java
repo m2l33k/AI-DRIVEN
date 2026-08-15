@@ -4,6 +4,8 @@ import io.javatab.microservices.messaging.domain.Message;
 import io.javatab.microservices.messaging.repository.MessageRepository;
 import io.javatab.microservices.messaging.web.dto.ConversationDto;
 import io.javatab.microservices.messaging.web.dto.MessageDto;
+import io.javatab.microservices.messaging.ws.NotificationDto;
+import io.javatab.microservices.messaging.ws.NotificationSocketHandler;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -21,17 +23,21 @@ import java.util.Map;
 public class MessageService {
 
 	private final MessageRepository repository;
+	private final NotificationSocketHandler notifications;
 
-	public MessageService(MessageRepository repository) {
+	public MessageService(MessageRepository repository, NotificationSocketHandler notifications) {
 		this.repository = repository;
+		this.notifications = notifications;
 	}
 
-	/** Persist a new message from {@code me} to {@code recipient}. */
+	/** Persist a new message from {@code me} to {@code recipient} and push a live notification. */
 	public MessageDto send(String me, String recipient, String content) {
 		if (recipient.equals(me)) {
 			throw new IllegalArgumentException("You cannot message yourself");
 		}
 		Message saved = repository.save(new Message(me, recipient, content.trim(), Instant.now()));
+		// Real-time push to the recipient's open sessions (no-op if they're offline).
+		notifications.sendToUser(recipient, NotificationDto.message(me, saved.content()));
 		return MessageDto.of(saved, me);
 	}
 

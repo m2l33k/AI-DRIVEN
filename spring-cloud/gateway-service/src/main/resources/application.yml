@@ -88,6 +88,10 @@ spring:
               uri: lb://messaging-service
               predicates:
                 - Path=/api/messages/**
+            - id: messaging-ws
+              uri: lb:ws://messaging-service
+              predicates:
+                - Path=/ws/**
             - id: messaging-service-docs
               uri: lb://messaging-service
               predicates:
@@ -249,6 +253,10 @@ spring:
               uri: lb://messaging-service
               predicates:
                 - Path=/api/messages/**
+            - id: messaging-ws
+              uri: lb:ws://messaging-service
+              predicates:
+                - Path=/ws/**
             - id: messaging-service-docs
               uri: lb://messaging-service
               predicates:

@@ -1,10 +1,12 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DatePipe } from '@angular/common';
 import { RouterLink, RouterLinkActive, RouterOutlet, Router } from '@angular/router';
 import { interval, startWith } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
 import { I18nService } from '../../core/i18n.service';
 import { MessagesService } from '../../core/messages.service';
+import { NotificationsService } from '../../core/notifications.service';
 
 export interface NavItem {
   label: string;
@@ -23,7 +25,7 @@ export interface NavItem {
 @Component({
   selector: 'hw-role-shell',
   standalone: true,
-  imports: [RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, DatePipe],
   template: `
     <div class="shell" [class.collapsed]="collapsed()" [class.mobile-open]="mobileOpen()"
          [style.--role-accent]="accent()">
@@ -89,10 +91,12 @@ export interface NavItem {
           <!-- Account / secondary -->
           @if (!collapsed()) { <span class="nav-section">{{ i18n.t('Account') }}</span> }
           <nav>
-            <button class="nav-item" title="Notifications">
+            <button class="nav-item" title="Notifications" (click)="toggleNotif()">
               <svg class="li" viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
-              @if (!collapsed()) { <span class="lbl">{{ i18n.t('Notifications') }}</span> <span class="badge">3</span> }
-              @else { <i class="dot"></i> }
+              @if (!collapsed()) {
+                <span class="lbl">{{ i18n.t('Notifications') }}</span>
+                @if (notif.unread() > 0) { <span class="badge">{{ notif.unread() }}</span> }
+              } @else if (notif.unread() > 0) { <i class="dot"></i> }
             </button>
             <a class="nav-item" routerLink="messages" routerLinkActive="active" title="Messages"
                (click)="mobileOpen.set(false)">
@@ -147,10 +151,29 @@ export interface NavItem {
             <span class="role-badge">{{ i18n.t(roleName()) }}</span>
           </div>
           <div class="top-actions">
-            <button class="icon-btn" aria-label="Notifications">
-              <svg class="li" viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
-              <i class="badge-dot"></i>
-            </button>
+            <div class="notif">
+              <button class="icon-btn" aria-label="Notifications" (click)="toggleNotif()">
+                <svg class="li" viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>
+                @if (notif.unread() > 0) { <i class="badge-count">{{ notif.unread() > 9 ? '9+' : notif.unread() }}</i> }
+              </button>
+              @if (notifOpen()) {
+                <div class="scrim-t" (click)="notifOpen.set(false)"></div>
+                <div class="notif-panel">
+                  <div class="np-head"><strong>{{ i18n.t('Notifications') }}</strong></div>
+                  <div class="np-list">
+                    @for (n of notif.items(); track $index) {
+                      <a class="np-item" [class.unread]="!n.read" routerLink="messages" (click)="notifOpen.set(false)">
+                        <span class="np-avatar">{{ (n.from || '?').charAt(0).toUpperCase() }}</span>
+                        <span class="np-body">
+                          <span class="np-top"><strong>{{ n.from }}</strong><span class="np-time">{{ n.at | date:'HH:mm' }}</span></span>
+                          <span class="np-preview">{{ n.preview }}</span>
+                        </span>
+                      </a>
+                    } @empty { <p class="np-empty">No notifications yet.</p> }
+                  </div>
+                </div>
+              }
+            </div>
             <button class="icon-btn lang-btn" (click)="i18n.toggle()"
                     [attr.aria-label]="i18n.lang() === 'en' ? 'Switch to Chinese' : 'Switch to English'"
                     [title]="i18n.lang() === 'en' ? 'Switch to 中文' : 'Switch to English'">
@@ -355,6 +378,24 @@ export interface NavItem {
     }
     .icon-btn:hover { background: rgba(193,21,54,.08); color: var(--crimson); }
     .badge-dot { position: absolute; top: 9px; right: 10px; width: 7px; height: 7px; border-radius: 50%; background: var(--crimson); border: 1.5px solid #fff; }
+
+    /* Notifications bell + dropdown */
+    .notif { position: relative; }
+    .badge-count { position: absolute; top: 4px; right: 4px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px; background: var(--crimson); color: #fff; font-size: 9px; font-weight: 800; font-style: normal; display: grid; place-items: center; border: 1.5px solid #fff; }
+    .scrim-t { position: fixed; inset: 0; z-index: 40; }
+    .notif-panel { position: absolute; top: calc(100% + 8px); right: 0; z-index: 50; width: 320px; max-height: 420px; display: flex; flex-direction: column; background: #fff; border: 1px solid var(--hw-border, #e5e6eb); border-radius: 14px; box-shadow: 0 16px 40px rgba(64,12,24,.18); overflow: hidden; }
+    .np-head { padding: 12px 16px; border-bottom: 1px solid var(--hw-border, #e5e6eb); font-size: 14px; }
+    .np-list { overflow-y: auto; }
+    .np-item { display: flex; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(--hw-border, #eee); text-decoration: none; }
+    .np-item:hover { background: #faf7f8; }
+    .np-item.unread { background: rgba(193,21,54,.05); }
+    .np-avatar { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 700; font-size: 13px; color: #fff; background: linear-gradient(135deg, #3491fa, #722ed1); }
+    .np-body { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+    .np-top { display: flex; justify-content: space-between; gap: 8px; }
+    .np-top strong { font-size: 13px; color: #2a1a1e; }
+    .np-time { font-size: 11px; color: #9a7d83; }
+    .np-preview { font-size: 12px; color: #6a565b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .np-empty { padding: 26px 16px; text-align: center; color: #9a7d83; font-size: 13px; }
     .content { flex: 1; overflow-y: auto; padding: 20px 24px 24px; }
 
     /* ---- Mobile ---- */
@@ -408,10 +449,23 @@ export class RoleShell {
   private auth = inject(AuthService);
   readonly i18n = inject(I18nService);
   readonly messages = inject(MessagesService);
+  readonly notif = inject(NotificationsService);
+  notifOpen = signal(false);
 
   /** Poll the unread-messages count for the sidebar "Messages" badge (auto-stops on destroy). */
   private readonly unreadPoll = interval(20000).pipe(startWith(0), takeUntilDestroyed())
     .subscribe(() => this.messages.refreshUnread());
+
+  constructor() {
+    // Open the live-notifications WebSocket once the shell (i.e. an authenticated session) mounts.
+    this.notif.connect();
+  }
+
+  toggleNotif() {
+    const open = !this.notifOpen();
+    this.notifOpen.set(open);
+    if (open) { this.notif.markAllRead(); }
+  }
 
   toggleGroup(item: NavItem) {
     if (this.collapsed()) { this.collapsed.set(false); }
@@ -431,6 +485,7 @@ export class RoleShell {
     this.displayName().split(' ').map((s) => s[0]).slice(0, 2).join('').toUpperCase();
 
   logout() {
+    this.notif.disconnect();
     this.auth.logout();
     this.router.navigate(['/login']);
   }

@@ -21,7 +21,7 @@ row here. Local = running on the host; docker = the container name on `shared-ne
 | rate-limiting-service | `9004` | `rate-limiting-service:9004` | `/api/protection/**` (standalone limiter: `/check`, `/policies`, `/stats`) |
 | distributed-tracing-service | `9005` | `distributed-tracing-service:9005` | `/api/tracing/health` |
 | fault-injection-service | `9006` | `fault-injection-service:9006` | `/api/fault/health` |
-| messaging-service | `9007` | `messaging-service:9007` | `/api/messages/**` (DMs between users) |
+| messaging-service | `9007` | `messaging-service:9007` | `/api/messages/**` (DMs) + **`/ws/notifications`** (WebSocket, `?token=`) |
 | Frontend (Angular dev) | `4200` | — | proxies `/api` → gateway `:9000` |
 
 ## Identity & data
