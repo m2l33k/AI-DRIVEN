@@ -1,7 +1,7 @@
 ---
 title: Next Steps
 tags: [todo, backlog]
-updated: 2026-08-10
+updated: 2026-08-14
 ---
 
 # Next Steps
@@ -43,6 +43,12 @@ Open threads and backlog. Check items off / move them to [[Session-Log]] when do
 
 ## Roaming Analysis Service (see [[Roaming-Analysis-Service]])
 - [x] Replace in-memory repo with JPA + **MySQL** (`roaming-mysql` :3307), seeded on first start.
+- [x] **REDESIGN Phase 1 (2026-08-14):** real `Data/Data/` dataset model — 6 JPA entities +
+      repos + `CsvDataLoader` (OpenCSV). Additive; build green.
+- [ ] **REDESIGN Phase 2:** rewrite `RiskAnalyzer` + re-point every endpoint to real aggregates
+      (fraud_flag, auth-failure bursts, impossible travel, QoS, margin/settlement).
+- [ ] **REDESIGN Phase 3:** add `/fraud`, `/handovers`, `/settlement`, `/attach`; delete the
+      synthetic `RoamingEvent` + seeder.
 - [ ] Wire the frontend Roaming Events page to `/api/roaming/*` (esp. `/live`, `/anomalies`, `/forecast`).
 - [ ] Swap heuristics for real ML (forecast, anomaly detection).
 - [ ] Add integration tests once the project reintroduces a test strategy.
@@ -56,17 +62,32 @@ protected endpoints land.
       deployment manifests) — currently docker-compose only.
 - [ ] **anomaly-detection-service** (9003) — real-time anomaly detection; likely centralises the
       roaming service's heuristic `/anomalies` and swaps in ML.
-- [ ] **rate-limiting-service** (9004) — throttling / abuse protection (Redis token bucket; could
-      back gateway rate-limit filters).
+- [x] **rate-limiting-service** (9004) — **Role A done + image built (2026-08-14):** Redis
+      token-bucket limiter (`/api/protection/check|policies|stats`), atomic Lua, JWT-guarded.
+      Reuses `roaming-events:read` / `detection-rules:write` → **no Keycloak change**. Image
+      `docker-rate-limiting-service:latest`. See [[Platform-Services]].
+      - [ ] Wire a gateway `RequestRateLimiter` filter to actually call `/check` on live traffic.
+      - [ ] Role B: attach-flood detection over roaming `attach_events` + persist `BlockEvent`s.
+      - [ ] Runtime smoke test: `./infra.sh up` then `up -d rate-limiting-service`; get a token as
+            `analyst-user` and hit `/api/protection/check` + `/stats` through the gateway.
 - [ ] **distributed-tracing-service** (9005) — decide: add a real **Jaeger** container to
       `docker-compose-observability.yml` (OTLP sink, augment/replace Tempo) or drop the placeholder.
       See ADR-01 in [[Architecture-Decisions]].
 - [ ] **fault-injection-service** (9006) — chaos testing (latency/errors/NF outages).
 
+## Scripts / tooling (see [[Scripts-and-Tooling]])
+- [ ] Update `run.sh` (local-JAR path), `build-images.sh`, and the `Tiltfile` to also launch
+      **roaming (9002)** + the four placeholders (9003–9006) — currently eureka+gateway+auth only.
+- [ ] Refresh `infra.sh`'s header comment + `urls` output for the new DBs (keycloak/roaming/
+      per-service Postgres + Redis) — the compose files are current, the printout isn't.
+
 ## Docs / memory
 - [ ] Regenerate `Noted/diagram/` PlantUML + images to include the 4 new services (9003–9006).
       See [[Diagrams]].
+- [ ] `.gitignore` or remove the personal CV files in `Noted/Assets/` (untracked, not project
+      artefacts). See [[Git-Workflow-and-History]].
 
 ## Related notes
 - [[Frontend-Architecture]]
+- [[Scripts-and-Tooling]]
 - [[Session-Log]]

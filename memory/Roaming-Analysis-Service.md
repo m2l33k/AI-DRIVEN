@@ -1,7 +1,7 @@
 ---
 title: Roaming Analysis Service
 tags: [backend, microservice, roaming, security]
-updated: 2026-08-07
+updated: 2026-08-14
 ---
 
 # Roaming Analysis Service
@@ -73,6 +73,71 @@ Clamped to [0,100]. Deliberately simple/explainable — placeholder for a real r
   named volume `roaming-mysql-data`. Deps added: `spring-boot-starter-data-jpa` + `mysql-connector-j`.
 - New analytics live in `service/RoamingInsightsService` (+ `web/dto/*Dto`); heuristic/statistical,
   explainable — placeholder for real ML.
+
+## 🔧 REDESIGN — build on the real `Data/Data/` dataset (planned)
+
+**Motivation.** The current model is synthetic: one flat aggregate `RoamingEvent` with hand-derived
+QoS/commercial numbers and 12 seeded rows. `Data/Data/` gives us a **real, relational roaming
+dataset (~39k rows)** that we should model faithfully and drive all analytics from. This also feeds
+the internship proposal deliverables (anomaly detection D4, conformance/data-driven KPIs) — see
+[[Proposal-Internship]].
+
+### Source data (`Data/Data/*.csv`)
+| File | Rows | Grain | Key columns |
+|------|------|-------|-------------|
+| `devices.csv` | 328 | device catalog | `device_id`, `imei_tac`, manufacturer, model, os, `lte_category`, `volte_supported`, `five_g_supported` |
+| `network_cells.csv` | 253 | cell topology | `cell_id`, `country_code`, `city`, `operator_id`, `tracking_area_code`, `latitude`, `longitude`, `cell_type` |
+| `roaming-cdr-...csv` | 10 000 | **CDR / TAP-RAP fact** | `cdr_id`, `tap_file_id`, `tap_file_type` (TAP/NRTRDE), `home_operator_id`, `visited_operator_id`, `subscriber_imsi`, `msisdn`, `device_id`, `serving_cell_id`, `call_type` (voice/sms/data), start/end, `duration_seconds`, `data_volume_mb`, `charged_amount`, `wholesale_cost`, `currency`, `iot_tariff_id`, **`fraud_flag`**, **`fraud_detection_reason`**, `settlement_status`, `settlement_date`, `nrtrde_flag` |
+| `attach_events.csv` | 13 455 | attach/registration | `attach_id`, `subscriber_imsi`, operators, `cell_id`, datetime, `attach_status`, `reject_cause`, **`auth_failure_flag`**, `registration_delay_ms` |
+| `session_qos.csv` | 5 035 | per-session QoS | `session_id`, `cdr_id`, imsi, operators, cell, start/end, `download_mb`, `upload_mb`, `avg_throughput_mbps`, `latency_ms`, `packet_loss_pct`, `session_status`, `drop_reason` |
+| `handover_events.csv` | 10 591 | mobility | `handover_id`, imsi, `visited_operator_id`, `source_cell_id`, `target_cell_id`, datetime, `event_type`, `handover_status`, `failure_cause` |
+
+Join keys: CDR↔QoS on `cdr_id`; everything↔`subscriber_imsi`; cell refs↔`network_cells.cell_id`;
+device↔`devices.device_id`. **Partner = operator** (`OPRDEO2D`, `OPRGBEE`…), *not* MCC-MNC PLMN —
+direction is derived from a configured **home operator set** (`home_operator_id ∈ HOME ⇒ OUTBOUND`,
+`visited_operator_id ∈ HOME ⇒ INBOUND`).
+
+### New domain model (replace the single aggregate entity)
+`domain/` gets six JPA entities mirroring the CSVs: `Device`, `NetworkCell`, `RoamingCdr`,
+`AttachEvent`, `SessionQos`, `HandoverEvent` (+ enums `CallType`, `TapFileType`, `AttachStatus`,
+`SessionStatus`, `HandoverStatus`, `SettlementStatus`). Keep `Direction`/`RiskLevel`. The old flat
+`RoamingEvent` becomes a **derived view** (a `PartnerWindow` projection), not the table of record.
+
+### Ingestion
+Add a `ingest/CsvDataLoader` (`CommandLineRunner`, guarded by empty-table check, like the current
+seeder) using **OpenCSV** (or Spring Batch for the 10k+ files). Load order: devices, cells → CDRs →
+attach, qos, handovers. Source path configurable (`roaming.data-dir`, default the repo `Data/Data`);
+package a trimmed copy under `src/main/resources/seed/` for docker. Idempotent per table.
+
+### Analytics — recompute every endpoint from real fields
+- **Fraud / anomaly** (`/anomalies`, new `/fraud`): drive from real `fraud_flag` +
+  `fraud_detection_reason`; `auth_failure_flag` bursts per IMSI/cell (IMSI-catcher / rogue-UE);
+  `reject_cause` clustering; `nrtrde_flag` near-real-time exposure; **impossible travel** computed
+  from consecutive attaches on cells whose lat/lon distance ÷ Δt exceeds a speed threshold.
+- **QoS / experience** (`/qos`, `/experience`): aggregate `session_qos` (throughput, `latency_ms`,
+  `packet_loss_pct`, `drop_reason`) per visited operator; worst-first.
+- **Mobility** (new `/handovers`): handover failure ratio per cell/operator + top `failure_cause`.
+- **Registration health** (new `/attach` or fold into `/live`): attach success ratio +
+  `registration_delay_ms` p50/p95 per partner.
+- **Revenue / settlement** (`/revenue`, `/optimization`, new `/settlement`): margin =
+  `charged_amount − wholesale_cost` per partner/`call_type`; unsettled exposure by
+  `settlement_status`; multi-currency aware.
+- **Live / forecast** (`/live`, `/forecast`): time-bucket CDRs/attaches over their real timestamps.
+
+### Wiring / infra changes
+- Same MySQL (`roaming-mysql` :3307); `ddl-auto=update` creates the six tables.
+- Add `opencsv` (+ optional `spring-boot-starter-batch`) to `pom.xml`.
+- Keep JWT `PERM_roaming-events:read` on every endpoint; add read scopes for the new paths.
+- Frontend Roaming Events page then binds to the real `/api/roaming/*`.
+
+### Action checklist (what to do)
+- [ ] Add the six JPA entities + enums; delete/retire the synthetic `RoamingEvent` seeder.
+- [ ] Add `opencsv` dep + `ingest/CsvDataLoader`; make `roaming.data-dir` configurable; bundle a docker seed copy.
+- [ ] Add repositories (`JpaRepository` + custom aggregate queries / JPQL projections) per entity.
+- [ ] Rewrite `RiskAnalyzer` to score from real signals (fraud_flag, auth-failure rate, impossible travel, QoS drop, reject_cause).
+- [ ] Re-point every controller endpoint to real aggregates; add `/fraud`, `/handovers`, `/settlement`, `/attach`.
+- [ ] Update gateway routes only if new sub-paths need explicit rules (wildcard already covers `/api/roaming/**`).
+- [ ] Update this note + [[Session-Log]] + [[Next-Steps]] when landed; wire the frontend page.
 
 ## TODO / next
 - Wire the frontend Roaming Events page + Security dashboard to `/api/roaming/*` (esp. `/live`,

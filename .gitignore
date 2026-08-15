@@ -30,6 +30,7 @@ mlruns/
 
 # Datasets
 data/
+Data/
 datasets/
 *.csv
 *.parquet

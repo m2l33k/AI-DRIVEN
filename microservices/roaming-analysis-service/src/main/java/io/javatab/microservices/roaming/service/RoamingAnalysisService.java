@@ -56,9 +56,14 @@ public class RoamingAnalysisService {
 				.orElseThrow(() -> new NoSuchElementException("Roaming event not found: " + id));
 	}
 
-	/** Aggregate analytics for dashboards, computed over all events. */
+	/** Aggregate analytics for dashboards, computed over all persisted events. */
 	public RoamingSummaryDto summary() {
-		List<RoamingEventDto> all = repository.findAll().stream()
+		return summary(repository.findAll());
+	}
+
+	/** Aggregate analytics over an arbitrary set of events (DB, uploaded CSV or simulated batch). */
+	public RoamingSummaryDto summary(List<RoamingEvent> events) {
+		List<RoamingEventDto> all = events.stream()
 				.map(this::toDto)
 				.sorted(Comparator.comparing(RoamingEventDto::timestamp))
 				.toList();

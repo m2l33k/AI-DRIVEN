@@ -23,6 +23,12 @@ spring:
     redis:
       host: ${RATELIMIT_REDIS_HOST:localhost}
       port: ${RATELIMIT_REDIS_PORT:6379}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/auth-management}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/auth-management/protocol/openid-connect/certs}
 
 eureka:
   client:
@@ -67,6 +73,12 @@ spring:
     redis:
       host: ratelimit-redis
       port: 6379
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://keycloak:8080/realms/auth-management
+          jwk-set-uri: http://keycloak:8080/realms/auth-management/protocol/openid-connect/certs
 eureka:
   client:
     service-url:

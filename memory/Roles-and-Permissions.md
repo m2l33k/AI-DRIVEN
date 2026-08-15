@@ -1,7 +1,7 @@
 ---
 title: Roles and Permissions
 tags: [roles, keycloak, security]
-updated: 2026-08-07
+updated: 2026-08-14
 ---
 
 # Roles and Permissions
@@ -46,6 +46,15 @@ client `platform-client`). These 4 realm roles drive the whole [[Frontend-Archit
 `users:read/write`, `roles:read/write`, `platform-config:read/write`, `nf:read/restart`,
 `core-config:read/write`, `security-alerts:read`, `roaming-events:read`,
 `detection-rules:read/write`, `audit:read/delete`.
+
+## rate-limiting-service reuses existing perms (no realm change — 2026-08-14)
+The rate-limiting-service (`/api/protection/*`) deliberately **reuses existing permissions** so the
+realm JSON / Keycloak is untouched:
+- **reads** (`/check`, GET `/policies`, `/stats`) → **`roaming-events:read`** (SECURITY_ANALYST,
+  AUDITOR, PLATFORM_ADMIN already hold it).
+- **writes** (`PUT`/`DELETE /policies`) → **`detection-rules:write`** (SECURITY_ANALYST holds it).
+So `analyst-user` (SECURITY_ANALYST, pw `password`) can already call every protection endpoint.
+See [[Platform-Services]].
 
 ## Demo users
 All have password `password`. `admin-user` → PLATFORM_ADMIN, plus one user per other role.

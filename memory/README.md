@@ -1,7 +1,7 @@
 ---
 title: Memory Vault — Home
 tags: [index, moc]
-updated: 2026-08-10
+updated: 2026-08-14
 ---
 
 # 🗄️ Memory Vault
@@ -27,12 +27,15 @@ Every note is Markdown with `[[wiki-links]]`, so use the Graph View to navigate.
 
 **Backend & infra**
 - [[Backend-and-Infra]] — microservices, Keycloak, observability, infra tooling
+- [[Scripts-and-Tooling]] — every helper script + compose file, and which are stale ⚠️
 - [[Ports-and-URLs]] — quick reference: every port, URL, and key endpoint
   - [[Auth-Service]] — login state machine, first-login, OTP reset, user mgmt (port 9001)
   - [[Roaming-Analysis-Service]] — roaming events + risk scoring API (port 9002)
   - [[Platform-Services]] — 4 new placeholder services: anomaly/rate-limit/tracing/fault (9003–9006)
 
-**Process**
+**Docs & process**
+- [[Proposal-Internship]] — the full internship proposal (Cloud-Native 5G Core; 3 differentiating layers)
+- [[Presentation]] — the academic / internship defense deck (`Noted/PRESENTATION.md`)
 - [[Git-Workflow-and-History]] — branches, what was deleted, commit rules ⚠️
 - [[Session-Log]] — chronological log of what we did each session
 - [[Next-Steps]] — open threads and the backlog

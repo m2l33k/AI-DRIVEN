@@ -106,6 +106,12 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.GET, "/api/security/detection-rules/**").hasAuthority("PERM_detection-rules:read")
                         .pathMatchers("/api/security/detection-rules/**").hasAuthority("PERM_detection-rules:write")
 
+                        // --- Rate limiting / abuse protection ---
+                        // Reuses existing SECURITY_ANALYST permissions (no new Keycloak roles needed).
+                        .pathMatchers(HttpMethod.PUT, "/api/protection/policies/**").hasAuthority("PERM_detection-rules:write")
+                        .pathMatchers(HttpMethod.DELETE, "/api/protection/policies/**").hasAuthority("PERM_detection-rules:write")
+                        .pathMatchers("/api/protection/**").hasAuthority("PERM_roaming-events:read")
+
                         // --- Audit logs (AUDITOR reads; nobody deletes) ---
                         .pathMatchers(HttpMethod.GET, "/api/audit/**").hasAuthority("PERM_audit:read")
                         .pathMatchers(HttpMethod.DELETE, "/api/audit/**").hasAuthority("PERM_audit:delete")

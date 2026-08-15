@@ -12,6 +12,7 @@ Complete documentation for the **Auth Management System** Spring Cloud microserv
 | [`uml/README.md`](uml/README.md) | Index of the diagrams and how to render them |
 | [`uml/diagrams.mermaid.md`](uml/diagrams.mermaid.md) | All diagrams in Mermaid — renders inline on GitHub |
 | [`report/report.md`](report/report.md) | **Project report** with the **"Starter"** chapter (objectives, design, decisions, trade-offs) |
+| [`PRESENTATION.md`](PRESENTATION.md) | **Academic / internship presentation** — full defense outline (context → design → results → perspectives) grounded in this codebase |
 
 ## Suggested reading order
 

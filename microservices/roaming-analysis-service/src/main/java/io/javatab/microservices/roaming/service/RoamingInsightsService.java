@@ -1,11 +1,15 @@
 package io.javatab.microservices.roaming.service;
 
+import io.javatab.microservices.roaming.analysis.AnomalyDetector;
 import io.javatab.microservices.roaming.analysis.RiskAnalyzer;
 import io.javatab.microservices.roaming.domain.Direction;
 import io.javatab.microservices.roaming.domain.RiskLevel;
 import io.javatab.microservices.roaming.domain.RoamingEvent;
+import io.javatab.microservices.roaming.ingest.RoamingEventCsvParser;
+import io.javatab.microservices.roaming.ingest.RoamingEventCsvParser.CsvParseResult;
 import io.javatab.microservices.roaming.repository.RoamingEventRepository;
 import io.javatab.microservices.roaming.web.dto.AnomalyDto;
+import io.javatab.microservices.roaming.web.dto.CsvAnalysisDto;
 import io.javatab.microservices.roaming.web.dto.ExperienceDto;
 import io.javatab.microservices.roaming.web.dto.ForecastDto;
 import io.javatab.microservices.roaming.web.dto.LiveMonitorDto;
@@ -13,7 +17,9 @@ import io.javatab.microservices.roaming.web.dto.OptimizationDto;
 import io.javatab.microservices.roaming.web.dto.QosDto;
 import io.javatab.microservices.roaming.web.dto.RevenueDto;
 import io.javatab.microservices.roaming.web.dto.RoamingEventDto;
+import io.javatab.microservices.roaming.web.dto.SimulationResultDto;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -38,10 +44,20 @@ public class RoamingInsightsService {
 
 	private final RoamingEventRepository repository;
 	private final RiskAnalyzer riskAnalyzer;
+	private final AnomalyDetector anomalyDetector;
+	private final RoamingAnalysisService analysisService;
+	private final RoamingEventCsvParser csvParser;
+	private final RoamingSimulator simulator;
 
-	public RoamingInsightsService(RoamingEventRepository repository, RiskAnalyzer riskAnalyzer) {
+	public RoamingInsightsService(RoamingEventRepository repository, RiskAnalyzer riskAnalyzer,
+								  AnomalyDetector anomalyDetector, RoamingAnalysisService analysisService,
+								  RoamingEventCsvParser csvParser, RoamingSimulator simulator) {
 		this.repository = repository;
 		this.riskAnalyzer = riskAnalyzer;
+		this.anomalyDetector = anomalyDetector;
+		this.analysisService = analysisService;
+		this.csvParser = csvParser;
+		this.simulator = simulator;
 	}
 
 	/** ✅ Monitor roaming in real time — snapshot over the last {@code windowMinutes}. */
@@ -62,31 +78,48 @@ public class RoamingInsightsService {
 		return new LiveMonitorDto(windowMinutes, window.size(), subs, perMin, avgRisk, highRisk, revenue, recent);
 	}
 
-	/** ✅ Detect anomalies — events breaching risk/QoS thresholds, with reasons. */
+	/** ✅ Detect anomalies — statistical + rule-based detection over all persisted events. */
 	public List<AnomalyDto> anomalies() {
-		List<AnomalyDto> out = new ArrayList<>();
-		for (RoamingEvent e : repository.findAll()) {
-			int score = riskAnalyzer.score(e);
-			List<String> reasons = new ArrayList<>();
-			if (score >= 60) reasons.add("High risk score (" + score + ")");
-			if (e.impossibleTravel()) reasons.add("Impossible travel detected");
-			if (e.signalingErrors() >= 6) reasons.add("Signalling error spike (" + e.signalingErrors() + ")");
-			if (e.newDeviceRatio() >= 0.4) reasons.add("High new-device ratio (" + pct(e.newDeviceRatio()) + "%)");
-			if (e.droppedSessionRatio() >= 0.15) reasons.add("Elevated dropped sessions (" + pct(e.droppedSessionRatio()) + "%)");
-			if (e.avgLatencyMs() >= 120) reasons.add("High latency (" + e.avgLatencyMs() + " ms)");
-			if (reasons.isEmpty()) continue;
-			String severity = score >= 60 || e.impossibleTravel() ? "CRITICAL" : reasons.size() >= 2 ? "WARNING" : "INFO";
-			out.add(new AnomalyDto(e.id(), e.timestamp(), e.direction(), e.partnerPlmn(), e.country(),
-					score, RiskLevel.fromScore(score), severity, reasons));
-		}
-		out.sort(Comparator.comparingInt(AnomalyDto::riskScore).reversed());
-		return out;
+		return anomalyDetector.detect(repository.findAll());
+	}
+
+	/**
+	 * ✅ Analyse an uploaded CSV — parse it, summarise all the data, flag anomalies and forecast the
+	 * next {@code hoursAhead} hours of traffic. Nothing is persisted.
+	 */
+	public CsvAnalysisDto analyzeCsv(MultipartFile file, int hoursAhead) {
+		CsvParseResult res = csvParser.parse(file);
+		return new CsvAnalysisDto(
+				res.fileName(), res.parsed(), res.skipped(), res.columns(),
+				analysisService.summary(res.events()),
+				anomalyDetector.detect(res.events()),
+				forecast(hoursAhead, res.events()));
+	}
+
+	/**
+	 * ✅ Simulate roaming traffic — generate {@code count} synthetic events over the last
+	 * {@code minutesSpread} minutes (persisted) and return a live-monitor snapshot over
+	 * {@code windowMinutes} so the effect can be observed.
+	 */
+	public SimulationResultDto simulate(int count, int minutesSpread, int windowMinutes) {
+		List<RoamingEvent> generated = simulator.generate(count, minutesSpread, true);
+		List<RoamingEventDto> sample = generated.stream()
+				.sorted(Comparator.comparing(RoamingEvent::timestamp).reversed())
+				.limit(8)
+				.map(this::toDto)
+				.toList();
+		return new SimulationResultDto(generated.size(), windowMinutes, live(windowMinutes), sample);
 	}
 
 	/** ✅ Predict future traffic — linear-trend forecast of subscribers/hour for {@code hoursAhead}. */
 	public ForecastDto forecast(int hoursAhead) {
+		return forecast(hoursAhead, repository.findAll());
+	}
+
+	/** Linear-trend forecast over an arbitrary set of events (DB or an uploaded CSV). */
+	public ForecastDto forecast(int hoursAhead, List<RoamingEvent> events) {
 		Map<String, Long> buckets = new TreeMap<>();
-		repository.findAll().forEach(e -> buckets.merge(HOUR.format(e.timestamp()), (long) e.subscribers(), Long::sum));
+		events.forEach(e -> buckets.merge(HOUR.format(e.timestamp()), (long) e.subscribers(), Long::sum));
 		List<ForecastDto.Point> history = buckets.entrySet().stream()
 				.map(en -> new ForecastDto.Point(en.getKey(), en.getValue(), false))
 				.toList();
@@ -229,7 +262,6 @@ public class RoamingInsightsService {
 	}
 
 	private static double clamp(double v) { return Math.max(0, Math.min(100, v)); }
-	private static long pct(double ratio) { return Math.round(ratio * 100); }
 	private static double round(double v, int places) {
 		double f = Math.pow(10, places);
 		return Math.round(v * f) / f;

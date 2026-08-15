@@ -12,18 +12,18 @@ updated: 2026-08-10
 ## Ports
 Full table (incl. observability + data + URLs) → [[Ports-and-URLs]].
 
-| Component | Port |
-|-----------|------|
-| Eureka server | 8761 |
-| Gateway | 9000 |
-| auth-service | 9001 |
-| roaming-analysis-service | 9002 |
-| anomaly-detection-service | 9003 |
-| rate-limiting-service | 9004 |
-| distributed-tracing-service | 9005 |
-| fault-injection-service | 9006 |
-| roaming MySQL | 3307 (host) / 3306 (docker `roaming-mysql`) |
-| Keycloak | 8081 (local) / 8080 (docker) |
+| Component                   | Port                                        |
+| --------------------------- | ------------------------------------------- |
+| Eureka server               | 8761                                        |
+| Gateway                     | 9000                                        |
+| auth-service                | 9001                                        |
+| roaming-analysis-service    | 9002                                        |
+| anomaly-detection-service   | 9003                                        |
+| rate-limiting-service       | 9004                                        |
+| distributed-tracing-service | 9005                                        |
+| fault-injection-service     | 9006                                        |
+| roaming MySQL               | 3307 (host) / 3306 (docker `roaming-mysql`) |
+| Keycloak                    | 8081 (local) / 8080 (docker)                |
 
 ## Microservices / Spring Cloud
 - `spring-cloud/` — `eureka-server` (service discovery) + `gateway-service` (Spring Cloud

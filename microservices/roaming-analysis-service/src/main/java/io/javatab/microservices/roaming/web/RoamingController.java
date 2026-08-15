@@ -5,6 +5,7 @@ import io.javatab.microservices.roaming.domain.RiskLevel;
 import io.javatab.microservices.roaming.service.RoamingAnalysisService;
 import io.javatab.microservices.roaming.service.RoamingInsightsService;
 import io.javatab.microservices.roaming.web.dto.AnomalyDto;
+import io.javatab.microservices.roaming.web.dto.CsvAnalysisDto;
 import io.javatab.microservices.roaming.web.dto.ExperienceDto;
 import io.javatab.microservices.roaming.web.dto.ForecastDto;
 import io.javatab.microservices.roaming.web.dto.LiveMonitorDto;
@@ -14,15 +15,19 @@ import io.javatab.microservices.roaming.web.dto.QosDto;
 import io.javatab.microservices.roaming.web.dto.RevenueDto;
 import io.javatab.microservices.roaming.web.dto.RoamingEventDto;
 import io.javatab.microservices.roaming.web.dto.RoamingSummaryDto;
+import io.javatab.microservices.roaming.web.dto.SimulationResultDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -97,12 +102,42 @@ public class RoamingController {
 	}
 
 	@Operation(summary = "Anomaly detection",
-			description = "Events breaching risk/QoS thresholds, with reasons and severity. Requires roaming-events:read.",
+			description = "Events flagged by the statistical + rule-based detector (population-baseline "
+					+ "z-scores, fraud risk and QoS thresholds), each with a composite anomaly score, "
+					+ "baseline deviation, severity and reasons. Requires roaming-events:read.",
 			security = @SecurityRequirement(name = "bearerAuth"))
 	@PreAuthorize("hasAuthority('PERM_roaming-events:read')")
 	@GetMapping("/anomalies")
 	public List<AnomalyDto> anomalies() {
 		return insights.anomalies();
+	}
+
+	@Operation(summary = "Analyse an uploaded CSV",
+			description = "Upload a roaming-events CSV to observe all of its data as an aggregated summary, "
+					+ "the anomalies detected within it, and a traffic forecast predicting future events. "
+					+ "Nothing is persisted. A minimal file (direction, partner_plmn, country, subscribers, "
+					+ "signaling_errors, new_device_ratio, impossible_travel) is enough — missing QoS/commercial "
+					+ "columns are derived. Requires roaming-events:read.",
+			security = @SecurityRequirement(name = "bearerAuth"))
+	@PreAuthorize("hasAuthority('PERM_roaming-events:read')")
+	@PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public CsvAnalysisDto upload(@RequestParam("file") MultipartFile file,
+			@RequestParam(defaultValue = "6") int hoursAhead) {
+		return insights.analyzeCsv(file, hoursAhead);
+	}
+
+	@Operation(summary = "Simulate roaming traffic",
+			description = "Generate synthetic roaming events over a recent window (persisted, ids prefixed "
+					+ "SIM-) and return a live-monitor snapshot so the real-time monitor and anomaly feed can "
+					+ "be observed reacting. Requires roaming-events:read.",
+			security = @SecurityRequirement(name = "bearerAuth"))
+	@PreAuthorize("hasAuthority('PERM_roaming-events:read')")
+	@PostMapping("/simulate")
+	public SimulationResultDto simulate(
+			@RequestParam(defaultValue = "20") int count,
+			@RequestParam(defaultValue = "60") int minutesSpread,
+			@RequestParam(defaultValue = "60") int windowMinutes) {
+		return insights.simulate(count, minutesSpread, windowMinutes);
 	}
 
 	@Operation(summary = "Traffic forecast",

@@ -1,13 +1,82 @@
 ---
 title: Session Log
 tags: [log, journal]
-updated: 2026-08-08
+updated: 2026-08-14
 ---
 
 # Session Log
 
 Chronological record of what we did. Newest first. Add an entry whenever you finish
 something meaningful.
+
+## 2026-08-14
+
+### rate-limiting-service — Role A: real Redis token-bucket limiter (detail: [[Platform-Services]])
+- Turned the placeholder into a working limiter. New `io.javatab.microservices.ratelimit` code:
+  `domain/RateLimitPolicy` (@Entity, keyed by `keyType`) + `RateLimitAction`; `repository/*` +
+  `PolicySeeder` (seeds `default` 100/min, `imsi` 20/min→BLOCK, `operator` 2000/min, `ip` 300/min);
+  `ratelimit/TokenBucketService` (atomic **Lua** `token_bucket.lua`, allow/block counters +
+  top-blocked ZSET); `config/SecurityConfig` (JWT, copied from roaming) + `config/RedisConfig`;
+  `web/ProtectionController` + DTOs.
+- API `/api/protection`: `POST /check` (decide+consume → 200 or **429** + `Retry-After`),
+  `GET/PUT/DELETE /policies`, `GET /stats`. **Fail-open** on missing policy / Redis error.
+- Wiring: pom +security/+oauth2-resource-server/+validation; `application.yml` +Keycloak issuer
+  (both profiles); **gateway** now enforces `PERM_protection:read` (+`manage` on policy writes),
+  `/api/protection/health` stays public. Added the infra-deps clarifying comment to the
+  `rate-limiting-service` block in `docker-compose-base.yml`.
+- **Redis check:** `ratelimit-redis` (:6379, appendonly, healthcheck, volume) was **already**
+  present in `docker-compose-infra.yml` — no new container needed; the `docker` profile already
+  points at it. Same for `ratelimit-postgres` (:5434).
+- **No Keycloak change (user request):** dropped the planned `protection:read/manage` roles and
+  instead **reused existing perms** — reads → `roaming-events:read`, writes → `detection-rules:write`
+  (both held by SECURITY_ANALYST). Updated controller `@PreAuthorize` + gateway matchers.
+- **Docker image built:** packaged the fat jar (`package -DskipTests`) then
+  `docker compose -f docker-compose-base.yml build rate-limiting-service` →
+  **`docker-rate-limiting-service:latest`** (~573 MB), EXIT=0. (Not yet run — needs infra up.)
+- Verified: `mvnw -pl microservices/rate-limiting-service compile` + `package` → **EXIT=0**.
+
+### roaming-analysis-service — REDESIGN Phase 1: real dataset model + ingestion (detail: [[Roaming-Analysis-Service]])
+- Motivation: replace the synthetic single-aggregate `RoamingEvent` (12 seeded rows) with the real
+  relational `Data/Data/` dataset (~39k rows across 6 CSVs). See the **Redesign** section of the note.
+- **Phase 1 (additive, build stays green):** 6 JPA entities mirroring the CSVs — `Device`,
+  `NetworkCell`, `RoamingCdr` (fact: fraud_flag, TAP/NRTRDE, charged/wholesale, settlement),
+  `AttachEvent` (auth_failure, reject_cause, reg-delay), `SessionQos`, `HandoverEvent` — + their
+  `JpaRepository`s. Added `ingest/CsvDataLoader` (`CommandLineRunner`, OpenCSV, empty-table guard,
+  lenient blank→null parsing) loading dimensions then facts from `roaming.data-dir` (default repo
+  `Data/Data`, classpath `seed/` fallback). pom +`opencsv`; `application.yml` +`roaming.data-dir` +
+  `roaming.home-operators`. Old `RoamingEvent`/seeder/analytics left intact for now.
+- **Still TODO (Phase 2/3):** rewrite `RiskAnalyzer` + re-point every endpoint to real aggregates;
+  add `/fraud`, `/handovers`, `/settlement`, `/attach`; then delete the synthetic entity/seeder.
+- Verified: `mvnw -pl microservices/roaming-analysis-service compile` → **EXIT=0**.
+
+### Internship proposal captured in the vault (detail: [[Proposal-Internship]])
+- Added **[[Proposal-Internship]]** — the full Cloud-Native 5G Core proposal (3 differentiating
+  layers: Zero-Trust, Anomaly Detection, Conformance Test Framework) with a *"how this maps to the
+  repo"* section. Indexed in [[README]].
+
+### Memory vault review + refresh (detail: this file)
+- Reviewed the whole `memory/` vault against the codebase (git log, root `pom.xml` modules,
+  `docker/`, `keycloak/`, `Frontend/`, `Noted/`). Vault content was accurate; the drift was in
+  **process notes**, now fixed:
+  - **[[Git-Workflow-and-History]]** was badly stale (still listed frontend/roaming/memory as
+    "uncommitted on main"). Rewrote it: `git log` confirms it's all committed on `main`. Only two
+    **untracked personal CV files** remain in `Noted/Assets/` (not project artefacts) — flagged for
+    `.gitignore`/removal.
+  - Fixed **[[Session-Log]]** frontmatter date (was 2026-08-08 despite 08-10 entries).
+- **Added a new note [[Scripts-and-Tooling]]** — the main undocumented area. Covers `run.sh`,
+  `infra.sh`, `build-images.sh`, `create-project.sh`, `Tiltfile`, and the `docker/` compose files.
+  Captured a real **gotcha**: `run.sh` (local-JAR path), `build-images.sh`, and the `Tiltfile` only
+  launch **eureka + gateway + auth** — they were never updated for roaming (9002) or the four
+  placeholders (9003–9006); `infra.sh`'s header/`urls` output is also stale. Added a follow-up in
+  [[Next-Steps]].
+- Linked the new note from the vault [[README]] index.
+
+### Academic presentation deck (detail: [[Presentation]])
+- Created **`Noted/PRESENTATION.md`** — a full academic / internship defense outline (Huawei / TT
+  5G Core context) following the requested 8-part structure, grounded in the real codebase (not
+  filler). Uses «angle-bracket» placeholders for name/dates/KPIs. Indexed in `Noted/INDEX.md`.
+- Added vault note **[[Presentation]]** pointing at it (with sourcing links + "before submitting"
+  caveats); linked from [[README]] and root `PROJECT_MEMORY.md`.
 
 ## 2026-08-10
 
