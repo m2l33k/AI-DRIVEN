@@ -1,7 +1,7 @@
 ---
 title: Auth Service
 tags: [backend, microservice, auth, keycloak, security]
-updated: 2026-08-08
+updated: 2026-08-15
 ---
 
 # Auth Service
@@ -9,6 +9,15 @@ updated: 2026-08-08
 Keycloak-backed authentication + user management API. The backend is a **thin layer** in front
 of Keycloak — Keycloak stays the source of truth for passwords, policies, email verification,
 required actions, sessions, and tokens. See [[Backend-and-Infra]] · [[Roles-and-Permissions]].
+
+> **✅ Full audit 2026-08-15** — re-read every auth-service class + the frontend `core/` and `auth/`
+> screens against this note. **It matches the code** (endpoints, state-aware login, create-user
+> `[VERIFY_EMAIL, UPDATE_PASSWORD]`, own email-verify flow, OTP reset, in-memory token services,
+> username-or-email resolution). Verified extras worth noting: `updatePassword` checks the current
+> password by **attempting a login** (throws "Current password is incorrect" on failure);
+> `resetForgottenPassword` sets only `UPDATE_PASSWORD`; admin token = master-realm **`admin-cli`**
+> password grant (`KeycloakProperties.admin*`). Quick token for testing: the **Bruno `AccessToken`**
+> request (see [[Scripts-and-Tooling]]). The frontend wiring TODO is **done** (see [[Next-Steps]]).
 
 - **Module:** `microservices/auth-service` · package `io.javatab.microservices.auth`
 - **Port:** `9001` (gateway `9000`, eureka `8761`, roaming `9002`)

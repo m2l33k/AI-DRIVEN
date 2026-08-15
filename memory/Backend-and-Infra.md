@@ -66,9 +66,12 @@ Full table (incl. observability + data + URLs) → [[Ports-and-URLs]].
   **realm SMTP** (realm settings) is what actually sends the `send-verify-email` link — still TODO.
 
 ## Observability (from commit `5ab6c0b`, `96edc40`)
-- **Prometheus** — scrapes gateway + eureka.
+- **Prometheus** — scrapes gateway + eureka (+ auth, roaming via `host.docker.internal`).
 - **Grafana** — datasources provisioned; dashboards in `grafana-dashboard/`.
 - **Loki** (logs), **Tempo** (traces), **Fluent Bit** (log shipping), **OpenTelemetry**.
+- **Dashboard design (D6):** the full set of planned dashboards — NF health/KPIs, 5GC signalling,
+  security/anomaly fusion, zero-trust/certs, rate-limit, roaming, logs/traces — is designed in
+  **[[Grafana-Dashboards]]** (with data sources + PromQL/LogQL). Ties into [[5GC-Core]].
 
 ## Orchestration / tooling
 - `docker/` — compose/config for the stack.

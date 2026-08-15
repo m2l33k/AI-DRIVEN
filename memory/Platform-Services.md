@@ -64,9 +64,13 @@ kubernetes/deployment.yml + service.yml         ClusterIP 80 -> <port>
 - `mvnw compile` on all four + gateway → **EXIT=0** (2026-08-10).
 
 ## Roadmap — what each should become
-- **anomaly-detection-service** — real-time anomaly detection over 5G signalling/roaming.
-  Likely consumes/overlaps with [[Roaming-Analysis-Service]]'s heuristic `/anomalies`; candidate
-  to centralise anomaly logic and swap heuristics for ML.
+> In the **[[5GC-Core|free5GC]]** design these three placeholders become the proposal's Layer-02/03
+> engines around the core — see the service-mapping table in [[5GC-Core]] and dashboards in
+> [[Grafana-Dashboards]].
+- **anomaly-detection-service** — real-time anomaly detection over 5G signalling/roaming
+  (**Layer 02**): consume free5GC signalling (metrics + Loki logs) → registration-flood / auth-failure
+  bursts / NAS anomalies; P1 rule-based → P2 z-score/IQR reusing [[Roaming-Analysis-Service]]'s
+  `AnomalyDetector`; alerts → Grafana **D4**. Centralises anomaly logic; ML later.
 - **rate-limiting-service** — ✅ **Role A (standalone limiter)** (2026-08-14), + Swagger/PUT-DTO
   fixes (2026-08-15). A gateway-enforcement experiment was **tried and reverted** the same day (it
   slowed the hot path — see the 2026-08-15 section below). Limiter stays **advisory** (`/check`).
@@ -75,8 +79,9 @@ kubernetes/deployment.yml + service.yml         ClusterIP 80 -> <port>
   *backend*, not a Spring service. Real work is either (a) add a Jaeger container to
   `docker-compose-observability.yml` (OTLP sink, can augment/replace Tempo) and make this a thin
   query facade, or (b) drop the service and use Jaeger directly. Decide before building logic.
-- **fault-injection-service** — chaos / resilience testing (inject latency, errors, NF outages)
-  to validate the platform's fault tolerance.
+- **fault-injection-service** — chaos / resilience testing (**Layer 03**, proposal §5.3): kill SMF
+  mid-session (NRF heartbeat cleanup), UDM 503, cert expiry, isolate UPF↔SMF (PFCP teardown) — assert
+  free5GC recovers. Pairs with the conformance scenario runner. See [[5GC-Core]] Phase 4.
 
 ## rate-limiting-service — Role A (Redis token bucket) ✅ 2026-08-14
 No longer a placeholder. Implements an **atomic token-bucket rate limiter** on Redis (:6379) with

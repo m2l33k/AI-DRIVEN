@@ -62,6 +62,45 @@ services:
     networks:
       - shared-network
 
+  # ---- Storage / Redis exporters (feed the "Redis & Storage" Grafana dashboard) ----
+  # Redis containers + DBs live in docker-compose-infra.yml; infra.sh brings both compose files up
+  # on the same shared-network, so these exporters and Prometheus can reach them by container name.
+
+  # One exporter scrapes BOTH Redis via Prometheus multi-target (see prometheus.yml 'redis' job).
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    ports:
+      - "9121:9121"
+    networks:
+      - shared-network
+
+  # Postgres exporters — one per server (creds differ per DB). Add anomaly/tracing/fault the same way.
+  postgres-exporter-keycloak:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: postgres-exporter-keycloak
+    environment:
+      - DATA_SOURCE_NAME=postgresql://keycloak:keycloak@keycloak-postgres:5432/keycloak_db?sslmode=disable
+    networks:
+      - shared-network
+
+  postgres-exporter-ratelimit:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: postgres-exporter-ratelimit
+    environment:
+      - DATA_SOURCE_NAME=postgresql://ratelimit:ratelimit@ratelimit-postgres:5432/ratelimit_db?sslmode=disable
+    networks:
+      - shared-network
+
+  # MySQL exporter for the roaming DB. v0.14.0 supports the DATA_SOURCE_NAME env form.
+  mysqld-exporter-roaming:
+    image: prom/mysqld-exporter:v0.14.0
+    container_name: mysqld-exporter-roaming
+    environment:
+      - DATA_SOURCE_NAME=roaming:roaming@(roaming-mysql:3306)/
+    networks:
+      - shared-network
+
 networks:
   shared-network:
     driver: bridge

@@ -79,6 +79,25 @@ URLs live in [[Ports-and-URLs]]; the *why* behind the infra shape is in [[Archit
 - ⚠️ The new per-service Postgres/Redis (ADR-09) and MySQL are **docker-compose only** — no k8s
   StatefulSets or datasource env yet. Tracked in [[Next-Steps]].
 
+## API testing — Bruno collection (`api-specs/bruno/`) — *was undocumented (found 2026-08-15)*
+A **[Bruno](https://usebruno.com)** collection (open-source Postman alternative; `.bru` files).
+- `AccessToken.bru` — `POST {{keycloakBaseUrl}}/realms/auth-management/protocol/openid-connect/token`
+  (password grant, `client_id=platform-client`, `client_secret=platform-client-secret`,
+  `username=operator-user`, `password=password`, `scope=openid roles`) → grabs a JWT for hitting the
+  gateway/services. Handy for **Swagger Authorize** or `curl -H "Authorization: Bearer …"`.
+- `environments/docker.bru` + `environments/kubernetes.bru` — env vars (`keycloakBaseUrl`, …) for the
+  two deployment targets; `bruno.json` is the collection manifest.
+- Swap `operator-user` for `analyst-user`/`admin-user` (all pw `password`) to get a token with the
+  perms you need. See [[Roles-and-Permissions]] · [[Auth-Service]].
+
+## Grafana dashboards on disk (`grafana-dashboard/`) — *was under-documented*
+- Pre-existing **community Spring Boot** dashboards: `Spring Boot 3.x Statistics.json` +
+  `Spring Boot Observability.json` (+ a `provisioning/` folder). These are the generic JVM/HTTP
+  boards, **distinct** from `docker/grafana/` (datasource/provisioning config) and from
+  `docker/dashboard-1.yml` (another dashboard JSON, misleading `.yml` extension).
+- The **planned custom** dashboards (NF KPIs, security/anomaly, zero-trust, roaming…) are designed in
+  [[Grafana-Dashboards]] — export those JSONs here to have them provisioned.
+
 ## Keycloak scripts (`keycloak/`)
 - `export-realm.{ps1,sh}` — `kc.sh export` (incl. users) → `platform-realm.json` (config-as-code;
   ADR-10). **Restore `${KC_SMTP_*}` placeholders before committing** — export hardcodes SMTP.

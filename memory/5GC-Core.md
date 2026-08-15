@@ -57,17 +57,72 @@ UERANSIM gNB/UE ──NGAP/NAS(SCTP)──▶ AMF ─┐
   (registration, 5G-AKA, PDU session), asserts SBI responses; **fault-injection-service (9006)** does
   NF-crash / cert-expiry / partition cases.
 
-## Integration checklist (proposed, not yet started)
-- [ ] Provision an **Ubuntu VM/WSL2** with `gtp5g` (kernel headers → build/insmod). Verify `lsmod`.
-- [ ] Clone `free5gc-compose`; bring up core + MongoDB + WebConsole; register a UERANSIM gNB/UE;
-      confirm a successful **Initial Registration + PDU session** (baseline before we add anything).
-- [ ] Point **Prometheus** at free5GC NF metrics endpoints; add Grafana NF-KPI panels.
-- [ ] Wire the operator **Network Functions** page (currently mock AMF/SMF/UPF/AUSF/UDM) to real NF
-      status (via NRF `/nnrf-nfm/v1/nf-instances` or a small Java facade `/api/nf/*`).
-- [ ] Enable **SBI TLS + NRF OAuth2** in free5GC config; demo SEC-01/SEC-02.
-- [ ] Mesh/Cilium mTLS + NetworkPolicies between NF containers (Layer 01 contribution).
-- [ ] Stream NF signalling into anomaly-detection-service; craft UERANSIM attack scripts (Layer 02).
-- [ ] Scenario runner + fault-injection for Layer 03.
+## How each existing service plugs into the 5GC harness
+The Java platform doesn't disappear — each service takes a defined role *around* free5GC:
+
+| Existing piece | Role in the 5GC design | Work needed |
+|----------------|------------------------|-------------|
+| **gateway-service** (9000) | North-bound API + **NF facade** (`/api/nf/*` over NRF `nf-instances`) for the operator console; single auth choke point | add `NfController` (WebClient → NRF), route/secure `/api/nf/**` (`PERM_nf:read`) |
+| **eureka-server** (8761) | *Java-side* discovery only — **NRF is free5GC's registry** for NFs; keep the two separate | none (don't try to register NFs in Eureka) |
+| **auth-service** + **Keycloak** | Operator/analyst **console** RBAC (`PERM_*`); **distinct** from free5GC's **NRF-OAuth2** which secures SBI between NFs | keep as-is; document the two token planes |
+| **roaming-analysis-service** (9002) | **Layer 02** analytics engine — its `AnomalyDetector` (z-scores) is reused on roaming/attach data; `/anomalies`,`/qos`,`/revenue` feed Grafana D4/D7 | point at real `Data/Data` + (later) free5GC attach signals |
+| **anomaly-detection-service** (9003) | **Layer 02** real-time engine over **free5GC signalling** (registration bursts, auth failures, NAS anomalies) → alerts to security dashboard | stop being a placeholder: consume free5GC metrics/Loki logs; rule-based (P1) → z-score/IQR (P2) |
+| **rate-limiting-service** (9004) | **DoS-on-AMF** mitigation (proposal §4.3) + abuse protection; advisory now (ADR-11 retired) | optionally sidecar/limit at the AMF ingress later |
+| **distributed-tracing-service** (9005) | Trace facade over **Tempo/Jaeger** for SBI call-flow traces (registration→AUSF→UDM) | decide Tempo vs Jaeger (ADR-01); instrument or scrape |
+| **fault-injection-service** (9006) | **Layer 03** chaos: NF crash / cert-expiry / DB-503 / UPF partition (proposal §5.3) | scenario hooks that kill/poison free5GC NFs + assert recovery |
+| **observability** (Prometheus/Grafana/Loki/Tempo) | **D6** dashboards — see [[Grafana-Dashboards]] | add free5GC scrape/exporters + Loki log shipping |
+| **Frontend** (Angular) | Operator **Network Functions** (→ real `/api/nf/*`), Security dashboards (anomaly/limiter/roaming) | wire NF page; add a 5GC/security overview |
+
+## Phased integration plan (detailed) — proposal §6 mapped to *this* repo
+**Phase 0 — Host & baseline (blocker; user's Linux box).**
+- [ ] Provision **Ubuntu 22.04 (VM) or WSL2** with **`gtp5g`** built against the running kernel
+      headers; `sudo insmod`/`modprobe`; verify `lsmod | grep gtp5g`. (Proposal §7 target.)
+- [ ] Clone **`github.com/free5gc/free5gc-compose`**; `docker compose up` → NRF/AMF/SMF/UPF/AUSF/
+      UDM/UDR/(PCF/NSSF) + **MongoDB** + **WebConsole**.
+- [ ] Provision a subscriber in **WebConsole** (IMSI, key/OPc, slice/S-NSSAI, DNN).
+- [ ] Run a **UERANSIM** gNB + UE; confirm a clean **Initial Registration** *and* **PDU Session**
+      (ping through UPF). **Do not build anything until this passes.**
+
+**Phase 1 — Observe (D2/D3 foundation).**
+- [ ] Add **cAdvisor + node-exporter** (container CPU/mem/net) + free5GC metric endpoints to
+      `docker/prometheus/prometheus.yml`; also add rate-limiting (9004) + anomaly (9003) targets.
+- [ ] Ship free5GC NF **logs → Loki** (Fluent Bit/promtail); derive LogQL counters (registration,
+      auth-fail, PDU) for **Grafana D3**.
+- [ ] Build **NRF facade** `GET /api/nf/*` in the gateway (WebClient → `nnrf-nfm/v1/nf-instances`
+      → nfType/nfStatus/ip); secure `PERM_nf:read`; graceful-empty when NRF unreachable.
+- [ ] Wire the operator **Network Functions** page to `/api/nf/*` (replace the mock). Build **Grafana
+      D2** (NF health/topology).
+
+**Phase 2 — Zero-Trust (Layer 01 / SEC-01/02).**
+- [ ] Turn on free5GC **SBI TLS** + **NRF OAuth2** (scoped tokens `namf-comm`/`nsmf-pdusession`);
+      demo **SEC-01** (no cert → handshake reject) + **SEC-02** (wrong scope → 403).
+- [ ] Add **mTLS + NetworkPolicies between NF containers** via a **service mesh (Istio/Linkerd)** or
+      **Cilium/eBPF** (§4.2.3: forbid AMF↛UPF direct). Build **Grafana D5** (handshake fails, token
+      rejects, cert-expiry, mesh denials). PKI via cert-manager/CFSSL or Vault.
+
+**Phase 3 — Anomaly detection (Layer 02 / D4 / SEC-03).**
+- [ ] **anomaly-detection-service** consumes free5GC signalling (metrics + Loki): **P1 rule-based**
+      (registration-flood, auth-failure burst) → **P2 statistical** (z-score/IQR, reuse the roaming
+      `AnomalyDetector`). Emit alerts → **Grafana D4** + the frontend security view.
+- [ ] **UERANSIM attack scripts**: registration flood (DoS-on-AMF), IMSI enumeration (SEC-03 alert
+      within ≤10 probes), fake-gNB NAS-sequence anomaly.
+
+**Phase 4 — Conformance & fault (Layer 03 / D3/D5 evidence).**
+- [ ] **Scenario runner** driving UERANSIM through **TC-01→PERF-02** (registration, 5G-AKA, PDU,
+      dereg, handover; PERF ≥50 concurrent / p95 ≤500 ms), asserting SBI responses + pcap evidence.
+- [ ] **fault-injection-service** cases: kill SMF mid-session (NRF heartbeat cleanup), UDM 503,
+      cert expiry, isolate UPF↔SMF (PFCP teardown). CI/CD gate (optional).
+
+**Phase 5 — Package & document (D5/D7).**
+- [ ] One-command bring-up (compose) for core + sims + harness; K8s+Helm (stretch).
+- [ ] Final architecture/deployment/test docs; live demo script.
+
+## Open questions / decisions to make
+- free5GC **version pin** + matching `gtp5g` version vs the host kernel (must agree).
+- Mesh choice for Layer 01: **Istio vs Linkerd vs Cilium** (Cilium also gives eBPF NetworkPolicy §4.2.3).
+- Tracing: **Tempo (current) vs add Jaeger** for the distributed-tracing-service (ADR-01, open).
+- Where the NF facade lives: **gateway controller** (simplest, chosen for step) vs a dedicated service.
+- Repo layout: free5GC/UERANSIM as a **sibling folder / sub-repo** (NOT in the Maven build).
 
 ## Notes / gotchas
 - free5GC and this Spring platform are **separate runtimes** — the harness consumes free5GC's
@@ -78,5 +133,6 @@ UERANSIM gNB/UE ──NGAP/NAS(SCTP)──▶ AMF ─┐
   free5GC signals — see [[Platform-Services]].
 
 ## Related notes
-- [[Proposal-Internship]] · [[Architecture-Decisions]] (ADR-13) · [[Platform-Services]] ·
-  [[Roaming-Analysis-Service]] · [[Backend-and-Infra]] · [[Next-Steps]] · [[Glossary]]
+- [[Proposal-Internship]] · [[Architecture-Decisions]] (ADR-13) · [[Grafana-Dashboards]] ·
+  [[Platform-Services]] · [[Roaming-Analysis-Service]] · [[Backend-and-Infra]] · [[Next-Steps]] ·
+  [[Glossary]]

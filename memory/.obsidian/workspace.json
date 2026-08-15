@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Proposal-Internship.md",
+                "file": "Next-Steps.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Proposal-Internship"
+              "title": "Next-Steps"
             }
           }
         ],
@@ -114,7 +114,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Proposal-Internship.md",
+                "file": "Next-Steps.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -204,6 +204,15 @@
   },
   "active": "4eb6cb8adb3d18d8",
   "lastOpenFiles": [
+    "Ports-and-URLs.md.tmp.13612.b6e6a5d9a857",
+    "Grafana-Dashboards.md.tmp.13612.d3e928d9a66a",
+    "Auth-Service.md.tmp.13612.f1de535481ba",
+    "Scripts-and-Tooling.md.tmp.13612.d73888bcc210",
+    "Proposal-Internship.md",
+    "Session-Log.md.tmp.13612.70ae066e6c85",
+    "Backend-and-Infra.md.tmp.13612.975d92f09013",
+    "Grafana-Dashboards.md",
+    "Grafana-Dashboards.md.tmp.13612.2ce49f717e13",
     "Ports-and-URLs.md.tmp.13612.5952284edec3",
     "Platform-Services.md.tmp.13612.1c47ecd309a7",
     "Frontend-Architecture.md",
@@ -213,18 +222,10 @@
     "Auth-Service.md",
     "Diagrams.md",
     "Platform-Services.md",
-    "Proposal-Internship.md",
     "README.md",
     "Roles-and-Permissions.md",
     "Architecture-Decisions.md",
     "README.md.tmp.13612.188cc72f342c",
-    "Ports-and-URLs.md.tmp.13612.95e022656db3",
-    "Ports-and-URLs.md.tmp.13612.de9f06418435",
-    "Next-Steps.md.tmp.13612.353475edf20a",
-    "Roles-and-Permissions.md.tmp.13612.67f5fb885d5a",
-    "Frontend-Architecture.md.tmp.13612.5b8e8cf9dffe",
-    "Frontend-Components.md.tmp.13612.c8d6ca482a2a",
-    "Architecture-Decisions.md.tmp.13612.61d2aea052e2",
     "Project-Overview.md",
     "Presentation.md",
     "Ports-and-URLs.md",

@@ -11,6 +11,49 @@ something meaningful.
 
 ## 2026-08-15
 
+### Grafana: "Redis & Storage" dashboard + DB/Redis exporters (detail: [[Grafana-Dashboards]])
+- Built **`grafana-dashboard/Redis and Storage.json`** (uid `redis-and-storage`, 28 panels / 4 rows):
+  Redis (both instances), PostgreSQL (keycloak + ratelimit), MySQL (roaming), and HikariCP app pools.
+- Redis/DBs have **no native Prometheus metrics** → added exporters to
+  `docker-compose-observability.yml`: **redis-exporter** (multi-target, both Redis),
+  **postgres-exporter-keycloak/-ratelimit**, **mysqld-exporter-roaming** (creds from infra compose:
+  keycloak/keycloak, ratelimit/ratelimit, roaming/roaming). Added matching Prometheus jobs
+  (`redis` multi-target relabel, `postgres-keycloak`, `postgres-ratelimit`, `mysql-roaming`).
+- Validated: dashboard JSON OK; `docker compose -f docker-compose-observability.yml config` OK;
+  `prometheus.yml` YAML OK. ⚠️ Exporters best-effort (untested vs a live stack); anomaly/tracing/fault
+  Postgres + legacy postgres/mongo can follow the same pattern.
+
+### Grafana: cross-service "Business Services" dashboard + Prometheus scrape for all services (detail: [[Grafana-Dashboards]])
+- Built **`grafana-dashboard/Business Services.json`** (uid `business-services`, 33 panels / 8 rows):
+  fleet overview, per-service health table, traffic (rate/5xx/status/top-endpoints), latency (avg/max/
+  slowest), JVM (heap/CPU/threads/GC), errors & logs (`logback_events_total`, exceptions by type),
+  HikariCP pools, and business-endpoint tables (auth/users + roaming/protection/…). All from
+  micrometer metrics via the `prometheus` datasource, filtered by a `$service` var
+  (`label_values(up, job)`). Auto-provisioned (`../grafana-dashboard` mount → "Spring Boot" folder).
+- **`docker/prometheus/prometheus.yml`** now also scrapes **anomaly (9003), rate-limiting (9004),
+  tracing (9005), fault (9006)** (were missing) → the board sees all 6 app services + gateway/eureka.
+- JSON validated (`python -m json.tool`). Note: latency uses avg (`rate(sum)/rate(count)`) + `_max`;
+  true p95 needs histogram buckets (percentiles-histogram) — not enabled, so no `histogram_quantile`.
+
+### Codebase audit: auth + Keycloak + whole-repo sweep vs the vault (detail: [[Auth-Service]])
+- **Auth + Keycloak (backend + frontend) fully re-read** — every class in
+  `microservices/auth-service` (AuthController/UserController, AuthService, KeycloakService,
+  PasswordResetService, EmailVerificationService, the 4 in-memory token services, SecurityConfig,
+  KeycloakProperties) + the frontend `core/` (auth.service/interceptor/guards/models) and `auth/`
+  screens (login/first-login/reset-password). **The [[Auth-Service]] note matches the code** — added
+  an audit stamp + a few verified extras (updatePassword verifies via login attempt; admin-cli token).
+- **Confirmed** the "wire login/first-login/reset" TODO was already implemented (login switches on all
+  3 `LoginResponse.status` cases) — marked done in [[Next-Steps]].
+- **Whole-repo sweep** (root `pom.xml` 9 modules, `docker/`, `kubernetes/infrastructure`, `Frontend`,
+  scripts). The vault is **thorough**; only two genuinely undocumented items found, now captured:
+  - **`api-specs/bruno/`** — a **Bruno** API collection (`AccessToken.bru` grabs a Keycloak token;
+    `environments/{docker,kubernetes}.bru`). Added to [[Scripts-and-Tooling]].
+  - **`grafana-dashboard/`** — pre-existing **community Spring Boot** dashboards
+    (`Spring Boot 3.x Statistics.json`, `Spring Boot Observability.json`) + `docker/dashboard-1.yml`;
+    clarified in [[Scripts-and-Tooling]] + [[Grafana-Dashboards]] (distinct from the planned custom boards).
+- Everything else (services, gateway, roaming, rate-limit, observability, k8s, scripts, roles) was
+  already documented and accurate.
+
 ### rate-limiting gateway enforcement — REVERTED (perf regression) (detail: [[Platform-Services]] · ADR-11 retired)
 - The gateway `RateLimitGlobalFilter` (added earlier the same day) made the **gateway + all services
   slow**: it put a **synchronous per-request call** to `rate-limiting-service` on the hot path; with
@@ -23,6 +66,20 @@ something meaningful.
 - **Kept:** the standalone limiter (`/check`,`/policies`,`/stats`) + the Swagger-Authorize and
   PUT-DTO (`RateLimitPolicyDto` + `ApiExceptionHandler`) fixes. The frontend Rate Limiting page is
   unaffected (calls the service directly). **ADR-11 retired.** Both modules compile (EXIT=0).
+
+### 5GC design deep-dive: detailed phased TODO, per-service roles, Grafana dashboards (detail: [[5GC-Core]] · [[Grafana-Dashboards]])
+- Expanded **[[5GC-Core]]** with a **"how each existing service plugs into the harness"** table
+  (gateway NF-facade, eureka-vs-NRF, auth/Keycloak-vs-NRF-OAuth2, roaming/anomaly = Layer 02,
+  rate-limit = DoS mitigation, tracing, fault = Layer 03, observability, frontend) + a **detailed
+  Phase 0→5 plan** (host/`gtp5g` baseline → observe → zero-trust → anomaly → conformance/fault →
+  package) mapped to proposal §6, plus open decisions (mesh choice, tracing, version pins).
+- Created **[[Grafana-Dashboards]]** — full **D6** design: 8 dashboards (Platform, NF Health,
+  Signalling, Security/Anomaly, Zero-Trust/Certs, Rate-Limit, Roaming, Logs/Traces) with **data
+  sources + PromQL/LogQL** and a **reality check** (free5GC's native Prometheus metrics are limited →
+  budget cAdvisor/node-exporter + Loki LogQL + a small exporter).
+- Rewrote the **[[Next-Steps]]** 5GC section into the full phased checklist + an observability/Grafana
+  block; updated [[Platform-Services]] roadmap (anomaly=Layer02/D4, fault=Layer03), [[Backend-and-Infra]]
+  observability, and the [[README]] index. Docs only — no code yet (Phase 0 host is the blocker).
 
 ### Decision: use free5GC as the 5G Core substrate (detail: [[5GC-Core]] · ADR-13)
 - Chose **free5GC** (open-source Go NFs) + **UERANSIM** as the real core; this Spring repo stays the

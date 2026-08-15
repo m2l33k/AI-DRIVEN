@@ -48,6 +48,9 @@ row here. Local = running on the host; docker = the container name on `shared-ne
 | Loki | `3100` | `loki:3100` | log store |
 | Tempo | `4317`/`4318`/`3200` | `tempo:*` | OTLP gRPC/HTTP + query |
 | Fluent Bit | `24224` | `fluent-bit:24224` | fluentd log driver → Loki |
+| redis-exporter | `9121` | `redis-exporter:9121` | multi-target → both Redis (for "Redis & Storage" dashboard) |
+| postgres-exporter (keycloak/ratelimit) | — | `postgres-exporter-*:9187` | per-server Postgres metrics |
+| mysqld-exporter (roaming) | — | `mysqld-exporter-roaming:9104` | roaming MySQL metrics |
 
 ## Per-service actuator/docs (every Spring service)
 - Health: `GET /actuator/health`

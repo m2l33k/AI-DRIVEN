@@ -27,6 +27,7 @@ Every note is Markdown with `[[wiki-links]]`, so use the Graph View to navigate.
 
 **Backend & infra**
 - [[Backend-and-Infra]] — microservices, Keycloak, observability, infra tooling
+- [[Grafana-Dashboards]] — detailed dashboard design (NF KPIs, security/anomaly, zero-trust, D6)
 - [[Scripts-and-Tooling]] — every helper script + compose file, and which are stale ⚠️
 - [[Ports-and-URLs]] — quick reference: every port, URL, and key endpoint
   - [[Auth-Service]] — login state machine, first-login, OTP reset, user mgmt (port 9001)

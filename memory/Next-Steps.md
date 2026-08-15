@@ -35,14 +35,18 @@ Open threads and backlog. Check items off / move them to [[Session-Log]] when do
 ## Frontend — polish (optional)
 - [ ] Responsive pass on tables for small screens.
 - [ ] Loading / empty / error states once data is real.
-- [ ] i18n (login already hints at en/fr/ar).
+- [ ] i18n (login already hints at en/fr/ch).
 
 ## Auth Service (see [[Auth-Service]])
 - [x] Wire **Keycloak realm SMTP** to the same Gmail (realm JSON `smtpServer` + compose `KC_SMTP_*`
       + `keycloak/configure-smtp.ps1` for live instances). ← still: run it + test delivery.
 - [ ] Move in-memory OTP / reset-token / first-login-token stores to **Redis** if multi-instance.
-- [ ] Wire the Angular **login / reset-password / first-login** screens to the new endpoints
-      (handle the 3 `LoginResponse.status` cases).
+- [x] Wire the Angular **login / reset-password / first-login** screens to the new endpoints
+      (handle the 3 `LoginResponse.status` cases). **Done (2026-08-08)** — `login.ts` switches on
+      `res.status` (SUCCESS→homeRoute, PASSWORD_CHANGE_REQUIRED→`/first-login`,
+      EMAIL_VERIFICATION_REQUIRED→banner); `first-login.ts` → `firstLoginChangePassword`;
+      `reset-password.ts` → 3-step OTP (`forgotPassword`→`verifyOtp`→`resetPassword`). Duplicate of
+      the checked item in *Frontend — integration*.
 - [ ] Decide whether created users verify email via Keycloak's link or a custom flow.
 
 ## Roaming Analysis Service (see [[Roaming-Analysis-Service]])
@@ -84,19 +88,50 @@ protected endpoints land.
       See ADR-01 in [[Architecture-Decisions]].
 - [ ] **fault-injection-service** (9006) — chaos testing (latency/errors/NF outages).
 
-## 5GC Core — free5GC integration (see [[5GC-Core]], ADR-13) — NEW 2026-08-15
-Decision made: adopt **free5GC** + **UERANSIM**; this repo stays the harness. Not started.
-- [ ] Provision **Ubuntu VM / WSL2** with the **`gtp5g` kernel module** (build vs kernel headers;
-      verify `lsmod | grep gtp5g`). ⚠️ free5GC UPF won't run without it — no bare Windows/mac Docker.
-- [ ] Bring up `free5gc/free5gc-compose` (NFs + MongoDB + WebConsole); register a UERANSIM gNB/UE;
-      confirm baseline **Initial Registration + PDU session** before adding anything.
-- [ ] Point Prometheus at free5GC NF metrics; add Grafana NF-KPI panels.
-- [ ] Wire the operator **Network Functions** page to real NF status (NRF `nf-instances` or a small
-      `/api/nf/*` Java facade).
-- [ ] Layer 01: enable free5GC SBI TLS + NRF OAuth2 (SEC-01/02) + mesh/Cilium mTLS between NFs.
-- [ ] Layer 02: stream free5GC signalling into anomaly-detection-service (9003) + reuse roaming
-      `AnomalyDetector`; UERANSIM attack scripts (SEC-03).
-- [ ] Layer 03: scenario runner (TC-01→PERF-02) + fault-injection-service cases.
+## 5GC Core — free5GC integration (see [[5GC-Core]] for the full plan · ADR-13) — NEW 2026-08-15
+Decision: adopt **free5GC** + **UERANSIM**; this repo stays the **harness**. Not started. The
+per-service role mapping + open decisions are in [[5GC-Core]]; the phased checklist below mirrors it.
+
+**Phase 0 — Host & baseline (BLOCKER, user's Linux box):**
+- [ ] Ubuntu 22.04 VM (or WSL2) with **`gtp5g`** built vs kernel headers; `insmod`/`modprobe`;
+      verify `lsmod | grep gtp5g`. ⚠️ free5GC UPF won't run without it — **no bare Windows/mac Docker**.
+- [ ] `free5gc/free5gc-compose` up (NRF/AMF/SMF/UPF/AUSF/UDM/UDR + Mongo + WebConsole).
+- [ ] Provision a subscriber in WebConsole (IMSI, key/OPc, S-NSSAI, DNN).
+- [ ] UERANSIM gNB+UE → confirm clean **Initial Registration + PDU session** (ping via UPF).
+      **Build nothing until this passes.**
+
+**Phase 1 — Observe (NF facade + dashboards):**
+- [ ] `NfController` in the gateway: `GET /api/nf/*` (WebClient → NRF `nnrf-nfm/v1/nf-instances`),
+      secure `PERM_nf:read`, graceful-empty when NRF down.
+- [ ] Wire the operator **Network Functions** page to `/api/nf/*` (replace the mock signal data).
+- [ ] Add cAdvisor + node-exporter + rate-limiting(9004)/anomaly(9003) to `prometheus.yml`; ship
+      free5GC logs → Loki. Build **Grafana D2/D3** (see [[Grafana-Dashboards]]).
+
+**Phase 2 — Zero-Trust (Layer 01 / SEC-01/02):**
+- [ ] Enable free5GC **SBI TLS + NRF OAuth2** (scoped tokens) → demo SEC-01 (no cert) / SEC-02 (403).
+- [ ] mTLS + NetworkPolicy between NF containers via **service mesh (Istio/Linkerd) or Cilium/eBPF**;
+      PKI via cert-manager/CFSSL or Vault. Build **Grafana D5** (handshake/token/cert/mesh).
+
+**Phase 3 — Anomaly (Layer 02 / D4 / SEC-03):**
+- [ ] **anomaly-detection-service (9003)** consumes free5GC signalling (metrics+Loki): P1 rule-based
+      → P2 z-score/IQR (reuse roaming `AnomalyDetector`) → alerts to **Grafana D4** + frontend.
+- [ ] UERANSIM attack scripts: registration flood (DoS-on-AMF), IMSI enumeration (SEC-03), fake-gNB.
+
+**Phase 4 — Conformance & fault (Layer 03):**
+- [ ] Scenario runner → UERANSIM TC-01→PERF-02 (registration, 5G-AKA, PDU, dereg, handover; PERF
+      ≥50 concurrent / p95 ≤500 ms) with pcap evidence.
+- [ ] **fault-injection-service (9006)** cases: kill SMF mid-session, UDM 503, cert expiry, UPF↔SMF
+      partition. Optional CI/CD gate.
+
+**Phase 5 — Package & docs (D5/D7):** one-command bring-up (compose), K8s+Helm (stretch), final docs + demo.
+
+## Observability / Grafana dashboards (D6) — see [[Grafana-Dashboards]]
+- [ ] Add rate-limiting (9004) + anomaly (9003) scrape targets to `docker/prometheus/prometheus.yml`.
+- [ ] Stand up **cAdvisor + node-exporter** for free5GC container CPU/mem/net.
+- [ ] **Fluent Bit/promtail → Loki** for free5GC NF logs; LogQL counters for the signalling board (D3).
+- [ ] Build the 7 dashboards: D1 Platform (extend), D2 NF Health, D3 Signalling, D4 Security/Anomaly,
+      D5 Zero-Trust/Certs, D6 Rate-Limit, D7 Roaming, D8 Logs/Traces. Export JSON → `grafana-dashboard/`.
+- [ ] Alert rules (proposal §4.3 P1): registration-burst, 5xx spike, cert-expiry <7d, NF heartbeat miss.
 
 ## Scripts / tooling (see [[Scripts-and-Tooling]])
 - [ ] Update `run.sh` (local-JAR path), `build-images.sh`, and the `Tiltfile` to also launch

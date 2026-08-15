@@ -23,6 +23,57 @@ scrape_configs:
     static_configs:
       - targets: ['host.docker.internal:9002']
 
+  - job_name: 'anomaly-detection-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:9003']
+
+  - job_name: 'rate-limiting-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:9004']
+
+  - job_name: 'distributed-tracing-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:9005']
+
+  - job_name: 'fault-injection-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:9006']
+
+  # ---- Redis (via redis_exporter multi-target: one exporter, both instances) ----
+  - job_name: 'redis'
+    metrics_path: /scrape
+    static_configs:
+      - targets:
+          - redis://ratelimit-redis:6379
+          - redis://anomaly-redis:6379
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: redis-exporter:9121
+
+  # ---- Databases (via per-server exporters) ----
+  - job_name: 'postgres-keycloak'
+    static_configs:
+      - targets: ['postgres-exporter-keycloak:9187']
+        labels: { db: 'keycloak_db' }
+
+  - job_name: 'postgres-ratelimit'
+    static_configs:
+      - targets: ['postgres-exporter-ratelimit:9187']
+        labels: { db: 'ratelimit_db' }
+
+  - job_name: 'mysql-roaming'
+    static_configs:
+      - targets: ['mysqld-exporter-roaming:9104']
+        labels: { db: 'roaming_db' }
+
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
