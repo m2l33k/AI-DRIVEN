@@ -1,7 +1,10 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink, RouterLinkActive, RouterOutlet, Router } from '@angular/router';
+import { interval, startWith } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
 import { I18nService } from '../../core/i18n.service';
+import { MessagesService } from '../../core/messages.service';
 
 export interface NavItem {
   label: string;
@@ -91,11 +94,14 @@ export interface NavItem {
               @if (!collapsed()) { <span class="lbl">{{ i18n.t('Notifications') }}</span> <span class="badge">3</span> }
               @else { <i class="dot"></i> }
             </button>
-            <button class="nav-item" title="Messages">
+            <a class="nav-item" routerLink="messages" routerLinkActive="active" title="Messages"
+               (click)="mobileOpen.set(false)">
               <svg class="li" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-              @if (!collapsed()) { <span class="lbl">{{ i18n.t('Messages') }}</span> <span class="badge alt">5</span> }
-              @else { <i class="dot alt"></i> }
-            </button>
+              @if (!collapsed()) {
+                <span class="lbl">{{ i18n.t('Messages') }}</span>
+                @if (messages.unread() > 0) { <span class="badge alt">{{ messages.unread() }}</span> }
+              } @else if (messages.unread() > 0) { <i class="dot alt"></i> }
+            </a>
             <button class="nav-item" (click)="openChangePw()" title="Change password">
               <svg class="li" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
               @if (!collapsed()) { <span class="lbl">{{ i18n.t('Change password') }}</span> }
@@ -401,6 +407,11 @@ export class RoleShell {
   private router = inject(Router);
   private auth = inject(AuthService);
   readonly i18n = inject(I18nService);
+  readonly messages = inject(MessagesService);
+
+  /** Poll the unread-messages count for the sidebar "Messages" badge (auto-stops on destroy). */
+  private readonly unreadPoll = interval(20000).pipe(startWith(0), takeUntilDestroyed())
+    .subscribe(() => this.messages.refreshUnread());
 
   toggleGroup(item: NavItem) {
     if (this.collapsed()) { this.collapsed.set(false); }

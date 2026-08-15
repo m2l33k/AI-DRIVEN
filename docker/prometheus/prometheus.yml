@@ -43,6 +43,11 @@ scrape_configs:
     static_configs:
       - targets: ['host.docker.internal:9006']
 
+  - job_name: 'messaging-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:9007']
+
   # ---- Redis (via redis_exporter multi-target: one exporter, both instances) ----
   - job_name: 'redis'
     metrics_path: /scrape

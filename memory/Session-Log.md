@@ -11,6 +11,24 @@ something meaningful.
 
 ## 2026-08-15
 
+### messaging-service — new microservice: direct messaging between users (detail: [[Messaging-Service]])
+- Built a full **messaging-service** (port 9007, dedicated `messaging-postgres` :5438) per the service
+  template: `Message` @Entity, `MessageRepository` (JPA + `@Query`/`@Modifying`), `MessageService`,
+  `MessageController` (`/api/messages`: send, conversations inbox, thread, mark-read, unread-count),
+  DTOs, `SecurityConfig` (JWT; **any authenticated user**; sender from JWT `preferred_username`),
+  `OpenApiConfig`, `ApiExceptionHandler`, Dockerfile + k8s.
+- **Wired:** root `pom.xml` module; gateway routes **both profiles** + docs route + Swagger entry;
+  gateway `SecurityConfig` `/api/messages/**` → authenticated; `docker-compose-infra.yml`
+  (`messaging-postgres` + volume); `docker-compose-base.yml` (`messaging-service`); `prometheus.yml`
+  scrape (9007).
+- Verified: `mvnw -o compile` messaging + gateway → EXIT=0; all YAML valid; `docker compose config`
+  (infra + base) OK. **Backend only** — frontend Messages page is the next step ([[Next-Steps]]).
+- **Started `messaging-postgres`** without recreating anything else:
+  `docker compose -f docker/docker-compose-infra.yml up -d --no-deps messaging-postgres` → `Up (healthy)`,
+  `0.0.0.0:5438->5432`, `pg_isready` OK. (The orphan-containers warning for Grafana/Prometheus/… is
+  harmless — did **not** use `--remove-orphans`.) `--no-deps` + a single service name = only that
+  container is touched; the running infra/observability stack is left as-is.
+
 ### Frontend polish: responsive tables + loading/empty/error states (detail: [[Frontend-Components]])
 - **Responsive tables:** global rule in `src/styles.css` — `@media (max-width:720px) .tbl { display:block;
   overflow-x:auto; white-space:nowrap }` → every table across all pages scrolls horizontally on small

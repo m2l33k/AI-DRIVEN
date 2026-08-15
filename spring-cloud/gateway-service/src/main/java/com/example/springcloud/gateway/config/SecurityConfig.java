@@ -80,7 +80,13 @@ public class SecurityConfig {
                         // --- Platform metrics overview (from Prometheus) — any authenticated user ---
                         .pathMatchers(HttpMethod.GET, "/api/metrics/**").authenticated()
 
+                        // --- Messaging: any authenticated user can DM any other ---
+                        .pathMatchers("/api/messages/**").authenticated()
+
                         // --- IAM: users (PLATFORM_ADMIN) ---
+                        // Directory (username + display name) is readable by any authenticated user —
+                        // used by messaging's recipient picker. Must precede the users:read rule.
+                        .pathMatchers(HttpMethod.GET, "/api/users/directory").authenticated()
                         .pathMatchers(HttpMethod.GET, "/api/users/**").hasAuthority("PERM_users:read")
                         .pathMatchers("/api/users/**").hasAuthority("PERM_users:write")
 

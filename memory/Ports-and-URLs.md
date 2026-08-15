@@ -21,6 +21,7 @@ row here. Local = running on the host; docker = the container name on `shared-ne
 | rate-limiting-service | `9004` | `rate-limiting-service:9004` | `/api/protection/**` (standalone limiter: `/check`, `/policies`, `/stats`) |
 | distributed-tracing-service | `9005` | `distributed-tracing-service:9005` | `/api/tracing/health` |
 | fault-injection-service | `9006` | `fault-injection-service:9006` | `/api/fault/health` |
+| messaging-service | `9007` | `messaging-service:9007` | `/api/messages/**` (DMs between users) |
 | Frontend (Angular dev) | `4200` | — | proxies `/api` → gateway `:9000` |
 
 ## Identity & data
@@ -34,6 +35,7 @@ row here. Local = running on the host; docker = the container name on `shared-ne
 | ratelimit Postgres | `5434` | `ratelimit-postgres:5432` | DB `ratelimit_db`, user/pass `ratelimit` |
 | tracing Postgres | `5435` | `tracing-postgres:5432` | DB `tracing_db`, user/pass `tracing` |
 | fault Postgres | `5436` | `fault-postgres:5432` | DB `fault_db`, user/pass `fault` |
+| messaging Postgres | `5438` | `messaging-postgres:5432` | DB `messaging_db`, user/pass `messaging` |
 | ratelimit Redis | `6379` | `ratelimit-redis:6379` | rate-limit counters |
 | anomaly Redis | `6380` | `anomaly-redis:6379` | real-time windows |
 | Postgres (shared) | `5432` | `postgres:5432` | legacy / optional (`course_db`) |

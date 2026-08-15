@@ -21,6 +21,7 @@ export const routes: Routes = [
       { path: 'roles', loadComponent: () => import('./roles/admin/roles/roles').then((m) => m.AdminRoles) },
       { path: 'monitoring', loadComponent: () => import('./roles/admin/monitoring/monitoring').then((m) => m.AdminMonitoring) },
       { path: 'metrics', loadComponent: () => import('./roles/admin/metrics/metrics').then((m) => m.AdminMetrics) },
+      { path: 'messages', loadComponent: () => import('./messaging/messages').then((m) => m.Messages) },
     ],
   },
 
@@ -34,6 +35,7 @@ export const routes: Routes = [
       { path: 'dashboard', loadComponent: () => import('./roles/network-operator/dashboard/operator-dashboard').then((m) => m.OperatorDashboard) },
       { path: 'network-functions', loadComponent: () => import('./roles/network-operator/network-functions/network-functions').then((m) => m.NetworkFunctions) },
       { path: 'core-config', loadComponent: () => import('./roles/network-operator/core-config/core-config').then((m) => m.CoreConfig) },
+      { path: 'messages', loadComponent: () => import('./messaging/messages').then((m) => m.Messages) },
     ],
   },
 
@@ -56,6 +58,7 @@ export const routes: Routes = [
       { path: 'roaming/tools', loadComponent: () => import('./roles/security-analyst/roaming/roaming-tools').then((m) => m.RoamingTools) },
       { path: 'detection-rules', loadComponent: () => import('./roles/security-analyst/detection-rules/detection-rules').then((m) => m.DetectionRules) },
       { path: 'rate-limiting', loadComponent: () => import('./roles/security-analyst/rate-limiting/rate-limiting').then((m) => m.RateLimiting) },
+      { path: 'messages', loadComponent: () => import('./messaging/messages').then((m) => m.Messages) },
     ],
   },
 
@@ -68,6 +71,7 @@ export const routes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       { path: 'dashboard', loadComponent: () => import('./roles/auditor/dashboard/auditor-dashboard').then((m) => m.AuditorDashboard) },
       { path: 'audit-logs', loadComponent: () => import('./roles/auditor/audit-logs/audit-logs').then((m) => m.AuditLogs) },
+      { path: 'messages', loadComponent: () => import('./messaging/messages').then((m) => m.Messages) },
     ],
   },
 

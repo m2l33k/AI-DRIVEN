@@ -72,6 +72,10 @@ URLs live in [[Ports-and-URLs]]; the *why* behind the infra shape is in [[Archit
 
 - `infra.sh` = infra + observability compose files together; `run.sh docker` = base compose only.
 - Validate a compose file: `docker compose -f docker/<file> config`.
+- **Bring up ONE infra container** (e.g. a single new DB) without recreating/removing the rest:
+  `docker compose -f docker/docker-compose-infra.yml up -d --no-deps <service>` — `--no-deps` + a
+  single service name touches only that container; the running stack is left as-is. (An "orphan
+  containers" warning for the observability services is harmless — don't pass `--remove-orphans`.)
 
 ## Kubernetes
 - Per-service manifests live in each module's `kubernetes/deployment.yml` + `service.yml`

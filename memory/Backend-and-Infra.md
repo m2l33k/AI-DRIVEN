@@ -22,6 +22,7 @@ Full table (incl. observability + data + URLs) → [[Ports-and-URLs]].
 | rate-limiting-service       | 9004                                        |
 | distributed-tracing-service | 9005                                        |
 | fault-injection-service     | 9006                                        |
+| messaging-service           | 9007 (DMs between users; see [[Messaging-Service]]) |
 | roaming MySQL               | 3307 (host) / 3306 (docker `roaming-mysql`) |
 | Keycloak                    | 8081 (local) / 8080 (docker)                |
 

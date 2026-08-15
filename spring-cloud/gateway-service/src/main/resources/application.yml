@@ -84,6 +84,16 @@ spring:
                 - Path=/fault-injection-service/v3/api-docs
               filters:
                 - RewritePath=/fault-injection-service/(?<segment>.*), /$\{segment}
+            - id: messaging-service
+              uri: lb://messaging-service
+              predicates:
+                - Path=/api/messages/**
+            - id: messaging-service-docs
+              uri: lb://messaging-service
+              predicates:
+                - Path=/messaging-service/v3/api-docs
+              filters:
+                - RewritePath=/messaging-service/(?<segment>.*), /$\{segment}
 
 eureka:
   client:
@@ -161,6 +171,8 @@ springdoc:
         url: /distributed-tracing-service/v3/api-docs
       - name: fault-injection-service
         url: /fault-injection-service/v3/api-docs
+      - name: messaging-service
+        url: /messaging-service/v3/api-docs
 ---
 app:
   jwk-set-uri: http://keycloak:8080/realms/auth-management/protocol/openid-connect/certs
@@ -233,6 +245,16 @@ spring:
                 - Path=/fault-injection-service/v3/api-docs
               filters:
                 - RewritePath=/fault-injection-service/(?<segment>.*), /$\{segment}
+            - id: messaging-service
+              uri: lb://messaging-service
+              predicates:
+                - Path=/api/messages/**
+            - id: messaging-service-docs
+              uri: lb://messaging-service
+              predicates:
+                - Path=/messaging-service/v3/api-docs
+              filters:
+                - RewritePath=/messaging-service/(?<segment>.*), /$\{segment}
   security:
     oauth2:
       resourceserver:

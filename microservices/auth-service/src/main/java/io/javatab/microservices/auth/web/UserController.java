@@ -4,6 +4,7 @@ import io.javatab.microservices.auth.keycloak.KeycloakService;
 import io.javatab.microservices.auth.mail.MailService;
 import io.javatab.microservices.auth.service.EmailVerificationService;
 import io.javatab.microservices.auth.web.dto.CreateUserRequest;
+import io.javatab.microservices.auth.web.dto.DirectoryUser;
 import io.javatab.microservices.auth.web.dto.UserSummary;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -50,6 +51,24 @@ public class UserController {
 	@GetMapping
 	public List<UserSummary> listUsers() {
 		return keycloak.listUsers();
+	}
+
+	@Operation(summary = "User directory",
+			description = "Lightweight username + display-name list for recipient pickers (e.g. messaging). "
+					+ "Available to any authenticated user — no users:read required. No sensitive fields.",
+			security = @SecurityRequirement(name = "bearerAuth"))
+	@GetMapping("/directory")
+	public List<DirectoryUser> directory() {
+		return keycloak.listUsers().stream()
+				.map(u -> new DirectoryUser(u.username(), displayName(u)))
+				.filter(d -> d.username() != null && !d.username().isBlank())
+				.toList();
+	}
+
+	private static String displayName(UserSummary u) {
+		String full = ((u.firstName() == null ? "" : u.firstName()) + " "
+				+ (u.lastName() == null ? "" : u.lastName())).trim();
+		return full.isBlank() ? u.username() : full;
 	}
 
 	@Operation(summary = "Create a user",

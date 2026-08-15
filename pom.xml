@@ -28,5 +28,6 @@
         <module>microservices/rate-limiting-service</module>
         <module>microservices/distributed-tracing-service</module>
         <module>microservices/fault-injection-service</module>
+        <module>microservices/messaging-service</module>
     </modules>
 </project>

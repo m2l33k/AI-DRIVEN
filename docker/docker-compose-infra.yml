@@ -189,6 +189,27 @@ services:
     networks:
       - shared-network
 
+  messaging-postgres:
+    image: "postgres:17.4"
+    container_name: "messaging-postgres"
+    mem_limit: 256m
+    ports:
+      - "5438:5432"
+    environment:
+      - POSTGRES_USER=messaging
+      - POSTGRES_PASSWORD=messaging
+      - POSTGRES_DB=messaging_db
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - messaging-postgres-data:/var/lib/postgresql/data
+    networks:
+      - shared-network
+
   # --- Redis (only for services that need it) ---
 
   ratelimit-redis:
@@ -238,5 +259,6 @@ volumes:
   ratelimit-postgres-data:
   tracing-postgres-data:
   fault-postgres-data:
+  messaging-postgres-data:
   ratelimit-redis-data:
   anomaly-redis-data:
