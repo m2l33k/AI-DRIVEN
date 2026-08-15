@@ -180,9 +180,17 @@ anomaly engine addresses the 5G security-monitoring market (~$4.5 B by 2028).
 
 ---
 
+## Core substrate decision (2026-08-15): free5GC, not from-scratch NFs
+**We will use the open-source [[5GC-Core|free5GC]] core** (Go NFs + UERANSIM), not hand-build the
+NFs — consistent with §2.2 ("a vanilla core has diminishing value; the contributions are the three
+added layers"). free5GC over open5GS for its NRF-OAuth2 + SBI-TLS (zero-trust Layer 01 / SEC-02).
+The three differentiating layers land *around* free5GC. ⚠️ free5GC's UPF needs the `gtp5g` kernel
+module → runs on an Ubuntu VM/WSL2 (already the §7 target), separate from this Java repo. Details +
+integration checklist: [[5GC-Core]] · rationale: ADR-13 in [[Architecture-Decisions]].
+
 ## How this maps to the current repo
-This repo is the **cloud-native / security-and-observability harness** around the proposal, not the
-Go NFs themselves (yet):
+This repo is the **cloud-native / security-and-observability harness** around the proposal / around
+the [[5GC-Core|free5GC]] core — not the Go NFs themselves:
 - **Zero-Trust (Layer 01)** → already partially realised: JWT resource servers on every service via
   Keycloak realm `auth-management`, `PERM_*`/`ROLE_*` mapping — see [[Auth-Service]],
   [[Roles-and-Permissions]]. Next: mTLS/PKI + network policy.

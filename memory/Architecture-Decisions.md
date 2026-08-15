@@ -9,6 +9,27 @@ updated: 2026-08-15
 The **why** behind the design — the non-obvious choices, and their trade-offs. Read this before
 proposing a change so you don't undo a deliberate decision. Newest first.
 
+## ADR-13 · Use free5GC as the 5G Core substrate; this repo is the harness (don't build NFs from scratch)
+**Decision (2026-08-15):** adopt **free5GC** (open-source, Go) as the actual 5G Core (NRF/AMF/SMF/
+UPF/AUSF/UDM/UDR/PCF/NSSF) driven by **UERANSIM** (gNB/UE sim). We do **not** hand-build the NFs.
+This Java/Spring platform stays the **security + observability + test harness** *around* free5GC.
+**Why:** the proposal itself (§2.2) says a vanilla core has diminishing value — the contribution is
+the three added layers (zero-trust, anomaly detection, conformance). free5GC gives real
+NGAP/NAS/PFCP/GTP-U + 5G-AKA + a Mongo subscriber store we can't build in Java, removes the biggest
+risk (AMF/NGAP complexity), and matches the proposal's Go preference. **free5GC over open5GS**
+because it has **NRF-as-OAuth2 + SBI TLS (TS 33.501 §13)** we can exercise for the zero-trust SBI
+token work (SEC-02) — closer to Layer 01. See [[5GC-Core]].
+**How the contributions land:** Layer 01 (zero-trust) = enable free5GC SBI TLS/OAuth2 **+** service
+mesh / Cilium mTLS + NetworkPolicies between NF containers (integration/ops, not NF code). Layer 02
+(anomaly) = our `AnomalyDetector` / anomaly-detection-service consume free5GC signalling metrics/logs.
+Layer 03 (conformance) = a scenario runner + fault-injection-service drive UERANSIM call flows.
+**⚠️ Constraint:** free5GC's UPF needs the **`gtp5g` Linux kernel module** — it does **not** run on
+bare Windows/macOS Docker. Needs Ubuntu (VM) or WSL2 with a `gtp5g`-built kernel (the proposal §7
+already targets "Ubuntu 22.04 LTS (VM/WSL2), kernel GTP module"). Standard path:
+`free5gc/free5gc-compose`. **Trade-off:** the core runs as a separate Linux runtime alongside this
+repo (consumes its APIs/metrics), not inside it; "build the core" is reframed as
+**"integrate, harden, observe, and test a real core."**
+
 ## ADR-12 · API DTOs are separate records; JPA entities are never the wire contract
 **Decision:** controllers accept/return **DTO records**, not JPA entities. Concretely, the
 rate-limiting `PUT /policies` uses `RateLimitPolicyDto` (not the `RateLimitPolicy` entity), and the
@@ -19,21 +40,20 @@ A validated DTO is the wire contract; the entity stays a persistence detail. Dis
 `PUT` 400 bug (2026-08-15). **Trade-off:** a small mapping layer (`Dto.from(entity)`), worth it for
 validation + a stable contract.
 
-## ADR-11 · Rate limiting enforced by a gateway GlobalFilter calling the limiter (not Gateway's RedisRateLimiter)
-**Decision:** the gateway runs a custom reactive **`RateLimitGlobalFilter`** that, before forwarding,
-calls the rate-limiting-service's **internal** decision endpoint (`POST /internal/protection/check`,
-unauthenticated, in-cluster only) and returns **429** when denied. Chosen over Spring Cloud Gateway's
-built-in `RequestRateLimiter`/`RedisRateLimiter`.
-**Why:** keeps the **Postgres policy table + `TokenBucketService` (Lua bucket) as the single source
-of truth** — the console's policy edits and `/stats` (allowed/blocked, top offenders) stay
-meaningful. The built-in filter would use its own separate Redis bucket, bypassing our policies.
-**Key resolution:** IMSI header → `imsi`, operator header → `operator`, else client IP → `ip` (maps
-to the seeded policies). **Fail-open** on limiter error and a master `protection.enforcement.enabled`
-flag, so the limiter can never take the platform down. The gateway carries **no user JWT** into the
-decision — hence the dedicated internal endpoint (never routed publicly), avoiding coupling
-enforcement to the caller's permissions.
-**Trade-offs:** one extra in-cluster hop per request (acceptable here; could be inlined against the
-same Redis later); the internal endpoint is unauthenticated but unreachable from outside the cluster.
+## ADR-11 · ~~Gateway GlobalFilter calls the limiter to enforce rate limits~~ — RETIRED (reverted 2026-08-15)
+**Status: RETIRED — reverted the same day it was added.** The idea: a reactive
+`RateLimitGlobalFilter` in the gateway calls the limiter's internal `POST /internal/protection/check`
+before forwarding and returns **429** on deny (keeping the Postgres policy table as the single source
+of truth, vs Gateway's built-in `RedisRateLimiter`).
+**Why reverted:** it added a **synchronous per-request hop to a service that may be down**. With
+`rate-limiting-service` not running, every request waited for a connection failure before failing
+open → the whole gateway + services became slow (login included, via post-login calls). All the
+pieces were deleted (gateway `ratelimit` package, `InternalProtectionController`,
+`protection.enforcement` config, `/internal/**` permit). The limiter stays **standalone/advisory**
+(`POST /check`), driven by the frontend Rate Limiting page.
+**Lesson / if revisited:** never put a blocking call to a maybe-down dependency on the gateway hot
+path. Do it **opt-in (off by default) + short timeout + fail-open**, or better **run the token bucket
+inside the gateway against Redis** (no extra service hop). See [[Platform-Services]].
 
 ## ADR-10 · Keycloak persisted to its own Postgres (not H2)
 **Decision:** Keycloak runs `start-dev` but with `KC_DB=postgres` pointing at a dedicated

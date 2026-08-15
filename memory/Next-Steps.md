@@ -72,9 +72,10 @@ protected endpoints land.
       token-bucket limiter (`/api/protection/check|policies|stats`), atomic Lua, JWT-guarded.
       Reuses `roaming-events:read` / `detection-rules:write` → **no Keycloak change**. Image
       `docker-rate-limiting-service:latest`. See [[Platform-Services]].
-      - [x] **Gateway enforcement on live traffic (2026-08-15):** `RateLimitGlobalFilter` calls the
-            limiter's internal `/internal/protection/check` and 429s on deny (ADR-11). Fixed the
-            Swagger Authorize scheme + the `PUT /policies` 400 (entity→DTO). Frontend page live.
+      - [x] Fixed the Swagger Authorize scheme + the `PUT /policies` 400 (entity→DTO); frontend page live.
+      - [~] **Gateway enforcement tried & REVERTED (2026-08-15):** `RateLimitGlobalFilter` slowed the
+            hot path (per-request call to a maybe-down service). Removed (ADR-11 retired). If
+            revisited: opt-in + timeout + fail-open, or run the bucket in-gateway against Redis.
       - [ ] Role B: attach-flood detection over roaming `attach_events` + persist `BlockEvent`s.
       - [ ] Runtime smoke test: `./infra.sh up` then `up -d rate-limiting-service`; token as
             `analyst-user`, hit `/api/protection/*` + hammer a downstream route to see 429s + stats.
@@ -82,6 +83,20 @@ protected endpoints land.
       `docker-compose-observability.yml` (OTLP sink, augment/replace Tempo) or drop the placeholder.
       See ADR-01 in [[Architecture-Decisions]].
 - [ ] **fault-injection-service** (9006) — chaos testing (latency/errors/NF outages).
+
+## 5GC Core — free5GC integration (see [[5GC-Core]], ADR-13) — NEW 2026-08-15
+Decision made: adopt **free5GC** + **UERANSIM**; this repo stays the harness. Not started.
+- [ ] Provision **Ubuntu VM / WSL2** with the **`gtp5g` kernel module** (build vs kernel headers;
+      verify `lsmod | grep gtp5g`). ⚠️ free5GC UPF won't run without it — no bare Windows/mac Docker.
+- [ ] Bring up `free5gc/free5gc-compose` (NFs + MongoDB + WebConsole); register a UERANSIM gNB/UE;
+      confirm baseline **Initial Registration + PDU session** before adding anything.
+- [ ] Point Prometheus at free5GC NF metrics; add Grafana NF-KPI panels.
+- [ ] Wire the operator **Network Functions** page to real NF status (NRF `nf-instances` or a small
+      `/api/nf/*` Java facade).
+- [ ] Layer 01: enable free5GC SBI TLS + NRF OAuth2 (SEC-01/02) + mesh/Cilium mTLS between NFs.
+- [ ] Layer 02: stream free5GC signalling into anomaly-detection-service (9003) + reuse roaming
+      `AnomalyDetector`; UERANSIM attack scripts (SEC-03).
+- [ ] Layer 03: scenario runner (TC-01→PERF-02) + fault-injection-service cases.
 
 ## Scripts / tooling (see [[Scripts-and-Tooling]])
 - [ ] Update `run.sh` (local-JAR path), `build-images.sh`, and the `Tiltfile` to also launch

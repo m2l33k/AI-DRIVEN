@@ -14,11 +14,11 @@ row here. Local = running on the host; docker = the container name on `shared-ne
 | Service | Local port | Docker host | Key paths |
 |---------|-----------|-------------|-----------|
 | Eureka server | `8761` | `eureka-server:8761` | dashboard `/` |
-| Gateway | `9000` | `gateway-service:9000` | all `/api/**`, `GET /api/metrics/overview`, `/swagger-ui.html`; **rate-limit enforcement** on downstream traffic (`RateLimitGlobalFilter`, `protection.enforcement.*`) |
+| Gateway | `9000` | `gateway-service:9000` | all `/api/**`, `GET /api/metrics/overview`, `/swagger-ui.html` (rate-limit enforcement filter was tried then reverted — see ADR-11) |
 | auth-service | `9001` | `auth-service:9001` | `/api/auth/**`, `/api/users/**` |
 | roaming-analysis-service | `9002` | `roaming-analysis-service:9002` | `/api/roaming/**` (13 eps incl. `POST /upload`, `POST /simulate`) |
 | anomaly-detection-service | `9003` | `anomaly-detection-service:9003` | `/api/anomaly/health` |
-| rate-limiting-service | `9004` | `rate-limiting-service:9004` | `/api/protection/**`, `POST /internal/protection/check` (in-cluster) |
+| rate-limiting-service | `9004` | `rate-limiting-service:9004` | `/api/protection/**` (standalone limiter: `/check`, `/policies`, `/stats`) |
 | distributed-tracing-service | `9005` | `distributed-tracing-service:9005` | `/api/tracing/health` |
 | fault-injection-service | `9006` | `fault-injection-service:9006` | `/api/fault/health` |
 | Frontend (Angular dev) | `4200` | — | proxies `/api` → gateway `:9000` |

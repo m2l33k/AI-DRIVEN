@@ -66,9 +66,10 @@ See [[Platform-Services]].
 - **Frontend gating:** `AuthService.hasPermission(p)` decodes the JWT's `platform-client` roles;
   the Rate Limiting page only shows policy **create/edit/delete** when `detection-rules:write` is
   present (defence-in-depth — the backend still enforces; a bypass gets a 403 surfaced in the UI).
-- **Gateway rate-limit enforcement:** the gateway's `RateLimitGlobalFilter` applies the policies to
-  **all** downstream traffic (ADR-11). This is *rate* limiting keyed by IMSI/operator/IP — orthogonal
-  to *RBAC*; it runs after JWT auth and returns **429** (not 403) when a bucket is exhausted.
+- **Gateway rate-limit enforcement:** was briefly added (a `RateLimitGlobalFilter` applying policies
+  to all downstream traffic) then **reverted** the same day — it slowed the hot path (ADR-11 retired).
+  Rate limiting is now **advisory only** via the standalone service's `/check`; RBAC (`PERM_*`) is
+  unchanged and remains the gateway's authorization mechanism.
 
 ## Demo users
 All have password `password`. `admin-user` → PLATFORM_ADMIN, plus one user per other role.

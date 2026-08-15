@@ -11,6 +11,30 @@ something meaningful.
 
 ## 2026-08-15
 
+### rate-limiting gateway enforcement — REVERTED (perf regression) (detail: [[Platform-Services]] · ADR-11 retired)
+- The gateway `RateLimitGlobalFilter` (added earlier the same day) made the **gateway + all services
+  slow**: it put a **synchronous per-request call** to `rate-limiting-service` on the hot path; with
+  that service **not running**, every request waited for a connection failure before failing open.
+- First mitigation: default the filter **OFF** + 300 ms timeout + exclude `/api/auth`. Then, at the
+  user's request, **fully removed it**: deleted the gateway `com.example.springcloud.gateway.ratelimit`
+  package (`RateLimitGlobalFilter`/`RateLimitClient`/`RateLimitConfig`/`RateLimitProperties`), the
+  `protection.enforcement` block in gateway `application.yml`, the limiter's `InternalProtectionController`,
+  and the `/internal/**` permit in its `SecurityConfig`. Gateway is back to plain routing + JWT.
+- **Kept:** the standalone limiter (`/check`,`/policies`,`/stats`) + the Swagger-Authorize and
+  PUT-DTO (`RateLimitPolicyDto` + `ApiExceptionHandler`) fixes. The frontend Rate Limiting page is
+  unaffected (calls the service directly). **ADR-11 retired.** Both modules compile (EXIT=0).
+
+### Decision: use free5GC as the 5G Core substrate (detail: [[5GC-Core]] · ADR-13)
+- Chose **free5GC** (open-source Go NFs) + **UERANSIM** as the real core; this Spring repo stays the
+  **harness** (security/observability/test) around it — **not** hand-building NFs. Rationale in the
+  proposal §2.2 (vanilla core = diminishing value; the 3 added layers are the contribution). free5GC
+  over open5GS for **NRF-OAuth2 + SBI-TLS** (zero-trust Layer 01 / SEC-02).
+- **⚠️ Environment reality captured:** free5GC UPF needs the **`gtp5g` kernel module** → Ubuntu
+  VM/WSL2 (proposal §7 target), not bare Windows/mac Docker; deploy via `free5gc/free5gc-compose`.
+- Wrote **[[5GC-Core]]** (NF list, topology diagram, layer mapping, integration checklist),
+  **ADR-13**, and updated [[Proposal-Internship]] / [[Next-Steps]] / [[README]]. No code yet —
+  integration starts once a Linux+gtp5g host is provisioned.
+
 ### roaming-analysis-service — CSV analysis, traffic simulation, stronger anomaly detection (detail: [[Roaming-Analysis-Service]])
 - **3 new capabilities on the existing (synthetic `RoamingEvent`) analytics**, all compiling
   (`mvnw -o -f microservices/roaming-analysis-service/pom.xml compile` → EXIT=0):

@@ -2,21 +2,6 @@ app:
   jwk-set-uri: ${APP_KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/auth-management/protocol/openid-connect/certs}
 prometheus:
   base-url: ${PROMETHEUS_BASE_URL:http://localhost:9090}
-
-# Gateway-side enforcement of the rate-limiting-service policies on all downstream traffic.
-protection:
-  enforcement:
-    enabled: ${PROTECTION_ENFORCEMENT_ENABLED:true}
-    fail-open: ${PROTECTION_ENFORCEMENT_FAIL_OPEN:true}
-    tokens-per-request: 1
-    # Requests to these prefixes (and any *-docs) are never rate-limited.
-    excluded-paths:
-      - /api/protection
-      - /internal
-      - /actuator
-      - /swagger-ui
-      - /eureka
-      - /api/auth
 server:
   port: 9000
   netty:

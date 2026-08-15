@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Frontend-Architecture.md",
+                "file": "Proposal-Internship.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Frontend-Architecture"
+              "title": "Proposal-Internship"
             }
           }
         ],
@@ -114,7 +114,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Frontend-Architecture.md",
+                "file": "Proposal-Internship.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -204,6 +204,11 @@
   },
   "active": "4eb6cb8adb3d18d8",
   "lastOpenFiles": [
+    "Ports-and-URLs.md.tmp.13612.5952284edec3",
+    "Platform-Services.md.tmp.13612.1c47ecd309a7",
+    "Frontend-Architecture.md",
+    "Proposal-Internship.md.tmp.13612.0fd0a2b98e99",
+    "5GC-Core.md",
     "Frontend-Components.md",
     "Auth-Service.md",
     "Diagrams.md",
@@ -211,7 +216,6 @@
     "Proposal-Internship.md",
     "README.md",
     "Roles-and-Permissions.md",
-    "Frontend-Architecture.md",
     "Architecture-Decisions.md",
     "README.md.tmp.13612.188cc72f342c",
     "Ports-and-URLs.md.tmp.13612.95e022656db3",
@@ -221,8 +225,6 @@
     "Frontend-Architecture.md.tmp.13612.5b8e8cf9dffe",
     "Frontend-Components.md.tmp.13612.c8d6ca482a2a",
     "Architecture-Decisions.md.tmp.13612.61d2aea052e2",
-    "Platform-Services.md.tmp.13612.88152550c919",
-    "Platform-Services.md.tmp.13612.572f6ec84f16",
     "Project-Overview.md",
     "Presentation.md",
     "Ports-and-URLs.md",

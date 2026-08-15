@@ -67,11 +67,10 @@ kubernetes/deployment.yml + service.yml         ClusterIP 80 -> <port>
 - **anomaly-detection-service** — real-time anomaly detection over 5G signalling/roaming.
   Likely consumes/overlaps with [[Roaming-Analysis-Service]]'s heuristic `/anomalies`; candidate
   to centralise anomaly logic and swap heuristics for ML.
-- **rate-limiting-service** — ✅ **Role A + gateway enforcement live** (2026-08-14 / 2026-08-15):
-  Redis token-bucket limiter, reusing existing SECURITY_ANALYST perms (no Keycloak change), **now
-  enforced on all downstream traffic** by a gateway `GlobalFilter` (see the 2026-08-15 section
-  below). Still open: Role B (attach-flood detection over roaming `attach_events`) + persist
-  `BlockEvent`s.
+- **rate-limiting-service** — ✅ **Role A (standalone limiter)** (2026-08-14), + Swagger/PUT-DTO
+  fixes (2026-08-15). A gateway-enforcement experiment was **tried and reverted** the same day (it
+  slowed the hot path — see the 2026-08-15 section below). Limiter stays **advisory** (`/check`).
+  Still open: Role B (attach-flood detection over roaming `attach_events`) + persist `BlockEvent`s.
 - **distributed-tracing-service** — **Jaeger** facade/placeholder. NB: Jaeger is a tracing
   *backend*, not a Spring service. Real work is either (a) add a Jaeger container to
   `docker-compose-observability.yml` (OTLP sink, can augment/replace Tempo) and make this a thin
@@ -106,7 +105,6 @@ can never take the platform down). Seeded policies: `default` 100/min, `imsi` 20
 | PUT | `/policies/{keyType}` | `PERM_detection-rules:write` | Create/replace a policy (body = `RateLimitPolicyDto`, validated) |
 | DELETE | `/policies/{keyType}` | `PERM_detection-rules:write` | Delete a policy |
 | GET | `/stats?topN=` | `PERM_roaming-events:read` | allowed/blocked counts, block-rate %, top offenders |
-| POST | `/internal/protection/check` | **public (in-cluster only)** | Gateway hot-path decision — never routed publicly |
 | GET | `/health` | public | Liveness probe |
 
 **✅ No Keycloak change needed (2026-08-14 decision).** Reuses permissions that already exist and
@@ -125,10 +123,12 @@ image **`docker-rate-limiting-service:latest`** (~573 MB), **EXIT=0**. To run it
 first (`./infra.sh up` → eureka, keycloak, `ratelimit-postgres`, `ratelimit-redis`), then
 `docker compose -f docker-compose-base.yml up -d rate-limiting-service`.
 
-## rate-limiting-service — fixes + gateway enforcement ✅ 2026-08-15
-Three fixes + the enforcement wiring that makes the limiter actually protect the other services.
+## rate-limiting-service — fixes (kept) + gateway enforcement (REVERTED) 2026-08-15
+Three fixes to the standalone service (**kept**), plus a gateway enforcement experiment that was
+**reverted the same day** — it made the whole gateway slow. The limiter stays **standalone/advisory**
+(called explicitly via `/check`), *not* wired into the request path.
 
-**Fixes (rate-limiting-service):**
+**Fixes (rate-limiting-service) — KEPT:**
 - **Swagger Authorize:** `OpenApiConfig` was missing `@SecurityScheme(name="bearerAuth", HTTP,
   bearer, JWT)` — the lock icons rendered (from operation `@SecurityRequirement`) but the button
   couldn't accept a token. Added it (mirrors roaming's).
@@ -139,33 +139,27 @@ Three fixes + the enforcement wiring that makes the limiter actually protect the
   used for **both** read (`from(entity)`) and write; controller GET/PUT now use it. Added
   **`web/ApiExceptionHandler`** (`@RestControllerAdvice`) → detailed 400s:
   `{error:"Validation failed", fields:{…}}` and `{error:"Malformed request body", details:…}`.
-- **`/internal/protection/check`** — new unauthenticated, in-cluster decision endpoint
-  (`InternalProtectionController`, reuses `TokenBucketService`); `/internal/**` permitted in
-  `SecurityConfig`. Not in the gateway route table → unreachable publicly. Lets the gateway ask
-  "allowed?" without carrying a user JWT (the public `/check` stays permission-guarded for humans).
 
-**Gateway enforcement (Option 1 — chosen over Gateway's built-in `RequestRateLimiter`)** — new
-package `com.example.springcloud.gateway.ratelimit`:
-- **`RateLimitGlobalFilter`** (reactive `GlobalFilter`, order `HIGHEST_PRECEDENCE+100`): derives a
-  `(keyType,key)` — `X-Subscriber-Imsi`→`imsi`, `X-Operator-Id`→`operator`, else client IP→`ip`
-  (maps onto the seeded policies) — calls the limiter and **short-circuits `429` + `Retry-After`**
-  on deny, else forwards. Skips `/api/protection`, `/internal`, `/actuator`, `/swagger-ui`,
-  `/eureka`, `/api/auth`, any `*/v3/api-docs`. **Fail-open** on limiter error (configurable).
-- **`RateLimitClient`** — load-balanced `WebClient` → `lb://rate-limiting-service/internal/protection/check`.
-- **`RateLimitConfig`** (`@LoadBalanced WebClient.Builder` + `@EnableConfigurationProperties`) and
-  **`RateLimitProperties`** (`protection.enforcement.enabled|failOpen|tokensPerRequest|excludedPaths`,
-  added to gateway `application.yml`, env-overridable `PROTECTION_ENFORCEMENT_*`).
-- **Effect:** editing a policy in the console now throttles **real traffic to every downstream
-  service** (roaming/anomaly/audit/…) at the single gateway choke point; `/stats` allowed/blocked +
-  top-offenders reflect real traffic. Both modules compile (EXIT=0). Why this over the built-in
-  `RedisRateLimiter`: keeps the Postgres policy table + `TokenBucketService` as the single source of
-  truth. See ADR-11 in [[Architecture-Decisions]].
+**❌ Gateway enforcement — REVERTED (2026-08-15).** Briefly added a reactive `RateLimitGlobalFilter`
+in the gateway (`com.example.springcloud.gateway.ratelimit`) + a `RateLimitClient` (load-balanced
+WebClient) + an unauthenticated `InternalProtectionController` (`POST /internal/protection/check`) so
+the gateway consulted the limiter on every request. **Problem:** it put a **synchronous per-request
+hop** on the hot path; with `rate-limiting-service` **not running**, every request waited for a
+connection failure before failing open → the gateway + all services became very slow (login felt
+slow too, via the post-login data calls). First tried a mitigation (default OFF + 300 ms timeout),
+then **removed it entirely** at the user's request. Deleted: the gateway `ratelimit` package, the
+`protection.enforcement` block in `application.yml`, `InternalProtectionController`, and the
+`/internal/**` permit in the limiter's `SecurityConfig`. Gateway is back to plain routing + JWT.
+**Lesson:** don't add a synchronous call to a maybe-down service on the gateway hot path (see the
+retired **ADR-11**). If revisited: make it opt-in/off-by-default, fast-timeout + fail-open, or better
+run the token bucket *inside* the gateway against Redis (no extra hop).
 
 **Still open:** persist `BlockEvent`s for the dashboard; Role B attach-flood detection tied to
-[[Roaming-Analysis-Service]]; runtime smoke test with the full stack up.
+[[Roaming-Analysis-Service]].
 
 **Frontend:** a **Rate Limiting** page (security-analyst) drives `/stats` + policy CRUD (write UI
-gated on `detection-rules:write`) + a decision tester — see [[Frontend-Components]].
+gated on `detection-rules:write`) + a decision tester — see [[Frontend-Components]]. Unaffected by the
+revert (it calls the standalone service directly).
 
 ## Related notes
 - [[Backend-and-Infra]] · [[Ports-and-URLs]] · [[Architecture-Decisions]] · [[Diagrams]] · [[Next-Steps]] · [[Session-Log]] · [[Roaming-Analysis-Service]]
