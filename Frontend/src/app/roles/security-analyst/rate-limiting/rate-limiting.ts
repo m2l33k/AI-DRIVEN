@@ -2,7 +2,7 @@ import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Subscription, interval, startWith, switchMap } from 'rxjs';
+import { Subscription, firstValueFrom, interval, startWith, switchMap } from 'rxjs';
 import { AuthService } from '../../../core/auth.service';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { StatCard } from '../../../shared/ui/stat-card';
@@ -148,10 +148,16 @@ const EMPTY_POLICY: Policy = {
     }
 
     <div class="hw-card panel">
-      <div class="panel-head"><h3>Test a rate-limit decision</h3><span class="tag">POST /check</span></div>
+      <div class="panel-head">
+        <h3>Test a rate-limit decision</h3>
+        <span class="tag">POST /check · consumes real tokens</span>
+      </div>
       <form class="check" (ngSubmit)="runCheck()">
         <label>Key type
-          <input [(ngModel)]="keyType" name="tkKeyType" placeholder="imsi / operator / ip / default" required />
+          <select [(ngModel)]="keyType" name="tkKeyType">
+            @for (p of policies(); track p.keyType) { <option [value]="p.keyType">{{ p.keyType }}</option> }
+            @if (policies().length === 0) { <option value="default">default</option> }
+          </select>
         </label>
         <label>Key
           <input [(ngModel)]="key" name="tkKey" placeholder="e.g. 234-15-000123" required />
@@ -159,17 +165,33 @@ const EMPTY_POLICY: Policy = {
         <label>Tokens
           <input type="number" min="1" [(ngModel)]="tokens" name="tkTokens" />
         </label>
-        <button class="hw-btn" type="submit" [disabled]="busy()">Send request</button>
+        <button class="hw-btn" type="submit" [disabled]="busy() || !key">Send 1</button>
+        <button class="hw-btn ghost" type="button" [disabled]="busy() || !key" (click)="runBurst(20)">
+          Burst ×20
+        </button>
+        <span class="hint">Tip: set a small bucket (e.g. capacity 5) then burst to watch it flip to BLOCKED.</span>
       </form>
 
       @if (result(); as r) {
         <div class="verdict" [class.allowed]="r.allowed" [class.denied]="!r.allowed">
           <strong>{{ r.allowed ? 'ALLOWED' : 'BLOCKED (' + r.action + ')' }}</strong>
+          <span>{{ r.keyType }}:{{ r.key }}</span>
           <span>remaining: {{ r.remaining }} / {{ r.limit }}</span>
           @if (!r.allowed) { <span>retry after {{ (r.retryAfterMs / 1000) | number:'1.0-1' }}s</span> }
         </div>
       }
       @if (error()) { <div class="verdict err">{{ error() }}</div> }
+
+      @if (log().length) {
+        <div class="log">
+          @for (l of log(); track l.seq) {
+            <span class="chip" [class.ok]="l.allowed" [class.no]="!l.allowed"
+                  [title]="'remaining ' + l.remaining">
+              #{{ l.seq }} {{ l.allowed ? 'OK' : '429' }}
+            </span>
+          }
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -212,8 +234,14 @@ const EMPTY_POLICY: Policy = {
     .banner-err { margin-top: 12px; padding: 10px 14px; border-radius: 6px; background: rgba(245,63,63,.1); color: var(--hw-danger); font-size: 12px; }
     .check { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
     .check label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--hw-text-3); }
-    .check input { padding: 8px 10px; border: 1px solid var(--hw-border); border-radius: 6px; font-size: 13px; min-width: 200px; }
+    .check input, .check select { padding: 8px 10px; border: 1px solid var(--hw-border); border-radius: 6px; font-size: 13px; min-width: 200px; }
     .check input[type=number] { min-width: 90px; }
+    .check select { min-width: 140px; }
+    .hint { font-size: 12px; color: var(--hw-text-3); flex-basis: 100%; }
+    .log { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+    .chip { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 5px; font-family: monospace; }
+    .chip.ok { background: rgba(0,168,112,.12); color: var(--hw-success); }
+    .chip.no { background: rgba(245,63,63,.12); color: var(--hw-danger); }
     .verdict { margin-top: 16px; padding: 12px 16px; border-radius: 8px; display: flex; gap: 18px; align-items: center; font-size: 13px; }
     .verdict.allowed { background: rgba(0,168,112,.1); color: var(--hw-success); }
     .verdict.denied { background: rgba(245,63,63,.1); color: var(--hw-danger); }
@@ -244,8 +272,10 @@ export class RateLimiting implements OnInit, OnDestroy {
   result = signal<CheckResult | null>(null);
   error = signal<string | null>(null);
   busy = signal(false);
+  log = signal<{ seq: number; allowed: boolean; remaining: number }[]>([]);
+  private seq = 0;
   keyType = 'imsi';
-  key = '';
+  key = '234-15-000123';
   tokens = 1;
 
   ngOnInit() {
@@ -332,26 +362,44 @@ export class RateLimiting implements OnInit, OnDestroy {
     });
   }
 
-  // ---- decision tester (read) ----
+  // ---- decision tester ----
 
-  runCheck() {
-    if (!this.keyType || !this.key) return;
+  runCheck() { void this.runBurst(1); }
+
+  /** Fire {@code n} checks in sequence (a bucket is stateful, so order matters) and log each verdict. */
+  async runBurst(n: number) {
+    if (!this.keyType || !this.key || this.busy()) return;
     this.busy.set(true);
     this.error.set(null);
-    this.result.set(null);
-    this.http.post<CheckResult>(`${API}/check`, {
-      keyType: this.keyType, key: this.key, tokens: this.tokens || 1,
-    }).subscribe({
-      next: (r) => { this.result.set(r); this.busy.set(false); },
-      error: (err: HttpErrorResponse) => {
-        // A 429 (blocked) still carries a RateLimitResult body — surface it as a verdict.
-        if (err.status === 429 && err.error) {
-          this.result.set(err.error as CheckResult);
-        } else {
-          this.error.set(err.error?.error ?? `Request failed (${err.status})`);
-        }
-        this.busy.set(false);
-      },
+    this.log.set([]);
+    for (let i = 0; i < n; i++) {
+      const r = await this.sendOne();
+      if (!r) break; // hard error (e.g. 403/network) — stop the burst
+      this.result.set(r);
+      this.log.update((l) => [...l, { seq: ++this.seq, allowed: r.allowed, remaining: r.remaining }]);
+    }
+    this.busy.set(false);
+    this.refreshStats(); // reflect the new allowed/blocked counts immediately
+  }
+
+  /** One /check call; a 429 (blocked) carries a valid CheckResult body, so treat it as a result. */
+  private async sendOne(): Promise<CheckResult | null> {
+    try {
+      return await firstValueFrom(this.http.post<CheckResult>(`${API}/check`, {
+        keyType: this.keyType, key: this.key, tokens: this.tokens || 1,
+      }));
+    } catch (e) {
+      const err = e as HttpErrorResponse;
+      if (err.status === 429 && err.error) return err.error as CheckResult;
+      this.error.set(err.error?.error ?? `Request failed (${err.status})`);
+      return null;
+    }
+  }
+
+  private refreshStats() {
+    this.http.get<ProtectionStats>(`${API}/stats`).subscribe({
+      next: (data) => this.stats.set(data),
+      error: () => { /* keep last known stats */ },
     });
   }
 }
