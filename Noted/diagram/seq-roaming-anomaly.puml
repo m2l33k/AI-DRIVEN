@@ -1,0 +1,40 @@
+@startuml seq-roaming-anomaly
+' =====================================================================
+'  SEQUENCE — roaming anomaly detection (analyst flow)
+' =====================================================================
+title Sequence — Roaming anomaly detection
+
+skinparam shadowing false
+actor "Security Analyst" as A
+participant "gateway :9000" as GW
+participant "RoamingController" as C
+participant "RoamingInsightsService" as S
+participant "AnomalyDetector" as AD
+participant "RiskAnalyzer" as RA
+participant "RoamingEventRepository" as R
+database "roaming-mysql :3307" as DB
+
+A -> GW : GET /api/roaming/anomalies\nBearer JWT (PERM_roaming-events:read)
+GW -> C : forward (authorized)
+C -> S : anomalies()
+S -> R : findAll()
+R -> DB : SELECT roaming_events
+DB --> R : rows
+R --> S : List<RoamingEvent>
+S -> AD : detect(events)
+loop per event
+  AD -> RA : score(event)  (additive heuristic 0..100)
+  RA --> AD : riskScore
+  AD -> AD : composite = ½ risk + capped z-score deviations\n(+25 impossible travel) → severity
+end
+AD --> S : List<AnomalyDto> (score, baselineDeviation, reasons)
+S --> C : anomalies
+C --> GW : 200 JSON
+GW --> A : anomalies → charts (gauge/line/bar)
+
+note over AD
+  Same AnomalyDetector is reused over uploaded CSV (/upload) and
+  simulated batches (/simulate) — the clean seam for future ML (ADR-02).
+end note
+
+@enduml

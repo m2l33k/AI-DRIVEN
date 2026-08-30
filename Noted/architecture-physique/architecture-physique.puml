@@ -1,0 +1,120 @@
+@startuml architecture-physique
+' =====================================================================
+'  ARCHITECTURE PHYSIQUE — Nexo Platform
+'  Machines physiques/virtuelles, réseaux, ports, ressources hôtes
+' =====================================================================
+title Architecture Physique — Plateforme Nexo (5G Core Management)
+
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam nodeBorderColor #444444
+skinparam databaseBorderColor #444444
+
+' ---------------------------------------------------------------------
+'  POSTE DE DÉVELOPPEMENT (machine physique)
+' ---------------------------------------------------------------------
+node "Poste de développement\nWindows 11 · CPU 8 cœurs · RAM 16 Go+" as HOST {
+
+  node "JVM (Java 17)\nrun.sh — JARs locaux" as JVM {
+    artifact "eureka-server :8761" as eur
+    artifact "gateway-service :9000" as gw
+    artifact "auth-service :9001" as auth
+    artifact "roaming-analysis :9002" as roam
+    artifact "rate-limiting :9004" as rl
+    artifact "messaging :9007" as msg
+    artifact "anomaly/tracing/fault :9003/5/6" as ph
+  }
+
+  node "Node.js\nng serve" as NODE {
+    artifact "Frontend Angular 22\n:4200 (proxy → :9000)" as spa
+  }
+
+  node "Docker Desktop (moteur Docker)\nréseau bridge : shared-network" as DOCKER {
+
+    node "Conteneurs Identité" as C_ID {
+      artifact "keycloak :8081→8080" as kc
+      database "keycloak-postgres :5437" as kcpg
+    }
+
+    node "Conteneurs Bases de données\n(1 base par service — ADR-09)" as C_DB {
+      database "roaming-mysql :3307" as mysql
+      database "ratelimit-postgres :5434" as rlpg
+      database "ratelimit-redis :6379" as rlr
+      database "anomaly-postgres :5433" as apg
+      database "anomaly-redis :6380" as ar
+      database "tracing-postgres :5435" as tpg
+      database "fault-postgres :5436" as fpg
+      database "messaging-postgres :5438" as mpg
+    }
+
+    node "Conteneurs Observabilité" as C_OBS {
+      artifact "prometheus :9090" as prom
+      artifact "grafana :3000" as graf
+      artifact "loki :3100" as loki
+      artifact "tempo :4317/4318/3200" as tempo
+      artifact "fluent-bit :24224" as fb
+    }
+  }
+}
+
+' ---------------------------------------------------------------------
+'  SUBSTRAT 5G CORE (machine/VM Linux séparée — contrainte gtp5g)
+' ---------------------------------------------------------------------
+node "Hôte Linux — Ubuntu 22.04 (VM / WSL2)\nnoyau + module gtp5g · RAM 16 Go / 8 cœurs" as LINUX {
+  node "free5gc-compose (Docker)" as F5 {
+    artifact "NFs : NRF · AMF · SMF · UPF\nAUSF · UDM/UDR · (PCF/NSSF)" as nfs
+    artifact "UERANSIM (gNB/UE simulé)" as ueransim
+    database "MongoDB (abonnés / contexte NF)" as mongo
+    artifact "WebConsole (provisioning IMSI)" as webc
+  }
+}
+
+' ---------------------------------------------------------------------
+'  POSTE CLIENT
+' ---------------------------------------------------------------------
+node "Poste utilisateur\n(Admin / Opérateur / Analyste / Auditeur)" as CLIENT {
+  artifact "Navigateur web" as browser
+}
+
+' ---- Liens réseau ----
+browser --> spa : HTTP :4200
+browser --> graf : HTTP :3000
+spa --> gw : HTTP /api (proxy) — Bearer JWT
+spa --> msg : WebSocket /ws?token=
+
+gw --> auth
+gw --> roam
+gw --> rl
+gw --> msg
+gw --> ph
+gw ..> eur : découverte
+
+gw --> kc : validation JWT (JWK)
+auth --> kc : password grant + Admin REST
+kc --> kcpg
+
+roam --> mysql
+rl --> rlpg
+rl --> rlr
+msg --> mpg
+ph --> apg
+
+prom --> gw : scrape (host.docker.internal)
+graf --> prom
+fb --> loki
+gw --> tempo : OTLP
+
+' ---- Intégration 5G Core (roadmap) ----
+gw ..> nfs : /api/nf/* (façade NRF — roadmap)
+prom ..> nfs : scrape métriques NF
+loki ..> nfs : logs NF (Fluent Bit / promtail)
+ueransim --> nfs : NGAP/NAS (SCTP) + GTP-U
+
+legend right
+  Séparation physique clé :
+  • Plateforme Nexo (Java/Angular) + infra Docker → poste Windows 11.
+  • Cœur 5G réel (free5GC) → hôte Linux séparé (UPF exige le module noyau gtp5g,
+    indisponible sous Docker Windows/macOS). Nexo consomme ses API/métriques/logs.
+endlegend
+
+@enduml

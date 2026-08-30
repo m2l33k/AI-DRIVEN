@@ -1,0 +1,93 @@
+@startuml lld-auth-service
+' =====================================================================
+'  LOW-LEVEL DESIGN — auth-service (:9001)
+'  package io.javatab.microservices.auth
+' =====================================================================
+title LLD — auth-service (:9001)  ·  io.javatab.microservices.auth
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "web" #E8F0FE {
+  class AuthController {
+    +login(LoginRequest) : LoginResponse
+    +forgotPassword(ForgotPasswordRequest)
+    +verifyOtp(VerifyOtpRequest)
+    +resetPassword(ResetPasswordRequest)
+    +updatePassword(UpdatePasswordRequest)
+    +firstLoginChange(FirstLoginChangePasswordRequest)
+    +verifyEmail(token)
+  }
+  class UserController {
+    +list() : List<UserSummary>
+    +create(CreateUserRequest)
+    +delete(username)
+    +directory() : List<DirectoryUser>
+  }
+  class ApiExceptionHandler
+  package "dto" {
+    class LoginRequest
+    class LoginResponse
+    class CreateUserRequest
+    class UserSummary
+    class DirectoryUser
+    class "…Request/Response records" as DTOS
+  }
+}
+
+package "service" #E6F4EA {
+  class AuthService
+  class PasswordResetService
+  class EmailVerificationService
+}
+
+package "keycloak" #FEF7E0 {
+  class KeycloakService {
+    +login() : tokens (password grant)
+    +createUser() / deleteUser() / listUsers()
+    +assignRealmRole() / resetPassword()
+    +inspectUserState() : UserState
+  }
+  enum UserState
+}
+
+package "otp" #FFF3E0 {
+  class OtpService
+  class ResetTokenService
+  class FirstLoginTokenService
+  class EmailVerificationTokenService
+}
+
+package "mail" #FCE8E6 {
+  class MailService
+}
+
+package "config" {
+  class SecurityConfig <<JWT resource server\nROLE_*/PERM_* converter\n@EnableMethodSecurity>>
+  class KeycloakProperties <<@ConfigurationProperties keycloak.*>>
+  class OpenApiConfig
+}
+
+AuthController --> AuthService
+AuthController --> PasswordResetService
+AuthController --> EmailVerificationService
+UserController --> KeycloakService
+UserController ..> SecurityConfig : @PreAuthorize PERM_users:*
+AuthService --> KeycloakService
+AuthService --> OtpService
+PasswordResetService --> ResetTokenService
+PasswordResetService --> KeycloakService
+EmailVerificationService --> EmailVerificationTokenService
+OtpService --> MailService
+PasswordResetService --> MailService
+KeycloakService ..> KeycloakProperties
+
+note bottom of KeycloakService
+  Thin wrapper over Keycloak via Spring RestClient:
+  end-user login = platform-client password grant;
+  admin ops = master-realm admin-cli token.
+  State-aware login (ADR-05); token/OTP stores in-memory (ADR-03).
+end note
+
+@enduml

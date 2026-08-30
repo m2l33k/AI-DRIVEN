@@ -1,0 +1,83 @@
+@startuml 03-hld-architecture
+' =====================================================================
+'  HIGH-LEVEL DESIGN — Layered component architecture
+' =====================================================================
+title Nexo Platform — High-Level Design (layered architecture)
+
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam componentStyle rectangle
+skinparam rectangleBorderColor #444444
+
+package "1 · Presentation Layer" #F3E8FD {
+  [Angular 22 Console\nrole-based consoles (admin/operator/analyst/auditor)\nsignals · lazy routes · custom SVG charts] as UI
+}
+
+package "2 · Edge Layer" #E8F0FE {
+  [gateway-service :9000\nrouting · JWT validation · PERM_* RBAC\nSwagger aggregation · metrics facade] as GW
+  [eureka-server :8761\nservice registry] as EUREKA
+}
+
+package "3 · Application / Domain Layer" #E6F4EA {
+  [auth-service :9001] as AUTH
+  [roaming-analysis-service :9002] as ROAM
+  [rate-limiting-service :9004] as RL
+  [messaging-service :9007] as MSG
+  [anomaly / tracing / fault :9003/5/6\n(roadmap engines)] as PH
+  [util (shared lib)] as UTIL
+}
+
+package "4 · Identity Layer" #FEF7E0 {
+  [Keycloak :8081\nrealm auth-management · platform-client\ncomposite roles → permissions] as KC
+}
+
+package "5 · Persistence Layer" #FFF3E0 {
+  database "MySQL (roaming)" as DB1
+  database "Postgres ×5\n(per-service)" as DB2
+  database "Redis ×2\n(buckets / windows)" as DB3
+}
+
+package "6 · Observability Layer" #FCE8E6 {
+  [Prometheus] as PROM
+  [Grafana] as GRAF
+  [Loki] as LOKI
+  [Tempo] as TEMPO
+  [Fluent Bit] as FB
+}
+
+UI --> GW : /api/** Bearer JWT + /ws/**
+GW --> AUTH
+GW --> ROAM
+GW --> RL
+GW --> MSG
+GW --> PH
+GW ..> EUREKA
+AUTH ..> UTIL
+ROAM ..> UTIL
+
+GW --> KC : validate JWT
+AUTH --> KC : password grant + Admin API
+
+ROAM --> DB1
+RL --> DB2
+RL --> DB3
+MSG --> DB2
+
+GW ..> FB
+AUTH ..> FB
+FB --> LOKI
+GW --> TEMPO
+PROM --> GW
+PROM --> AUTH
+PROM --> ROAM
+GRAF --> PROM
+GRAF --> LOKI
+GRAF --> TEMPO
+
+legend right
+  Cross-cutting concerns solved once at the platform level:
+  discovery · single secured entry point · OAuth2/OIDC auth
+  · permission-based authZ (edge + service) · metrics/logs/traces
+endlegend
+
+@enduml

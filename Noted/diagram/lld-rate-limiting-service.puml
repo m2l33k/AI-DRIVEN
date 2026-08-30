@@ -1,0 +1,77 @@
+@startuml lld-rate-limiting-service
+' =====================================================================
+'  LOW-LEVEL DESIGN — rate-limiting-service (:9004)
+'  package io.javatab.microservices.ratelimit
+' =====================================================================
+title LLD — rate-limiting-service (:9004)  ·  io.javatab.microservices.ratelimit
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "web" #E8F0FE {
+  class ProtectionController {
+    +POST /check  (decide+consume) → 200 / 429
+    +GET  /policies
+    +PUT  /policies/{keyType}
+    +DELETE /policies/{keyType}
+    +GET  /stats?topN=
+    --
+    reads → PERM_roaming-events:read
+    writes → PERM_detection-rules:write
+  }
+  class HealthController {
+    +GET /health  (public)
+  }
+  class ApiExceptionHandler
+  package "dto (records)" {
+    class RateLimitCheckRequest
+    class RateLimitResult
+    class RateLimitPolicyDto
+    class ProtectionStatsDto
+  }
+}
+
+package "ratelimit" #FFF3E0 {
+  class TokenBucketService {
+    +check(keyType,key,tokens) : RateLimitResult
+    -runs token_bucket.lua (1 round-trip)
+    -allow/block counters + top-blocked ZSET
+  }
+}
+
+package "domain (JPA)" #FEF7E0 {
+  class RateLimitPolicy {
+    capacity, refillTokens, refillIntervalMs
+    action : RateLimitAction
+  }
+  enum RateLimitAction { THROTTLE\nBLOCK }
+}
+
+package "repository" {
+  class RateLimitPolicyRepository
+  class PolicySeeder <<CommandLineRunner>>
+}
+
+package "config" {
+  class SecurityConfig <<JWT RS>>
+  class RedisConfig <<loads Lua script>>
+  class OpenApiConfig <<@SecurityScheme bearerAuth>>
+}
+
+ProtectionController --> TokenBucketService
+ProtectionController --> RateLimitPolicyRepository
+ProtectionController ..> RateLimitPolicyDto
+TokenBucketService --> RedisConfig
+TokenBucketService ..> RateLimitPolicy
+RateLimitPolicyRepository --> RateLimitPolicy
+PolicySeeder --> RateLimitPolicyRepository
+
+note bottom of TokenBucketService
+  Atomic token bucket on Redis (:6379); policies in Postgres (:5434).
+  FAIL-OPEN: missing/disabled policy or Redis error ⇒ allowed.
+  Advisory only — a gateway-enforcement filter was tried & REVERTED (ADR-11 retired):
+  never put a blocking call to a maybe-down service on the gateway hot path.
+end note
+
+@enduml

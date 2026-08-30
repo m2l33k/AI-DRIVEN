@@ -1,0 +1,96 @@
+@startuml 05-usecase
+' =====================================================================
+'  USE CASE DIAGRAM — 4 roles + shared messaging
+' =====================================================================
+title Nexo Platform — Use Case Diagram
+
+skinparam shadowing false
+skinparam packageStyle rectangle
+left to right direction
+
+actor "Platform Admin"   as ADMIN
+actor "Network Operator" as OPER
+actor "Security Analyst" as ANALYST
+actor "Auditor"          as AUDIT
+actor "Keycloak (IdP)"   as KC
+
+rectangle "Nexo Platform" {
+
+  ' ---- shared / auth ----
+  usecase "Log in (state-aware)"          as UC_LOGIN
+  usecase "Reset password (OTP)"          as UC_RESET
+  usecase "Change own password"           as UC_CHPW
+  usecase "Verify email"                  as UC_VERIFY
+  usecase "Direct-message another user"   as UC_MSG
+  usecase "Receive live notifications"    as UC_NOTIF
+
+  ' ---- admin ----
+  usecase "Manage users (CRUD)"           as UC_USERS
+  usecase "View roles & permissions"      as UC_ROLES
+  usecase "Monitor system health"         as UC_HEALTH
+  usecase "View API metrics"              as UC_METRICS
+
+  ' ---- operator ----
+  usecase "View network-function status"  as UC_NF
+  usecase "Restart a network function"    as UC_NFR
+  usecase "Apply core config"             as UC_CFG
+
+  ' ---- analyst ----
+  usecase "Analyse roaming events"        as UC_ROAM
+  usecase "Investigate anomalies / fraud" as UC_ANOM
+  usecase "Review QoS & revenue"          as UC_QOS
+  usecase "Tune detection rules"          as UC_RULES
+  usecase "Manage rate-limit policies"    as UC_RL
+
+  ' ---- auditor ----
+  usecase "Read everything (read-only)"   as UC_READ
+  usecase "Read audit logs"               as UC_AUDIT
+}
+
+' shared for all authenticated actors
+ADMIN   --> UC_LOGIN
+OPER    --> UC_LOGIN
+ANALYST --> UC_LOGIN
+AUDIT   --> UC_LOGIN
+ADMIN   --> UC_MSG
+OPER    --> UC_MSG
+ANALYST --> UC_MSG
+AUDIT   --> UC_MSG
+ADMIN   --> UC_NOTIF
+OPER    --> UC_NOTIF
+ANALYST --> UC_NOTIF
+AUDIT   --> UC_NOTIF
+
+UC_LOGIN ..> KC : <<include>> authenticate
+UC_RESET ..> KC : <<include>>
+UC_USERS ..> KC : <<include>> Admin REST
+
+' admin
+ADMIN --> UC_USERS
+ADMIN --> UC_ROLES
+ADMIN --> UC_HEALTH
+ADMIN --> UC_METRICS
+
+' operator
+OPER --> UC_NF
+OPER --> UC_NFR
+OPER --> UC_CFG
+
+' analyst
+ANALYST --> UC_ROAM
+ANALYST --> UC_ANOM
+ANALYST --> UC_QOS
+ANALYST --> UC_RULES
+ANALYST --> UC_RL
+
+' auditor
+AUDIT --> UC_READ
+AUDIT --> UC_AUDIT
+
+note bottom
+  Authorization is enforced on PERM_* permissions (Keycloak client roles),
+  not on role names — at the gateway AND inside each service (defence in depth).
+  audit:delete exists but is granted to NO role (append-only logs).
+end note
+
+@enduml

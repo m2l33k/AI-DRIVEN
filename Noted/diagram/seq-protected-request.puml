@@ -1,0 +1,35 @@
+@startuml seq-protected-request
+' =====================================================================
+'  SEQUENCE — protected request + PERM_* authorization (defence in depth)
+' =====================================================================
+title Sequence — Protected request (PERM_* authorization)
+
+skinparam shadowing false
+actor "User (SPA)" as U
+participant "gateway-service\n:9000" as GW
+participant "Keycloak JWK\n:8081" as JWK
+participant "downstream service\n(e.g. roaming :9002)" as SVC
+
+U -> GW : GET /api/roaming/anomalies\nAuthorization: Bearer <JWT>
+GW -> JWK : fetch/validate signature (JWK set, cached)
+JWK --> GW : keys
+GW -> GW : extract claims →\nROLE_* (realm_access) + PERM_* (platform-client)
+
+alt has PERM_roaming-events:read
+  GW -> SVC : forward (still bearing JWT) lb://roaming-analysis-service
+  SVC -> SVC : re-validate JWT + @PreAuthorize(PERM_roaming-events:read)
+  SVC --> GW : 200 payload
+  GW --> U : 200 payload
+else missing permission
+  GW --> U : 403 Forbidden
+else missing / expired token
+  GW --> U : 401 Unauthorized
+end
+
+note over GW, SVC
+  Authorize on the PERMISSION, never the role name (ADR-07).
+  Enforced at the gateway AND again in the service → defence in depth.
+  A public path must be permitted at BOTH tiers or the gateway 401s first.
+end note
+
+@enduml

@@ -1,0 +1,44 @@
+@startuml seq-first-login-otp
+' =====================================================================
+'  SEQUENCE — forgot-password / OTP reset (3-step)
+' =====================================================================
+title Sequence — Forgot password (OTP reset, 3 steps)
+
+skinparam shadowing false
+actor "User (SPA)" as U
+participant "gateway :9000" as GW
+participant "auth-service :9001" as AUTH
+participant "OtpService /\nResetTokenService" as OTP
+participant "MailService" as MAIL
+participant "KeycloakService" as KS
+participant "Keycloak :8081" as KC
+
+== Step 1 — request OTP ==
+U -> GW : POST /api/auth/forgot-password { email }
+GW -> AUTH : forward (permitAll)
+AUTH -> OTP : generate + store OTP (in-memory, ADR-03)
+AUTH -> MAIL : email OTP (Gmail App Password)
+MAIL --> U : OTP email
+AUTH --> U : 200 (OTP sent)
+
+== Step 2 — verify OTP ==
+U -> GW : POST /api/auth/verify-otp { email, otp }
+GW -> AUTH : forward
+AUTH -> OTP : validate OTP → issue reset token
+AUTH --> U : 200 { resetToken }
+
+== Step 3 — set new password ==
+U -> GW : POST /api/auth/reset-password { resetToken, newPassword }
+GW -> AUTH : forward
+AUTH -> OTP : validate reset token
+AUTH -> KS : resetPassword(user, newPassword)
+KS -> KC : Admin REST: set password (not temporary)
+KC --> KS : ok
+AUTH --> U : 200 (password changed → back to /login)
+
+note over OTP
+  OTP / reset-token / first-login / email-verify stores are in-memory today (ADR-03):
+  fine for a single instance; swap for Redis before scaling.
+end note
+
+@enduml

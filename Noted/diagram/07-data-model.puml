@@ -1,0 +1,92 @@
+@startuml 07-data-model
+' =====================================================================
+'  DATA MODEL — roaming dataset (Data/Data/*.csv → JPA entities)
+' =====================================================================
+title Data Model — Roaming domain (roaming-mysql :3307)
+
+skinparam shadowing false
+skinparam linetype ortho
+hide circle
+
+entity Device {
+  * device_id : PK
+  --
+  imei_tac
+  manufacturer / model / os
+  lte_category
+  volte_supported
+  five_g_supported
+}
+
+entity NetworkCell {
+  * cell_id : PK
+  --
+  country_code / city
+  operator_id
+  tracking_area_code
+  latitude / longitude
+  cell_type
+}
+
+entity RoamingCdr {
+  * cdr_id : PK
+  --
+  tap_file_id / tap_file_type
+  home_operator_id
+  visited_operator_id
+  subscriber_imsi / msisdn
+  device_id : FK
+  serving_cell_id : FK
+  call_type / duration_seconds
+  data_volume_mb
+  charged_amount / wholesale_cost / currency
+  fraud_flag / fraud_detection_reason
+  settlement_status / nrtrde_flag
+}
+
+entity AttachEvent {
+  * attach_id : PK
+  --
+  subscriber_imsi
+  cell_id : FK
+  datetime
+  attach_status / reject_cause
+  auth_failure_flag
+  registration_delay_ms
+}
+
+entity SessionQos {
+  * session_id : PK
+  --
+  cdr_id : FK
+  subscriber_imsi
+  download_mb / upload_mb
+  avg_throughput_mbps
+  latency_ms / packet_loss_pct
+  session_status / drop_reason
+}
+
+entity HandoverEvent {
+  * handover_id : PK
+  --
+  subscriber_imsi
+  visited_operator_id
+  source_cell_id : FK
+  target_cell_id : FK
+  event_type / handover_status
+  failure_cause
+}
+
+Device        ||--o{ RoamingCdr    : device_id
+NetworkCell   ||--o{ RoamingCdr    : serving_cell_id
+NetworkCell   ||--o{ AttachEvent   : cell_id
+NetworkCell   ||--o{ HandoverEvent : source/target_cell_id
+RoamingCdr    ||--o| SessionQos    : cdr_id
+
+note bottom
+  Real dataset ~39k rows: CDR/TAP-RAP 10k · attach 13.4k · QoS 5k · handover 10.6k
+  · devices 328 · cells 253. Join on subscriber_imsi / cdr_id / cell_id.
+  Direction derived from a configured home-operator set. Feeds CRISP-DM analytics.
+end note
+
+@enduml

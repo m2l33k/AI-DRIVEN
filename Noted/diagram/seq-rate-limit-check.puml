@@ -1,0 +1,41 @@
+@startuml seq-rate-limit-check
+' =====================================================================
+'  SEQUENCE — rate-limit decision (atomic token bucket)
+' =====================================================================
+title Sequence — Rate-limit check (Redis token bucket)
+
+skinparam shadowing false
+actor "Security Analyst\n(Rate Limiting page)" as A
+participant "gateway :9000" as GW
+participant "ProtectionController" as C
+participant "TokenBucketService" as T
+participant "RateLimitPolicyRepository" as P
+database "ratelimit-postgres :5434" as PG
+database "ratelimit-redis :6379" as R
+
+A -> GW : POST /api/protection/check\n{ keyType, key, tokens } (PERM_roaming-events:read)
+GW -> C : forward (authorized)
+C -> T : check(keyType, key, tokens)
+T -> P : find policy by keyType
+P -> PG : SELECT
+PG --> P : policy (capacity, refill, action)
+P --> T : policy
+
+alt policy present + enabled
+  T -> R : EVAL token_bucket.lua (refill→consume→PEXPIRE)
+  R --> T : { allowed, remaining, retryAfter }
+  T -> R : INCR allow/block counters + top-blocked ZSET
+  alt allowed
+    T --> C : RateLimitResult(allowed)
+    C --> GW : 200 { allowed, remaining }
+  else blocked
+    T --> C : RateLimitResult(blocked)
+    C --> GW : 429 + Retry-After + X-RateLimit-Remaining
+  end
+else missing/disabled policy OR Redis error
+  T --> C : FAIL-OPEN → allowed
+  C --> GW : 200 (never take the platform down)
+end
+GW --> A : decision (Send 1 / Burst ×20 tester)
+
+@enduml

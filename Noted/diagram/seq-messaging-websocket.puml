@@ -1,0 +1,40 @@
+@startuml seq-messaging-websocket
+' =====================================================================
+'  SEQUENCE — send DM + real-time WebSocket notification (ADR-14)
+' =====================================================================
+title Sequence — Direct message + live WebSocket notification
+
+skinparam shadowing false
+actor "Alice (SPA)" as A
+actor "Bob (SPA)" as B
+participant "gateway :9000" as GW
+participant "messaging-service :9007" as M
+participant "NotificationSocketHandler" as WS
+database "messaging-postgres :5438" as DB
+
+== Bob connects his socket ==
+B -> M : WS connect /ws/notifications?token=<JWT>\n(dev: direct; prod: lb:ws:// gateway)
+M -> M : JwtHandshakeInterceptor validates token → preferred_username
+M -> WS : register session in Map<user, Set<session>>
+
+== Alice sends a message ==
+A -> GW : POST /api/messages { recipient: bob, content }\nBearer JWT (authenticated)
+GW -> M : forward
+M -> M : sender = JWT preferred_username (not body)
+M -> DB : INSERT message (is_read=false)
+DB --> M : saved
+M -> WS : sendToUser("bob", NotificationDto{MESSAGE, from, preview})
+alt Bob online
+  WS -> B : push notification (topbar bell + count)
+else Bob offline
+  WS -> WS : no-op (delivered on next poll)
+end
+M --> GW : 201 MessageDto
+GW --> A : 201 (bubble rendered, mine=true)
+
+note over M, WS
+  Native WebSocket, no STOMP/SockJS (ADR-14). A user only sees threads
+  they are part of; sender identity comes from the JWT so it can't be spoofed.
+end note
+
+@enduml

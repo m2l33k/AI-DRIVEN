@@ -1,0 +1,58 @@
+@startuml 06-rbac-model
+' =====================================================================
+'  RBAC MODEL — realm roles (composite) → client-role permissions
+'  Source of truth: keycloak/platform-realm.json
+' =====================================================================
+title Nexo Platform — RBAC Model (roles → PERM_* permissions)
+
+skinparam shadowing false
+skinparam defaultTextAlignment left
+
+package "Realm roles (composite)  → ROLE_*" #FEF7E0 {
+  class PLATFORM_ADMIN   << #c7000b >>
+  class NETWORK_OPERATOR << #3491fa >>
+  class SECURITY_ANALYST << #00a870 >>
+  class AUDITOR          << #ff8f1f >>
+}
+
+package "Client roles on platform-client  → PERM_*" #E8F0FE {
+  class "users:read / users:write"                     as P_USERS
+  class "roles:read / roles:write"                     as P_ROLES
+  class "platform-config:read / write"                 as P_CFG
+  class "nf:read / nf:restart"                          as P_NF
+  class "core-config:read / write"                      as P_CORE
+  class "security-alerts:read"                          as P_ALERT
+  class "roaming-events:read"                           as P_ROAM
+  class "detection-rules:read / write"                  as P_RULES
+  class "audit:read"                                    as P_AUDIT
+  class "audit:delete  (granted to NO role)"            as P_DEL #FCE8E6
+}
+
+PLATFORM_ADMIN --> P_USERS
+PLATFORM_ADMIN --> P_ROLES
+PLATFORM_ADMIN --> P_CFG
+
+NETWORK_OPERATOR --> P_NF
+NETWORK_OPERATOR --> P_CORE
+
+SECURITY_ANALYST --> P_ALERT
+SECURITY_ANALYST --> P_ROAM
+SECURITY_ANALYST --> P_RULES
+
+AUDITOR --> P_USERS : read only
+AUDITOR --> P_ROLES : read only
+AUDITOR --> P_CFG   : read only
+AUDITOR --> P_NF    : read only
+AUDITOR --> P_CORE  : read only
+AUDITOR --> P_ALERT
+AUDITOR --> P_ROAM
+AUDITOR --> P_RULES : read only
+AUDITOR --> P_AUDIT
+
+note bottom of P_DEL
+  audit:delete is defined but mapped to no role ⇒ audit logs are append-only / tamper-evident.
+  rate-limiting-service reuses roaming-events:read (reads) + detection-rules:write (writes) —
+  so SECURITY_ANALYST manages policies; PLATFORM_ADMIN cannot (verified 403).
+end note
+
+@enduml

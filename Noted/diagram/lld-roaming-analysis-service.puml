@@ -1,0 +1,109 @@
+@startuml lld-roaming-analysis-service
+' =====================================================================
+'  LOW-LEVEL DESIGN — roaming-analysis-service (:9002)
+'  package io.javatab.microservices.roaming
+' =====================================================================
+title LLD — roaming-analysis-service (:9002)  ·  io.javatab.microservices.roaming
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "web" #E8F0FE {
+  class RoamingController {
+    +GET /events, /events/{id}
+    +GET /summary, /partners
+    +GET /live, /anomalies, /forecast
+    +GET /experience, /qos, /optimization, /revenue
+    +POST /upload (CSV), /simulate
+    --
+    @PreAuthorize PERM_roaming-events:read
+  }
+  class ApiExceptionHandler
+  package "dto (records)" {
+    class RoamingEventDto
+    class RoamingSummaryDto
+    class AnomalyDto
+    class ForecastDto
+    class QosDto
+    class RevenueDto
+    class "Partner/Experience/Optimization/\nLive/CsvAnalysis/Simulation Dto" as MORE
+  }
+}
+
+package "service" #E6F4EA {
+  class RoamingAnalysisService {
+    +filter/enrich(score+level)
+    +summary(List) / partners()
+  }
+  class RoamingInsightsService {
+    +live() / anomalies()
+    +forecast(hoursAhead)
+    +qos() / revenue() / optimization()
+    +analyzeCsv(file) / simulate()
+  }
+  class RoamingSimulator <<@Component>>
+}
+
+package "analysis" #FFF3E0 {
+  class RiskAnalyzer {
+    +score(event) : 0..100 (additive heuristic)
+  }
+  class AnomalyDetector {
+    +detect(List<RoamingEvent>) : List<AnomalyDto>
+    ..composite = ½ risk + z-score dev + impossible-travel..
+  }
+}
+
+package "ingest" {
+  class CsvDataLoader <<CommandLineRunner>>
+  class RoamingEventCsvParser
+}
+
+package "domain (JPA @Entity)" #FEF7E0 {
+  class RoamingEvent
+  class RoamingCdr
+  class AttachEvent
+  class SessionQos
+  class HandoverEvent
+  class Device
+  class NetworkCell
+  enum Direction
+  enum RiskLevel
+}
+
+package "repository (JpaRepository)" {
+  class RoamingEventRepository
+  class RoamingCdrRepository
+  class AttachEventRepository
+  class SessionQosRepository
+  class HandoverEventRepository
+  class DeviceRepository
+  class NetworkCellRepository
+  class RoamingDataSeeder <<CommandLineRunner>>
+}
+
+package "config" {
+  class SecurityConfig <<JWT RS>>
+  class OpenApiConfig
+}
+
+RoamingController --> RoamingAnalysisService
+RoamingController --> RoamingInsightsService
+RoamingInsightsService --> AnomalyDetector
+RoamingInsightsService --> RiskAnalyzer
+RoamingInsightsService --> RoamingSimulator
+RoamingInsightsService --> RoamingEventCsvParser
+RoamingAnalysisService --> RiskAnalyzer
+RoamingAnalysisService --> RoamingEventRepository
+RoamingEventRepository --> RoamingEvent
+CsvDataLoader --> RoamingCdrRepository
+RoamingDataSeeder --> RoamingEventRepository
+
+note bottom of AnomalyDetector
+  Explainable placeholder for ML (ADR-02): population z-scores today,
+  model scores later. Reusable over DB / uploaded CSV / simulated batch.
+  Redesign: re-point onto the 6 real Data/Data entities (~39k rows).
+end note
+
+@enduml

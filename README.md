@@ -84,6 +84,15 @@ Infrastructure design and the full service catalogue live in
 - [`services.puml`](Noted/diagram/services.puml) — service catalogue grouped by tier.
 - [`Noted/diagram/README.md`](Noted/diagram/README.md) — render instructions + full service table.
 
+### Physical architecture
+
+![Physical architecture](Noted/Assets/architecturephysique.jpg)
+
+> Physical/deployment view — the platform (Spring Boot JARs + Angular + Docker infra) runs on the
+> Windows dev host, while the real 5G core (free5GC + UERANSIM) runs on a separate Linux host
+> (the UPF requires the `gtp5g` kernel module). Source:
+> [`Noted/architecture-physique/`](Noted/architecture-physique/).
+
 ### Infrastructure — deployment topology
 
 ![Infrastructure](Noted/Assets/infra%205GC.png)

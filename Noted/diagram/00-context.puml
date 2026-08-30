@@ -1,0 +1,43 @@
+@startuml 00-context
+' =====================================================================
+'  HIGH-LEVEL DESIGN — System Context (C4 Level 1)
+'  Nexo — Cloud-native 5G Core management platform
+' =====================================================================
+title Nexo Platform — System Context (HLD / C4-L1)
+
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam rectangle {
+  BorderColor #444444
+  roundCorner 12
+}
+left to right direction
+
+actor "Platform Admin"     as ADMIN
+actor "Network Operator"   as OPER
+actor "Security Analyst"   as ANALYST
+actor "Auditor"            as AUDIT
+
+rectangle "**Nexo Platform**\nSpring Boot microservices + Angular 22 console\nRBAC · Observability · Roaming analytics" as NEXO #E8F0FE
+
+rectangle "Keycloak\nOAuth2 / OIDC Identity Provider\nrealm: auth-management" as KC #FEF7E0
+rectangle "free5GC + UERANSIM\n(external 5G Core substrate,\nseparate Linux runtime)" as CORE #E6F4EA
+rectangle "SMTP (Gmail)\nOTP + temp-password mail" as MAIL #FCE8E6
+rectangle "Observability Backends\nPrometheus · Grafana · Loki · Tempo" as OBS #F3E8FD
+
+ADMIN   --> NEXO : manage users, roles,\nplatform config, health
+OPER    --> NEXO : view/restart NFs,\napply core config
+ANALYST --> NEXO : roaming analytics,\nanomalies, rate-limit policies
+AUDIT   --> NEXO : read-only,\naudit logs
+
+NEXO --> KC   : authenticate (password grant),\nvalidate JWT, admin REST
+NEXO ..> CORE : consume NF metrics / logs /\nsignalling (roadmap: /api/nf/*)
+NEXO --> MAIL : send OTP / temp passwords
+NEXO --> OBS  : export metrics / logs / traces
+
+note bottom of NEXO
+  Every user reaches the platform through ONE door (the API Gateway :9000).
+  Authorization is permission-based (PERM_*), decoupled from role names.
+end note
+
+@enduml

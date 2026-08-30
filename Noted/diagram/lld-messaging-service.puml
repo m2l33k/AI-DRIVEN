@@ -1,0 +1,82 @@
+@startuml lld-messaging-service
+' =====================================================================
+'  LOW-LEVEL DESIGN — messaging-service (:9007)
+'  package io.javatab.microservices.messaging
+' =====================================================================
+title LLD — messaging-service (:9007)  ·  io.javatab.microservices.messaging
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "web" #E8F0FE {
+  class MessageController {
+    +POST /api/messages (send)
+    +GET  /conversations
+    +GET  /conversation/{peer}  (marks read)
+    +POST /conversation/{peer}/read
+    +GET  /unread-count
+    --
+    sender = JWT preferred_username (never body)
+  }
+  class ApiExceptionHandler
+  package "dto (records)" {
+    class SendMessageRequest
+    class MessageDto { +mine : boolean }
+    class ConversationDto { +lastPreview, unread }
+  }
+}
+
+package "service" #E6F4EA {
+  class MessageService {
+    +send(from, req)  (rejects self-message)
+    +conversations(user)
+    +thread(user, peer)  (marks read)
+    +unreadCount(user)
+  }
+}
+
+package "domain / repository" #FEF7E0 {
+  class Message <<@Entity messages>> {
+    sender, recipient : username
+    content, is_read, createdAt
+  }
+  class MessageRepository <<JpaRepository>> {
+    findConversation() / findAllForUser()
+    @Modifying markConversationRead()
+  }
+}
+
+package "ws (WebSocket — ADR-14)" #FFF3E0 {
+  class WebSocketConfig <<@EnableWebSocket>>
+  class JwtHandshakeInterceptor {
+    validates ?token=<JWT> (JwtDecoder)
+    stores preferred_username in session
+  }
+  class NotificationSocketHandler <<TextWebSocketHandler>> {
+    Map<username, Set<session>>  (multi-tab)
+    +sendToUser(user, NotificationDto)
+  }
+  class NotificationDto { type, from, preview, at }
+}
+
+package "config" {
+  class SecurityConfig <<JWT RS · /ws/** permitAll>>
+  class OpenApiConfig <<@SecurityScheme bearerAuth>>
+}
+
+MessageController --> MessageService
+MessageService --> MessageRepository
+MessageService --> NotificationSocketHandler : push on send
+MessageRepository --> Message
+WebSocketConfig --> NotificationSocketHandler
+WebSocketConfig --> JwtHandshakeInterceptor
+NotificationSocketHandler ..> NotificationDto
+
+note bottom of NotificationSocketHandler
+  Native WebSocket /ws/notifications (no STOMP/SockJS). Browser can't set an
+  Authorization header on WS ⇒ JWT passed as ?token= query param (ADR-14).
+  Gateway proxies via lb:ws://messaging-service.
+end note
+
+@enduml

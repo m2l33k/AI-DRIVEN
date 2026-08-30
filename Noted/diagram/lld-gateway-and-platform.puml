@@ -1,0 +1,57 @@
+@startuml lld-gateway-and-platform
+' =====================================================================
+'  LOW-LEVEL DESIGN — gateway-service (:9000), eureka (:8761),
+'  and the placeholder services (:9003/5/6)
+' =====================================================================
+title LLD — gateway-service + eureka + placeholder services
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "gateway-service :9000  ·  com.example.springcloud.gateway" #E8F0FE {
+  class GatewayServiceApplication
+  class SecurityConfig {
+    SecurityWebFilterChain (WebFlux)
+    permitAll: /actuator, swagger, /api/auth/login,
+               /api/auth/forgot-password, /ws/**,
+               GET /api/users/directory
+    PERM_* rules per route (read GET vs write)
+    grantedAuthoritiesExtractor: JWT → ROLE_*/PERM_*
+    anyExchange().authenticated()
+  }
+  class MetricsController {
+    +GET /api/metrics/overview  (PERM_platform-config:read)
+    queries Prometheus (WebClient) → JSON
+  }
+  class OpenApiConfig <<aggregates each service's /v3/api-docs>>
+  note bottom of SecurityConfig
+    Routing in application.yml: explicit lb:// routes per service +
+    Eureka discovery locator /<service-id>/** + lb:ws:// for /ws/**.
+    Both default and docker profiles.
+  end note
+}
+
+package "eureka-server :8761  ·  com.javatab.springcloud.eurekaserver" #FEF7E0 {
+  class EurekaServerApplication <<@EnableEurekaServer>>
+  note bottom : standalone; does not self-register;\nself-preservation off for fast dev eviction
+}
+
+package "Placeholder services (roadmap)  ·  same lean skeleton" #E6F4EA {
+  class "anomaly-detection :9003\nio…anomaly" as ANOM {
+    HealthController  GET /api/anomaly/health
+  }
+  class "distributed-tracing :9005\nio…tracing" as TRACE {
+    HealthController  GET /api/tracing/health
+  }
+  class "fault-injection :9006\nio…faultinjection" as FAULT {
+    HealthController  GET /api/fault/health
+  }
+  note bottom of ANOM
+    web + eureka-client + actuator + springdoc only.
+    No security, no domain logic yet (ADR-08); each owns a Postgres (ADR-09).
+    Health paths public at the gateway.
+  end note
+}
+
+@enduml

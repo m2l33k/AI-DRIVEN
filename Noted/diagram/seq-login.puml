@@ -1,0 +1,44 @@
+@startuml seq-login
+' =====================================================================
+'  SEQUENCE — state-aware login (ADR-05)
+' =====================================================================
+title Sequence — Login (state-aware)
+
+skinparam shadowing false
+actor "User (SPA)" as U
+participant "gateway-service\n:9000" as GW
+participant "auth-service\n:9001" as AUTH
+participant "KeycloakService" as KS
+participant "Keycloak\n:8081" as KC
+
+U -> GW : POST /api/auth/login { email, password }
+GW -> GW : route (permitAll) → lb://auth-service
+GW -> AUTH : forward
+AUTH -> KS : login(email, password)
+KS -> KC : POST /token (password grant, platform-client)
+
+alt credentials + account OK
+  KC --> KS : 200 { access_token (JWT) }
+  KS --> AUTH : tokens
+  AUTH --> GW : 200 LoginResponse { status: SUCCESS, access_token }
+  GW --> U : JWT (stored in localStorage)
+else "Account is not fully set up" (invalid_grant after password accepted)
+  KC --> KS : 400 invalid_grant
+  KS -> KC : Admin API: inspect user state
+  KC --> KS : requiredActions / emailVerified
+  KS --> AUTH : UserState
+  AUTH --> GW : 200 { status: PASSWORD_CHANGE_REQUIRED\n| EMAIL_VERIFICATION_REQUIRED }
+  GW --> U : drive UI (→ /first-login or verify message)
+else bad credentials
+  KC --> KS : 401 invalid_grant
+  KS --> AUTH : error
+  AUTH --> GW : 401
+  GW --> U : login error
+end
+
+note over AUTH, KC
+  auth-service returns a status instead of surfacing raw Keycloak errors (ADR-05).
+  Keycloak stays the source of truth for passwords/sessions/tokens (ADR-06).
+end note
+
+@enduml

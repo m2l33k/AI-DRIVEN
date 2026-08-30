@@ -1,0 +1,74 @@
+@startuml 04-deployment
+' =====================================================================
+'  DEPLOYMENT DIAGRAM — nodes, artifacts, runtime split
+'  Reflects the user's real workflow: JARs local, infra in Docker
+' =====================================================================
+title Nexo Platform — Deployment Diagram (local-dev topology)
+
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam nodeBorderColor #444444
+
+node "Developer Workstation (Windows 11)" {
+
+  node "JVM (run.sh — local JARs)" as jvm {
+    artifact "eureka-server.jar :8761" as a_eur
+    artifact "gateway-service.jar :9000" as a_gw
+    artifact "auth-service.jar :9001" as a_auth
+    artifact "roaming-analysis-service.jar :9002" as a_roam
+    artifact "rate-limiting-service.jar :9004" as a_rl
+    artifact "messaging-service.jar :9007" as a_msg
+    artifact "anomaly/tracing/fault :9003/5/6" as a_ph
+  }
+
+  node "Angular dev server (ng serve :4200)" as ng {
+    artifact "Frontend (proxy.conf → :9000, /ws → :9007)" as a_ui
+  }
+
+  node "Docker Engine (infra.sh up — shared-network)" as docker {
+    node "Identity" {
+      artifact "keycloak :8081" as d_kc
+      database "keycloak-postgres :5437" as d_kcpg
+    }
+    node "Databases" {
+      database "roaming-mysql :3307" as d_mysql
+      database "ratelimit-postgres :5434" as d_rlpg
+      database "ratelimit-redis :6379" as d_rlr
+      database "anomaly-postgres :5433 / anomaly-redis :6380" as d_anom
+      database "tracing/fault/messaging-postgres :5435/6/8" as d_pg
+    }
+    node "Observability" {
+      artifact "prometheus :9090" as d_prom
+      artifact "grafana :3000" as d_graf
+      artifact "loki :3100 / tempo :4318 / fluent-bit :24224" as d_obs
+    }
+  }
+}
+
+a_ui --> a_gw : HTTP /api (proxy)
+a_ui --> a_msg : WS /ws/notifications
+a_gw --> a_auth
+a_gw --> a_roam
+a_gw --> a_rl
+a_gw --> a_msg
+a_gw --> a_ph
+a_gw ..> a_eur
+
+a_gw --> d_kc : JWK validate
+a_auth --> d_kc : grant + admin
+d_kc --> d_kcpg
+a_roam --> d_mysql
+a_rl --> d_rlpg
+a_rl --> d_rlr
+a_msg --> d_pg
+a_ph --> d_anom
+d_prom --> a_gw : scrape (host.docker.internal)
+d_graf --> d_prom
+
+note bottom
+  Alternative deployments (same artifacts):
+  • Docker Compose  — run.sh docker → docker-compose-base.yml
+  • Kubernetes + Tilt — build-images.sh + tilt up (Minikube); each service has kubernetes/deployment.yml + service.yml
+end note
+
+@enduml

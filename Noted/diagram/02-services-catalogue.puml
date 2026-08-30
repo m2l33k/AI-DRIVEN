@@ -1,0 +1,53 @@
+@startuml 02-services-catalogue
+' =====================================================================
+'  SERVICE CATALOGUE — every service / container (updated, 9 services)
+' =====================================================================
+title Nexo Platform — Service Catalogue
+
+skinparam shadowing false
+skinparam defaultTextAlignment left
+skinparam componentStyle rectangle
+
+package "Application Services (Spring Boot 4.0.3 · Java 17 · Spring Cloud 2025.x)" #E8F0FE {
+  component "eureka-server\nspring-cloud/eureka-server · :8761\nservice discovery" as EUREKA
+  component "gateway-service\nspring-cloud/gateway-service · :9000\nAPI gateway · PERM_* RBAC · metrics" as GW
+  component "auth-service\nmicroservices/auth-service · :9001\nauth + user mgmt (Keycloak)" as AUTH
+  component "roaming-analysis-service\nmicroservices/roaming-analysis-service · :9002\nroaming events + risk / analytics" as ROAM
+  component "anomaly-detection-service\nmicroservices/anomaly-detection-service · :9003\nreal-time anomaly (roadmap)" as ANOM
+  component "rate-limiting-service\nmicroservices/rate-limiting-service · :9004\nRedis token-bucket limiter" as RL
+  component "distributed-tracing-service\nmicroservices/distributed-tracing-service · :9005\ntrace facade (roadmap)" as TRACE
+  component "fault-injection-service\nmicroservices/fault-injection-service · :9006\nchaos / resilience (roadmap)" as FAULT
+  component "messaging-service\nmicroservices/messaging-service · :9007\nDM + WebSocket notifications" as MSG
+  component "util\nutil/ · shared library (no port)" as UTIL
+}
+
+package "Identity" #FEF7E0 {
+  component "keycloak · :8081->8080\nrealm auth-management / platform-client" as KC
+  database  "keycloak-postgres · :5437" as KCPG
+}
+
+package "Data Stores (database-per-service — ADR-09)" #E6F4EA {
+  database "roaming-mysql · :3307 (mysql:8.4)" as MYSQL
+  database "anomaly-postgres · :5433" as APG
+  database "ratelimit-postgres · :5434" as RLPG
+  database "tracing-postgres · :5435" as TPG
+  database "fault-postgres · :5436" as FPG
+  database "messaging-postgres · :5438" as MPG
+  database "ratelimit-redis · :6379" as RLR
+  database "anomaly-redis · :6380" as AR
+  database "postgres :5432 / mongodb :27017 (legacy)" as LEG
+}
+
+package "Observability" #FCE8E6 {
+  component "prometheus :9090" as PROM
+  component "grafana :3000" as GRAF
+  component "loki :3100" as LOKI
+  component "tempo :4317/4318/3200" as TEMPO
+  component "fluent-bit :24224" as FB
+}
+
+package "Client" #F3E8FD {
+  component "Frontend · Angular 22 console (:4200)" as SPA
+}
+
+@enduml

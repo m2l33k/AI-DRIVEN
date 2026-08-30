@@ -1,0 +1,124 @@
+@startuml 01-infrastructure
+' =====================================================================
+'  INFRASTRUCTURE / DEPLOYMENT TOPOLOGY (updated — all 9 services)
+'  Reflects docker/docker-compose-*.yml + spring-cloud + microservices
+' =====================================================================
+title Nexo Platform — Infrastructure Design (full topology, 9 services)
+
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam componentStyle rectangle
+skinparam rectangleBorderColor #444444
+
+actor "Operator / Analyst /\nAdmin / Auditor" as User
+
+package "Client Tier" {
+  [Angular 22 Console\n(Frontend/ :4200)] as SPA
+  [Browser / curl / Bruno / Swagger] as Tools
+}
+
+node "Local JVM host (run.sh — JARs)" as jvm {
+
+  package "Edge (Spring Cloud)" {
+    component "gateway-service :9000\nSpring Cloud Gateway (WebFlux)\nOAuth2 RS + PERM_* RBAC\nGET /api/metrics/overview\nlb:ws:// for /ws/**" as GW
+    component "eureka-server :8761\nService Discovery" as EUREKA
+  }
+
+  package "Business Microservices" {
+    component "auth-service :9001\nKeycloak auth + user mgmt" as AUTH
+    component "roaming-analysis-service :9002\nroaming events + risk/analytics" as ROAM
+    component "anomaly-detection-service :9003\n(placeholder / roadmap)" as ANOM
+    component "rate-limiting-service :9004\nRedis token bucket" as RL
+    component "distributed-tracing-service :9005\n(Jaeger facade / roadmap)" as TRACE
+    component "fault-injection-service :9006\n(chaos / roadmap)" as FAULT
+    component "messaging-service :9007\nDM + WebSocket /ws/notifications" as MSG
+  }
+  component "util (shared library)" as UTIL
+}
+
+node "Docker: shared-network (infra + observability)" as net {
+
+  package "Identity" {
+    component "keycloak :8081 -> 8080\nrealm auth-management\nclient platform-client" as KC
+    database "keycloak-postgres :5437" as KCPG
+  }
+
+  package "Data Stores (database-per-service)" {
+    database "roaming-mysql :3307" as MYSQL
+    database "anomaly-postgres :5433" as APG
+    database "ratelimit-postgres :5434" as RLPG
+    database "tracing-postgres :5435" as TPG
+    database "fault-postgres :5436" as FPG
+    database "messaging-postgres :5438" as MPG
+    database "ratelimit-redis :6379" as RLREDIS
+    database "anomaly-redis :6380" as AREDIS
+    database "postgres :5432 / mongodb :27017\n(legacy / optional)" as LEGACY
+  }
+
+  package "Observability Stack" {
+    component "prometheus :9090" as PROM
+    component "grafana :3000" as GRAF
+    component "loki :3100" as LOKI
+    component "tempo :4317/4318/3200" as TEMPO
+    component "fluent-bit :24224" as FB
+  }
+}
+
+' ---- client flows ----
+User --> SPA
+User --> Tools
+SPA --> GW : /api/** (proxy → :9000)\nBearer JWT
+SPA --> MSG : /ws/notifications?token=
+Tools --> GW : :9000
+User --> GRAF : :3000
+
+' ---- gateway routing / discovery ----
+GW --> AUTH  : lb://auth-service
+GW --> ROAM  : lb://roaming-analysis-service
+GW --> ANOM  : lb://anomaly-detection-service
+GW --> RL    : lb://rate-limiting-service
+GW --> TRACE : lb://distributed-tracing-service
+GW --> FAULT : lb://fault-injection-service
+GW --> MSG   : lb://messaging-service (+ lb:ws://)
+AUTH ..> EUREKA : register
+ROAM ..> EUREKA : register
+RL ..> EUREKA : register
+MSG ..> EUREKA : register
+GW ..> EUREKA : discover
+
+' ---- identity ----
+GW --> KC : validate JWT (JWK set)
+AUTH --> KC : password grant + Admin REST
+KC --> KCPG : JDBC
+
+' ---- persistence ----
+ROAM --> MYSQL : JPA
+RL --> RLPG : policies
+RL --> RLREDIS : token buckets (Lua)
+ANOM --> APG
+ANOM ..> AREDIS
+TRACE --> TPG
+FAULT --> FPG
+MSG --> MPG : JPA (messages)
+
+' ---- observability ----
+GW ..> FB : logs
+AUTH ..> FB
+ROAM ..> FB
+FB --> LOKI
+GW --> TEMPO : OTLP
+PROM --> GW : scrape /actuator/prometheus
+PROM --> AUTH
+PROM --> ROAM
+PROM --> MSG
+GW --> PROM : GET /api/metrics/overview (PromQL)
+GRAF --> PROM
+GRAF --> LOKI
+GRAF --> TEMPO
+
+note bottom of jvm
+  User's workflow: application services run LOCALLY as JARs (run.sh);
+  ONLY infrastructure runs in Docker (infra.sh up).
+end note
+
+@enduml
