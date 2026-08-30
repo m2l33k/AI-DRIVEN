@@ -1,0 +1,238 @@
+# =============================================================================
+#  docker-compose-5gc.yml — free5GC 5G Core, integrated into the platform stack
+# =============================================================================
+#  Runs the free5GC NFs (NRF/AMF/SMF/UPF/AUSF/UDM/UDR/PCF/NSSF) + MongoDB +
+#  WebConsole ON THE SAME `shared-network` as the rest of the platform (Keycloak,
+#  observability, etc.) so the harness can reach them (gateway → NRF, Prometheus →
+#  NF metrics, Fluent Bit → NF logs).
+#
+#  ⚠️ LINUX ONLY — the UPF needs the host `gtp5g` kernel module (see scripts/5GC.sh).
+#
+#  ⚠️ CONFIG REUSE — the NF *config* and *cert* files are NOT re-authored here; they
+#     are mounted from a cloned upstream free5gc-compose so its maintainers own them.
+#     Set F5GC_DIR to that clone (default ../free5gc-compose, created by scripts/5GC.sh).
+#
+#  Interpolated env (compose ${VAR:-default}):
+#     F5GC_TAG   free5GC image tag    (default v3.4.4 — must match your gtp5g version)
+#     F5GC_DIR   free5gc-compose dir  (default ../free5gc-compose — source of config/ + cert/)
+#
+#  Run (with the platform infra) as ONE stack via:
+#     ./scripts/5GC.sh compose
+#  or manually:
+#     docker compose -f docker/docker-compose-infra.yml \
+#                    -f docker/docker-compose-observability.yml \
+#                    -f docker/docker-compose-5gc.yml up -d
+# =============================================================================
+
+services:
+
+  # --- Subscriber / NF-context store -----------------------------------------
+  free5gc-db:
+    container_name: free5gc-db
+    image: mongo:6.0.4
+    command: mongod --port 27017
+    expose:
+      - "27017"
+    volumes:
+      - free5gc-dbdata:/data/db
+    networks:
+      shared-network: {}
+      privnet:
+        ipv4_address: 10.100.200.10
+
+  # --- NRF (registry + OAuth2 authz server) ----------------------------------
+  free5gc-nrf:
+    container_name: free5gc-nrf
+    image: free5gc/nrf:${F5GC_TAG:-v3.4.4}
+    command: ./nrf -c ./config/nrfcfg.yaml
+    environment:
+      - DB_URI=mongodb://free5gc-db:27017/free5gc
+      - GIN_MODE=release
+    volumes:
+      - ${F5GC_DIR:-../free5gc-compose}/config/nrfcfg.yaml:/free5gc/config/nrfcfg.yaml
+      - ${F5GC_DIR:-../free5gc-compose}/cert:/free5gc/cert
+    expose:
+      - "8000"
+    depends_on:
+      - free5gc-db
+    networks:
+      shared-network: {}
+      privnet:
+        ipv4_address: 10.100.200.20
+
+  # --- AUSF ------------------------------------------------------------------
+  free5gc-ausf:
+    container_name: free5gc-ausf
+    image: free5gc/ausf:${F5GC_TAG:-v3.4.4}
+    command: ./ausf -c ./config/ausfcfg.yaml
+    volumes:
+      - ${F5GC_DIR:-../free5gc-compose}/config/ausfcfg.yaml:/free5gc/config/ausfcfg.yaml
+      - ${F5GC_DIR:-../free5gc-compose}/cert:/free5gc/cert
+    depends_on:
+      - free5gc-nrf
+    networks:
+      shared-network: {}
+      privnet:
+        ipv4_address: 10.100.200.21
+
+  # --- UDM -------------------------------------------------------------------
+  free5gc-udm:
+    container_name: free5gc-udm
+    image: free5gc/udm:${F5GC_TAG:-v3.4.4}
+    command: ./udm -c ./config/udmcfg.yaml
+    volumes:
+      - ${F5GC_DIR:-../free5gc-compose}/config/udmcfg.yaml:/free5gc/config/udmcfg.yaml
+      - ${F5GC_DIR:-../free5gc-compose}/cert:/free5gc/cert
+    depends_on:
+      - free5gc-nrf
+    networks:
+      shared-network: {}
+      privnet:
+        ipv4_address: 10.100.200.22
+
+  # --- UDR -------------------------------------------------------------------
+  free5gc-udr:
+    container_name: free5gc-udr
+    image: free5gc/udr:${F5GC_TAG:-v3.4.4}
+    command: ./udr -c ./config/udrcfg.yaml
+    environment:
+      - DB_URI=mongodb://free5gc-db:27017/free5gc
+      - GIN_MODE=release
+    volumes:
+      - ${F5GC_DIR:-../free5gc-compose}/config/udrcfg.yaml:/free5gc/config/udrcfg.yaml
+      - ${F5GC_DIR:-../free5gc-compose}/cert:/free5gc/cert
+    depends_on:
+      - free5gc-nrf
+      - free5gc-db
+    networks:
+      shared-network: {}
+      privnet:
+        ipv4_address: 10.100.200.23
+
+  # --- PCF -------------------------------------------------------------------
+  free5gc-pcf:
+    container_name: free5gc-pcf
+    image: free5gc/pcf:${F5GC_TAG:-v3.4.4}
+    command: ./pcf -c ./config/pcfcfg.yaml
+    volumes:
+      - ${F5GC_DIR:-../free5gc-compose}/config/pcfcfg.yaml:/free5gc/config/pcfcfg.yaml
+      - ${F5GC_DIR:-../free5gc-compose}/cert:/free5gc/cert
+    depends_on:
+      - free5gc-nrf
+    networks:
+      shared-network: {}
+      privnet:
+        ipv4_address: 10.100.200.24
+
+  # --- NSSF ------------------------------------------------------------------
+  free5gc-nssf:
+    container_name: free5gc-nssf
+    image: free5gc/nssf:${F5GC_TAG:-v3.4.4}
+    command: ./nssf -c ./config/nssfcfg.yaml
+    volumes:
+      - ${F5GC_DIR:-../free5gc-compose}/config/nssfcfg.yaml:/free5gc/config/nssfcfg.yaml
+      - ${F5GC_DIR:-../free5gc-compose}/cert:/free5gc/cert
+    depends_on:
+      - free5gc-nrf
+    networks:
+      shared-network: {}
+      privnet:
+        ipv4_address: 10.100.200.25
+
+  # --- SMF (session mgmt; PFCP to UPF) ---------------------------------------
+  free5gc-smf:
+    container_name: free5gc-smf
+    image: free5gc/smf:${F5GC_TAG:-v3.4.4}
+    command: ./smf -c ./config/smfcfg.yaml -u ./config/uerouting.yaml
+    volumes:
+      - ${F5GC_DIR:-../free5gc-compose}/config/smfcfg.yaml:/free5gc/config/smfcfg.yaml
+      - ${F5GC_DIR:-../free5gc-compose}/config/uerouting.yaml:/free5gc/config/uerouting.yaml
+      - ${F5GC_DIR:-../free5gc-compose}/cert:/free5gc/cert
+    depends_on:
+      - free5gc-nrf
+    networks:
+      shared-network: {}
+      privnet:
+        ipv4_address: 10.100.200.26
+
+  # --- AMF (access & mobility; NGAP/SCTP to the gNB) -------------------------
+  free5gc-amf:
+    container_name: free5gc-amf
+    image: free5gc/amf:${F5GC_TAG:-v3.4.4}
+    command: ./amf -c ./config/amfcfg.yaml
+    environment:
+      - GIN_MODE=release
+    volumes:
+      - ${F5GC_DIR:-../free5gc-compose}/config/amfcfg.yaml:/free5gc/config/amfcfg.yaml
+      - ${F5GC_DIR:-../free5gc-compose}/cert:/free5gc/cert
+    expose:
+      - "38412/sctp"
+    depends_on:
+      - free5gc-nrf
+    networks:
+      shared-network: {}
+      privnet:
+        ipv4_address: 10.100.200.27
+
+  # --- UPF (user plane; GTP-U — REQUIRES gtp5g on the host) ------------------
+  free5gc-upf:
+    container_name: free5gc-upf
+    image: free5gc/upf:${F5GC_TAG:-v3.4.4}
+    command: ./upf -c ./config/upfcfg.yaml
+    cap_add:
+      - NET_ADMIN
+    privileged: true
+    devices:
+      - /dev/net/tun
+    sysctls:
+      - net.ipv4.ip_forward=1
+    volumes:
+      - ${F5GC_DIR:-../free5gc-compose}/config/upfcfg.yaml:/free5gc/config/upfcfg.yaml
+    depends_on:
+      - free5gc-smf
+    networks:
+      shared-network: {}
+      privnet:
+        ipv4_address: 10.100.200.101
+
+  # --- WebConsole (subscriber provisioning UI + REST) ------------------------
+  free5gc-webui:
+    container_name: free5gc-webui
+    image: free5gc/webui:${F5GC_TAG:-v3.4.4}
+    command: ./webconsole -c ./config/webuicfg.yaml
+    environment:
+      - GIN_MODE=release
+    volumes:
+      - ${F5GC_DIR:-../free5gc-compose}/config/webuicfg.yaml:/free5gc/config/webuicfg.yaml
+    ports:
+      - "5000:5000"
+    depends_on:
+      - free5gc-db
+      - free5gc-nrf
+    networks:
+      shared-network: {}
+      privnet:
+        ipv4_address: 10.100.200.30
+
+# -----------------------------------------------------------------------------
+#  Networks
+#   • shared-network — the platform's existing bridge. Declared identically to the
+#     infra compose so that, when both files are passed in ONE `docker compose`
+#     invocation, the definitions MERGE into a single network the NFs share with
+#     Keycloak / Prometheus / the gateway.
+#   • privnet        — free5GC's private subnet with STATIC IPs (the NF cfg files
+#     reference these addresses; the UPF GTP-U path needs a stable address).
+# -----------------------------------------------------------------------------
+networks:
+  shared-network:
+    driver: bridge
+  privnet:
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.100.200.0/24
+    driver_opts:
+      com.docker.network.bridge.name: br-free5gc
+
+volumes:
+  free5gc-dbdata:
