@@ -1,0 +1,448 @@
+@startuml scenario-roaming-full
+' =====================================================================
+'  FULL SCENARIO — Roaming Analysis Service
+'  End-to-end analyst workflow: morning check → anomaly investigation
+'  → SLA breach → agreement renegotiation → synthetic tests → forecast.
+'  Covers every endpoint of RoamingController (18 operations).
+' =====================================================================
+
+title Full Scenario — Roaming Analysis Service\n"A Security Analyst's Morning Shift on the Nexo 5GC Platform"
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.2
+skinparam sequenceGroupBorderThickness 1.5
+skinparam noteBorderColor #AAAAAA
+skinparam noteBackgroundColor #FEFEFE
+skinparam sequenceGroupBodyBackgroundColor transparent
+skinparam participantBorderColor #444444
+skinparam actorBorderColor #444444
+
+actor       "Security Analyst\n(analyst-user)" as ANALYST
+participant "Angular SPA\n:4200"               as SPA
+participant "API Gateway\n:9000"               as GW
+participant "Keycloak\n:8081"                  as KC
+participant "RoamingController\n:9002"         as CTL
+participant "RoamingAnalysisService"           as RAS
+participant "RoamingInsightsService"           as RIS
+participant "PerformanceAssuranceService"      as PAS
+participant "AnomalyDetector"                  as AD
+participant "RiskAnalyzer"                     as RA
+participant "KpiCalculator"                    as KPI
+participant "RoamingSimulator"                 as SIM
+database    "roaming-mysql\n:3307"             as DB
+database    "Grafana\n:3000"                   as GRAF
+
+' =====================================================================
+'  PHASE 0 — Context
+' =====================================================================
+note over ANALYST, DB #FEF7E0
+  **Business context**
+  Home network: Nexo (operators OPRITWND · OPRGBEE · OPRESORE)
+  ~20 partner PLMNs worldwide (UK, France, Germany, USA, India, Nigeria…)
+  CDR + attach-event + session-QoS data loaded from CSV at startup.
+  RoamingAgreementSeeder created one IR.21 agreement per partner with SLA thresholds.
+  Streaming tick runs every 5 min, folding FIVE_MIN windows into rolling performance scores.
+end note
+
+' =====================================================================
+'  PHASE 1 — Authentication
+' =====================================================================
+== Phase 1 · Authentication ==
+
+ANALYST -> SPA : Login (analyst-user / password)
+SPA -> GW : POST /api/auth/login
+GW -> KC  : password grant\nclient_id=platform-client\nusername=analyst-user
+KC --> GW : access_token (JWT)\nroles: [SECURITY_ANALYST]\npermissions: [PERM_roaming-events:read]
+GW --> SPA : 200 { access_token, expires_in }
+SPA --> ANALYST : Security Analyst console unlocked\n(Roaming dashboard tab visible)
+
+note right of KC
+  SECURITY_ANALYST composite role
+  expands to PERM_roaming-events:read.
+  Gateway validates JWKS on every request.
+  Service also validates with @PreAuthorize.
+  Defence-in-depth: two enforcement points.
+end note
+
+' =====================================================================
+'  PHASE 2 — Morning Dashboard Check
+' =====================================================================
+== Phase 2 · Morning Dashboard Check ==
+
+ANALYST -> SPA : Open "Roaming Live Monitor"
+
+SPA -> GW  : GET /api/roaming/live?windowMinutes=60\nAuthorization: Bearer <JWT>
+GW  -> CTL : forward (PERM_roaming-events:read ✓)
+CTL -> RIS : live(60)
+RIS -> DB  : SELECT roaming_events WHERE timestamp >= now-60min
+DB  --> RIS : List<RoamingEvent> (window)
+RIS -> RA  : score(event) × N
+RA  --> RIS : risk scores (0-100 additive heuristic)
+RIS --> CTL : LiveMonitorDto\n{ events:14, subscribers:8 420, rate:0.23/min,\n  avgRisk:41, highRisk:3, revenueEur:12 840 }
+CTL --> GW  : 200 JSON
+GW  --> SPA : LiveMonitorDto
+SPA --> ANALYST : Live dashboard:\n3 HIGH-risk events in last hour ⚠️\nRevenue: €12 840
+
+' =====================================================================
+'  PHASE 3 — Event List & Filtering
+' =====================================================================
+== Phase 3 · Event Filtering ==
+
+ANALYST -> SPA : Filter: Direction=INBOUND · Risk=HIGH
+
+SPA -> GW  : GET /api/roaming/events?direction=INBOUND&riskLevel=HIGH
+GW  -> CTL : forward
+CTL -> RAS : listEvents(INBOUND, null, HIGH)
+RAS -> DB  : SELECT roaming_events (full table via projection)
+DB  --> RAS : all events
+RAS -> RA  : score(e) per event → filter HIGH (score≥60)
+RA  --> RAS : scored events
+RAS --> CTL : [RE-1002 USA 310-260 · RE-1006 India 404-45 · RE-1008 Nigeria 621-30]
+CTL --> GW  : 200 JSON
+GW  --> SPA : 3 HIGH-risk inbound events
+
+ANALYST -> SPA : Click event RE-1002 (USA)
+
+SPA -> GW  : GET /api/roaming/events/RE-1002
+GW  -> CTL : forward
+CTL -> RAS : getEvent("RE-1002")
+RAS -> DB  : SELECT WHERE id='RE-1002'
+DB  --> RAS : RoamingEvent { plmn:310-260, country:USA,\n  subscribers:12, errors:9, newDeviceRatio:0.55,\n  impossibleTravel:true, latency:98ms, drop:14.7% }
+RAS -> RA   : score → 82 (HIGH)
+RAS --> CTL : RoamingEventDto (riskScore=82, riskLevel=HIGH)
+CTL --> GW  : 200
+GW  --> SPA : Event detail panel
+SPA --> ANALYST : ⚠ RE-1002 — USA 310-260\nriskScore=82 HIGH\nImpossible travel detected · 9 signalling errors\n55% new-device ratio
+
+' =====================================================================
+'  PHASE 4 — Anomaly Engine
+' =====================================================================
+== Phase 4 · Anomaly Detection Engine ==
+
+ANALYST -> SPA : Open "Anomaly Detection" tab
+
+SPA -> GW  : GET /api/roaming/anomalies
+GW  -> CTL : forward
+CTL -> RIS : anomalies()
+RIS -> AD  : detect(allEvents)
+
+loop for each event in population
+  AD -> RA  : score(event)
+  RA --> AD : riskScore
+  AD -> AD  : compute population mean & std-dev\nz-score = (score - mean) / std\ncomposite = ½·risk + capped z-score deviations\n+25 bonus if impossibleTravel=true
+end
+
+AD --> RIS : List<AnomalyDto>\n[{id:RE-1002, score:88, deviation:+3.2σ,\n  severity:CRITICAL,\n  reasons:[impossible_travel, high_new_device_ratio, signalling_errors]},\n {id:RE-1008, score:74, deviation:+2.1σ,\n  severity:HIGH,\n  reasons:[impossible_travel, latency_spike]},\n {id:RE-1006, score:61, deviation:+1.4σ,\n  severity:MEDIUM,\n  reasons:[high_new_device_ratio]}]
+RIS --> CTL : 3 anomalies
+CTL --> GW  : 200
+GW  --> SPA : anomaly list
+SPA --> ANALYST : 🚨 RE-1002 CRITICAL  (+3.2σ) — impossible travel + fraud signals\n⚠ RE-1008 HIGH     (+2.1σ) — Nigeria: impossible travel + latency\n▲ RE-1006 MEDIUM   (+1.4σ) — India: 42% new-device ratio
+
+note over AD
+  AnomalyDetector is the clean seam for ML (ADR-02).
+  Currently: statistical (z-score) + rule-based (heuristic).
+  Same detector reused for /upload CSV and /simulate batch.
+end note
+
+' =====================================================================
+'  PHASE 5 — Partner Roll-up
+' =====================================================================
+== Phase 5 · Partner Analytics ==
+
+ANALYST -> SPA : Open "Partners" panel
+
+SPA -> GW  : GET /api/roaming/partners
+GW  -> CTL : forward
+CTL -> RAS : partners()
+RAS -> DB  : SELECT all events
+DB  --> RAS : all
+RAS -> RA  : score per event → group by partnerPlmn\navg risk, peak risk, highRisk count
+RAS --> CTL : List<PartnerSummaryDto> (ordered worst→best avg risk)\n[{310-260 USA  avgRisk:82 peakRisk:HIGH  events:2},\n {621-30  Nigeria avgRisk:71 peakRisk:HIGH  events:1},\n {404-45  India  avgRisk:61 peakRisk:HIGH  events:1},\n ...]
+CTL --> GW  : 200
+GW  --> SPA : partner table
+SPA --> ANALYST : 📊 3 partners flagged HIGH\nUSA 310-260 worst average risk (82)
+
+' =====================================================================
+'  PHASE 6 — Platform Summary for Dashboard
+' =====================================================================
+== Phase 6 · Dashboard Summary ==
+
+SPA -> GW  : GET /api/roaming/summary
+GW  -> CTL : forward
+CTL -> RAS : summary()
+RAS -> DB  : SELECT all events
+DB  --> RAS : all events (sorted by hour)
+RAS --> CTL : RoamingSummaryDto\n{ total:12, totalSubs:6 802, inbound:8, outbound:4,\n  byRisk:{LOW:5,MEDIUM:4,HIGH:3}, highRisk:3,\n  volumeSeries:[{08:00,1420},{09:00,2310},…] }
+CTL --> GW  : 200
+GW  --> SPA : summary
+SPA --> ANALYST : Dashboard filled — volume chart, risk donut, direction split
+
+' =====================================================================
+'  PHASE 7 — CSV Upload (New CDR Batch from NOC)
+' =====================================================================
+== Phase 7 · CSV Upload Analysis (NOC CDR Batch) ==
+
+note over ANALYST #FFF3E0
+  The NOC exports a new CDR CSV every morning.
+  The analyst uploads it for instant analysis without touching production data.
+end note
+
+ANALYST -> SPA : Upload cdrs-2026-09-10.csv (7 MB)
+
+SPA -> GW  : POST /api/roaming/upload?hoursAhead=6\nContent-Type: multipart/form-data\nfile=cdrs-2026-09-10.csv
+GW  -> CTL : forward
+CTL -> RIS : analyzeCsv(file, 6)
+RIS -> RIS : CsvParser.parse(file)\n→ { parsed:342, skipped:4, events:342 }
+RIS -> RAS : summary(csvEvents)
+RAS --> RIS : RoamingSummaryDto (CSV-scoped)
+RIS -> AD  : detect(csvEvents)
+AD  --> RIS : 11 anomalies in batch
+RIS -> RIS  : forecast(6, csvEvents)\nlinear-regression over hourly buckets
+RIS --> CTL : CsvAnalysisDto\n{ fileName:cdrs-2026-09-10.csv, parsed:342, skipped:4,\n  summary:{total:342, highRisk:11},\n  anomalies:[11 flagged],\n  forecast:[{14:00,1820},{15:00,2140},{16:00,2390},...] }
+CTL --> GW  : 200
+GW  --> SPA : CsvAnalysisDto
+SPA --> ANALYST : 📂 Batch analysed: 342 events · 11 anomalies\nForecast: traffic peaks at 2 390 subs by 16:00
+
+' =====================================================================
+'  PHASE 8 — Performance Assurance KPIs
+' =====================================================================
+== Phase 8 · Performance Assurance KPIs ==
+
+ANALYST -> SPA : KPI tab → window=DAY · all partners
+
+SPA -> GW  : GET /api/roaming/kpis?window=DAY
+GW  -> CTL : forward
+CTL -> PAS : kpis(null, DAY)
+PAS -> DB  : findInWindow(start=today-00:00, end=now)\n  AttachEvents · RoamingCDRs · SessionQoS
+DB  --> PAS : raw signalling records
+PAS -> KPI : compute(ALL, DAY, attaches, cdrs, sessions)
+KPI --> PAS : KpiSetDto\n{ registrationSuccessRate:97.3%, asr:72.4%, ner:88.1%,\n  sessionSetupSuccessRate:98.1%, acd:142s,\n  latencyP50:41ms, latencyP95:108ms, latencyP99:187ms,\n  dropRatePct:1.8%, throughputMbps:38.4 }
+PAS --> CTL : KpiSetDto
+CTL --> GW  : 200
+GW  --> SPA : KPIs
+SPA --> ANALYST : ✅ Registration: 97.3%  ASR: 72.4%  Latency P95: 108ms\n⚠ latencyP95 approaching SLA limit for 2 partners
+
+ANALYST -> SPA : KPI Timeseries — last 12 DAY windows
+
+SPA -> GW  : GET /api/roaming/kpis/timeseries?window=DAY&count=12
+GW  -> CTL : forward
+CTL -> PAS : timeseries(null, DAY, 12)
+
+loop 12 times (oldest → newest)
+  PAS -> KPI : computeWindow(partner=ALL, window, start, end)
+  KPI --> PAS : KpiSetDto
+end
+
+PAS --> CTL : KpiTimeseriesDto { 12 points }
+CTL --> GW  : 200
+GW  --> SPA : timeseries
+SPA --> ANALYST : 📈 12-day trend chart — ASR degrading -4% over last 3 days
+
+' =====================================================================
+'  PHASE 9 — SLA Evaluation
+' =====================================================================
+== Phase 9 · SLA Breach Evaluation ==
+
+ANALYST -> SPA : Open "SLA Compliance" view
+
+SPA -> GW  : GET /api/roaming/sla?window=DAY
+GW  -> CTL : forward
+CTL -> PAS : evaluateSla(DAY)
+
+loop for each RoamingAgreement
+  PAS -> PAS : timeseries(partner, DAY, lookback=3 windows)
+  PAS -> PAS : breaches(latestWindow, agreement)
+  PAS -> PAS : consecutiveBreach count\nalarm = consecutive ≥ 3
+end
+
+PAS --> CTL : List<SlaEvaluationDto> sorted worst-first\n[{partner:310-260 USA,\n  breaches:[ASR 58.1% < 60%, latencyP95 134ms > 120ms],\n  consecutive:3, alarm:TRUE, rollingScore:61.2, tier:WATCH},\n {partner:621-30 Nigeria,\n  breaches:[dropRate 4.1% > 3%],\n  consecutive:1, alarm:false, rollingScore:74.5, tier:STANDARD},\n ...10 compliant partners]
+CTL --> GW  : 200
+GW  --> SPA : SLA results
+SPA --> ANALYST : 🚨 ALARM — USA 310-260: 3 consecutive DAY windows breached\n  ASR below minimum (58.1% < 60%)\n  Latency P95 exceeded (134ms > 120ms)\n⚠ Nigeria 621-30: single breach, drop rate (4.1%)
+
+' =====================================================================
+'  PHASE 10 — Agreements & Optimization
+' =====================================================================
+== Phase 10 · Agreement Optimization ==
+
+ANALYST -> SPA : View agreements list
+
+SPA -> GW  : GET /api/roaming/agreements
+GW  -> CTL : forward
+CTL -> PAS : agreements()
+PAS -> DB  : SELECT roaming_agreements
+DB  --> PAS : List<RoamingAgreement>\n(IR.21 refs, SLA thresholds, rolling scores, tiers)
+PAS --> CTL : List<AgreementDto>
+CTL --> GW  : 200
+GW  --> SPA : all agreements
+SPA --> ANALYST : 20 agreements displayed with SLA thresholds and tiers
+
+ANALYST -> SPA : Open "Agreement Optimization" panel
+
+SPA -> GW  : GET /api/roaming/optimization
+GW  -> CTL : forward
+CTL -> RIS : optimization()
+RIS -> DB  : all events
+DB  --> RIS : grouped by PLMN
+RIS -> RA  : avgRisk per partner
+RA  --> RIS : risk scores
+RIS -> RIS  : per partner: revenue · cost · margin · QoS experience\n→ RENEGOTIATE if margin<0\n→ MONITOR if avgRisk≥60\n→ IMPROVE_QOS if experience<50\n→ PREFERRED if margin≥40% & risk<30\n→ STEADY otherwise
+RIS --> CTL : List<OptimizationDto> sorted by margin desc\n[{310-260 USA,  action:MONITOR,\n  revenue:€84, cost:€62, margin:€22, marginPct:26%,\n  rec:"Profitable but high fraud — tighten steering"},\n {621-30 Nigeria, action:RENEGOTIATE,\n  revenue:€38, cost:€51, margin:€-13,\n  rec:"Loss-making — renegotiate or introduce data caps"},\n {208-10 France,  action:PREFERRED,\n  revenue:€420, margin:44%, rec:"High-margin low-risk — preferred partner"},\n ...]
+CTL --> GW  : 200
+GW  --> SPA : optimization list
+SPA --> ANALYST : 💰 France 208-10 → PREFERRED (€420 revenue, 44% margin)\n📊 USA 310-260 → MONITOR (high fraud, profitable)\n❌ Nigeria 621-30 → RENEGOTIATE (loss-making, −€13)
+
+' =====================================================================
+'  PHASE 11 — Revenue & QoS Overview
+' =====================================================================
+== Phase 11 · Revenue & QoS Overview ==
+
+SPA -> GW  : GET /api/roaming/revenue
+GW  -> CTL : forward
+CTL -> RIS : revenue()
+RIS -> DB  : all events
+DB  --> RIS : sum revenue / cost per direction
+RIS --> CTL : RevenueDto\n{ totalRevenue:€4 820, cost:€3 140, margin:€1 680,\n  marginPct:34.8%, perSubscriberRevenue:€0.71,\n  inbound:€3 210, outbound:€1 610,\n  top5:[{France:€420},{UK:€380},{Germany:€290},...] }
+CTL --> GW  : 200
+GW  --> SPA : RevenueDto
+SPA --> ANALYST : 📊 Total margin: €1 680 (34.8%)\nTop earner: France 208-10
+
+SPA -> GW  : GET /api/roaming/qos
+GW  -> CTL : forward
+CTL -> RIS : qos()
+RIS -> RIS  : avg latency / throughput / drop over all events\n→ QoS score 0-100 (penalise latency>40ms, drop, low throughput)
+RIS --> CTL : QosDto\n{ avgLatencyMs:52.3, avgThroughputMbps:36.1,\n  avgDropPct:2.1, qosScore:71,\n  worst3:[{Nigeria:score18,Poor},{USA:score32,Poor},{India:score44,Fair}] }
+CTL --> GW  : 200
+GW  --> SPA : QosDto
+SPA --> ANALYST : 📡 Platform QoS score: 71/100\n⚠ Nigeria (18 · Poor) · USA (32 · Poor) worst performers
+
+SPA -> GW  : GET /api/roaming/experience
+GW  -> CTL : forward
+CTL -> RIS : experience()
+RIS --> CTL : List<ExperienceDto> worst-first\n(latency · throughput · drop · experienceScore · rating per PLMN)
+CTL --> GW  : 200
+GW  --> SPA : per-partner experience scores
+SPA --> ANALYST : Customer experience table sorted worst → best
+
+' =====================================================================
+'  PHASE 12 — Synthetic IREG Test Calls
+' =====================================================================
+== Phase 12 · Synthetic Test Calls (IREG-style probe) ==
+
+note over ANALYST #FEF7E0
+  Before escalating to the partner NOC about USA 310-260,
+  the analyst triggers synthetic test transactions to confirm degradation.
+end note
+
+ANALYST -> SPA : Run synthetic test-calls
+
+SPA -> GW  : POST /api/roaming/test-calls/run
+GW  -> CTL : forward
+CTL -> PAS : runSyntheticTests()
+
+loop for each active agreement × each TXN_TYPE [REGISTRATION, MO_CALL, MT_CALL, SMS, DATA_SESSION]
+  PAS -> PAS : health = max(0.5, rollingScore/100)\npass = random() < health\nlatency = random(20..200 ms)
+end
+
+PAS --> CTL : List<SyntheticTestResultDto>\n[{310-260, REGISTRATION, FAIL, 178ms, "timeout/no response"},\n {310-260, MO_CALL,      FAIL, 192ms, "timeout/no response"},\n {310-260, SMS,         PASS, 47ms,  "OK"},\n {208-10, REGISTRATION, PASS, 23ms,  "OK"}, ...]
+CTL --> GW  : 200
+GW  --> SPA : test results
+SPA --> ANALYST : 🧪 USA 310-260: REGISTRATION FAIL · MO_CALL FAIL (health=61%)\n✅ France 208-10: all 5 transaction types PASSED\n→ Confirmed: USA partner degraded. Escalate to NOC.
+
+' =====================================================================
+'  PHASE 13 — Traffic Simulation (Validate Anomaly Pipeline)
+' =====================================================================
+== Phase 13 · Traffic Simulation ==
+
+note over ANALYST #E8F0FE
+  Before end-of-shift, the analyst runs a simulation to verify the
+  anomaly detection pipeline will react to a spike in high-risk traffic.
+end note
+
+ANALYST -> SPA : Simulate 30 events over 120 min window
+
+SPA -> GW  : POST /api/roaming/simulate?count=30&minutesSpread=120&windowMinutes=60
+GW  -> CTL : forward
+CTL -> RIS : simulate(30, 120, 60)
+RIS -> SIM : generate(30, 120, synthetic=false)
+
+loop 30 events (SIM-prefixed ids)
+  SIM -> SIM : random direction · PLMN · country · subscribers\n  derive QoS + commercial figures\n  persist to roaming_events table
+end
+
+SIM --> RIS : 30 generated events
+RIS -> RIS  : liveOver(generated, windowMinutes=60)
+RIS --> CTL : SimulationResultDto\n{ generated:30, windowMinutes:60,\n  live:{ events:30, subs:14 200, avgRisk:48, highRisk:6 },\n  sample:[8 newest events] }
+CTL --> GW  : 200
+GW  --> SPA : SimulationResultDto
+SPA --> ANALYST : ✅ Simulation complete: 30 events persisted (SIM- prefix)\n6 HIGH-risk detected in anomaly pipeline reacted correctly
+
+' =====================================================================
+'  PHASE 14 — Traffic Forecast (Capacity Planning)
+' =====================================================================
+== Phase 14 · Traffic Forecast (Capacity Planning) ==
+
+ANALYST -> SPA : Forecast tab — next 6 hours
+
+SPA -> GW  : GET /api/roaming/forecast?hoursAhead=6
+GW  -> CTL : forward
+CTL -> RIS : forecast(6)
+RIS -> DB  : all events (incl. simulated)
+DB  --> RIS : grouped by UTC hour
+RIS -> RIS  : linear regression over hourly buckets\n  slope, intercept → 6 predicted points
+RIS --> CTL : ForecastDto\n{ model:linear-regression, slope:+120/hr,\n  history:[{08:00,1420},{09:00,2310},{10:00,3180},...],\n  forecast:[{14:00,4200},{15:00,4320},{16:00,4440},\n            {17:00,4560},{18:00,4680},{19:00,4800}] }
+CTL --> GW  : 200
+GW  --> SPA : ForecastDto
+SPA --> ANALYST : 📈 Upward trend: +120 subs/hr\nEvening peak ~4 800 subs at 19:00\n→ Flag to capacity team
+
+' =====================================================================
+'  PHASE 15 — Observability Drilldown (Grafana)
+' =====================================================================
+== Phase 15 · Observability Drilldown in Grafana ==
+
+ANALYST -> GRAF : Open Grafana :3000
+
+note over GRAF #FCE8E6
+  All previous API calls generated:
+  • Prometheus metrics  (http_server_requests_seconds_count, JVM metrics)
+  • Loki logs           (Loki4j appender — structured JSON with traceId + spanId)
+  • Tempo traces        (OTLP spans from Gateway OpenTelemetry Java Agent)
+  • Service graph       (Tempo metrics_generator → Prometheus remote_write)
+end note
+
+ANALYST -> GRAF : Explore → Tempo → Service Graph (Node Graph)
+GRAF --> ANALYST : Node graph: SPA → Gateway → RoamingService\ncall rate · error rate · latency P50/P95
+
+ANALYST -> GRAF : Click on a slow trace (latencyP95 spike at 10:42)
+GRAF --> ANALYST : Trace view: 9 spans\n  GW span: 412ms total\n  RoamingController: 389ms\n  RoamingInsightsService.analyzeCsv: 381ms\n  CsvParser.parse: 340ms (slowest — 342 rows)
+
+ANALYST -> GRAF : Click "Logs for this span" (tracesToLogs drilldown)
+GRAF --> ANALYST : Loki log lines for traceId=abc123:\n  INFO  CsvParser    — parsed 342 rows, skipped 4 (missing QoS cols)\n  WARN  AnomalyDetector — 11 anomalies above threshold\n  INFO  RoamingInsights — forecast slope=+74 subs/hr
+
+ANALYST -> GRAF : Open Redis & Storage dashboard
+GRAF --> ANALYST : Redis instances: 2 UP\nMemory used: ratelimit-redis 14MB · anomaly-redis 8MB\nKeyspace hit ratio: 94%
+
+ANALYST -> GRAF : Open Spring Boot dashboard → roaming-analysis-service
+GRAF --> ANALYST : HTTP requests: 38 req/session · avg 210ms\nJVM heap: 312MB / 512MB\nGC pauses: < 5ms
+
+' =====================================================================
+'  END — Summary
+' =====================================================================
+== End-of-Shift Summary ==
+
+note over ANALYST, GRAF #E6F4EA
+  **Actions taken this shift**
+  ✅ Live monitor checked — 3 HIGH-risk events in last hour
+  ✅ RE-1002 investigated — USA 310-260 impossible travel + fraud signals
+  ✅ Anomaly engine confirmed 3 critical/high detections (z-score statistical model)
+  ✅ CSV batch (342 CDRs) analysed instantly — 11 anomalies surfaced
+  ✅ KPI timeseries shows ASR degrading -4% over last 3 days
+  🚨 SLA ALARM raised — USA 310-260: 3 consecutive DAY windows in breach (ASR + latency)
+  ❌ Nigeria 621-30 — RENEGOTIATE recommended (loss-making agreement)
+  ⭐ France 208-10 — PREFERRED partner confirmed (€420 revenue, 44% margin, low risk)
+  🧪 Synthetic IREG test calls confirmed USA partner degradation (REGISTRATION + MO_CALL FAIL)
+  🔮 Evening peak forecast: ~4 800 subscribers at 19:00 — flagged to capacity team
+  📊 All activity traced in Tempo, logged in Loki, metriced in Prometheus
+end note
+
+@enduml

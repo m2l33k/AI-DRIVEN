@@ -5,7 +5,6 @@ import io.javatab.microservices.roaming.domain.RoamingEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -15,8 +14,11 @@ import java.util.List;
 /**
  * Seeds representative roaming events on first start (when the table is empty), deriving realistic
  * QoS and commercial figures from the raw signals so the analytics endpoints have data to work on.
+ *
+ * <p><b>Disabled (no {@code @Component}).</b> The analytics endpoints now read the <b>real</b>
+ * ingested dataset via {@code RoamingEventProjection}; this synthetic seeder is retained only for
+ * reference and offline testing and is no longer registered as a Spring bean.</p>
  */
-@Component
 public class RoamingDataSeeder implements CommandLineRunner {
 
 	private static final Logger log = LoggerFactory.getLogger(RoamingDataSeeder.class);

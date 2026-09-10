@@ -23,6 +23,7 @@ export class SecurityLayout {
         { label: 'Anomalies', path: 'roaming/anomalies', icon: '' },
         { label: 'Partners', path: 'roaming/partners', icon: '' },
         { label: 'QoS & Experience', path: 'roaming/qos', icon: '' },
+        { label: 'KPIs & SLA', path: 'roaming/kpis', icon: '' },
         { label: 'Revenue', path: 'roaming/revenue', icon: '' },
         { label: 'Tools', path: 'roaming/tools', icon: '' },
       ],

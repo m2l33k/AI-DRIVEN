@@ -7,7 +7,6 @@ import io.javatab.microservices.roaming.domain.RiskLevel;
 import io.javatab.microservices.roaming.domain.RoamingEvent;
 import io.javatab.microservices.roaming.ingest.RoamingEventCsvParser;
 import io.javatab.microservices.roaming.ingest.RoamingEventCsvParser.CsvParseResult;
-import io.javatab.microservices.roaming.repository.RoamingEventRepository;
 import io.javatab.microservices.roaming.web.dto.AnomalyDto;
 import io.javatab.microservices.roaming.web.dto.CsvAnalysisDto;
 import io.javatab.microservices.roaming.web.dto.ExperienceDto;
@@ -42,17 +41,17 @@ public class RoamingInsightsService {
 
 	private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH:00").withZone(ZoneOffset.UTC);
 
-	private final RoamingEventRepository repository;
+	private final RoamingEventProjection projection;
 	private final RiskAnalyzer riskAnalyzer;
 	private final AnomalyDetector anomalyDetector;
 	private final RoamingAnalysisService analysisService;
 	private final RoamingEventCsvParser csvParser;
 	private final RoamingSimulator simulator;
 
-	public RoamingInsightsService(RoamingEventRepository repository, RiskAnalyzer riskAnalyzer,
+	public RoamingInsightsService(RoamingEventProjection projection, RiskAnalyzer riskAnalyzer,
 								  AnomalyDetector anomalyDetector, RoamingAnalysisService analysisService,
 								  RoamingEventCsvParser csvParser, RoamingSimulator simulator) {
-		this.repository = repository;
+		this.projection = projection;
 		this.riskAnalyzer = riskAnalyzer;
 		this.anomalyDetector = anomalyDetector;
 		this.analysisService = analysisService;
@@ -62,9 +61,19 @@ public class RoamingInsightsService {
 
 	/** ✅ Monitor roaming in real time — snapshot over the last {@code windowMinutes}. */
 	public LiveMonitorDto live(int windowMinutes) {
-		Instant cutoff = Instant.now().minus(windowMinutes, ChronoUnit.MINUTES);
-		List<RoamingEvent> window = repository.findAll().stream()
-				.filter(e -> e.timestamp().isAfter(cutoff))
+		return liveOver(projection.events(), windowMinutes);
+	}
+
+	/**
+	 * Live-monitor snapshot over an arbitrary event set. The reference "now" is the newest event in
+	 * the set (the dataset is historical), so a window always covers the most recent activity.
+	 */
+	private LiveMonitorDto liveOver(List<RoamingEvent> events, int windowMinutes) {
+		Instant referenceNow = events.stream().map(RoamingEvent::timestamp)
+				.max(Comparator.naturalOrder()).orElse(Instant.now());
+		Instant cutoff = referenceNow.minus(windowMinutes, ChronoUnit.MINUTES);
+		List<RoamingEvent> window = events.stream()
+				.filter(e -> !e.timestamp().isBefore(cutoff))
 				.sorted(Comparator.comparing(RoamingEvent::timestamp).reversed())
 				.toList();
 
@@ -80,7 +89,7 @@ public class RoamingInsightsService {
 
 	/** ✅ Detect anomalies — statistical + rule-based detection over all persisted events. */
 	public List<AnomalyDto> anomalies() {
-		return anomalyDetector.detect(repository.findAll());
+		return anomalyDetector.detect(projection.events());
 	}
 
 	/**
@@ -102,18 +111,18 @@ public class RoamingInsightsService {
 	 * {@code windowMinutes} so the effect can be observed.
 	 */
 	public SimulationResultDto simulate(int count, int minutesSpread, int windowMinutes) {
-		List<RoamingEvent> generated = simulator.generate(count, minutesSpread, true);
+		List<RoamingEvent> generated = simulator.generate(count, minutesSpread, false);
 		List<RoamingEventDto> sample = generated.stream()
 				.sorted(Comparator.comparing(RoamingEvent::timestamp).reversed())
 				.limit(8)
 				.map(this::toDto)
 				.toList();
-		return new SimulationResultDto(generated.size(), windowMinutes, live(windowMinutes), sample);
+		return new SimulationResultDto(generated.size(), windowMinutes, liveOver(generated, windowMinutes), sample);
 	}
 
 	/** ✅ Predict future traffic — linear-trend forecast of subscribers/hour for {@code hoursAhead}. */
 	public ForecastDto forecast(int hoursAhead) {
-		return forecast(hoursAhead, repository.findAll());
+		return forecast(hoursAhead, projection.events());
 	}
 
 	/** Linear-trend forecast over an arbitrary set of events (DB or an uploaded CSV). */
@@ -154,7 +163,7 @@ public class RoamingInsightsService {
 
 	/** ✅ Improve QoS — platform-wide QoS overview + weakest partners. */
 	public QosDto qos() {
-		List<RoamingEvent> all = repository.findAll();
+		List<RoamingEvent> all = projection.events();
 		double latency = round(all.stream().mapToDouble(RoamingEvent::avgLatencyMs).average().orElse(0), 1);
 		double throughput = round(all.stream().mapToDouble(RoamingEvent::throughputMbps).average().orElse(0), 1);
 		double drop = round(all.stream().mapToDouble(RoamingEvent::droppedSessionRatio).average().orElse(0) * 100, 2);
@@ -204,7 +213,7 @@ public class RoamingInsightsService {
 
 	/** ✅ Increase roaming revenue — revenue / cost / margin overview + top partners. */
 	public RevenueDto revenue() {
-		List<RoamingEvent> all = repository.findAll();
+		List<RoamingEvent> all = projection.events();
 		double revenue = all.stream().mapToDouble(RoamingEvent::revenueEur).sum();
 		double cost = all.stream().mapToDouble(RoamingEvent::costEur).sum();
 		double margin = revenue - cost;
@@ -230,7 +239,7 @@ public class RoamingInsightsService {
 
 	private Map<String, List<RoamingEvent>> groupByPlmn() {
 		Map<String, List<RoamingEvent>> byPlmn = new LinkedHashMap<>();
-		repository.findAll().forEach(e -> byPlmn.computeIfAbsent(e.partnerPlmn(), k -> new ArrayList<>()).add(e));
+		projection.events().forEach(e -> byPlmn.computeIfAbsent(e.partnerPlmn(), k -> new ArrayList<>()).add(e));
 		return byPlmn;
 	}
 

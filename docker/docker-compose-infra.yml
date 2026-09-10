@@ -99,7 +99,9 @@ services:
       keycloak-postgres:
         condition: service_healthy
     volumes:
-      - ../keycloak/platform-realm.json:/opt/keycloak/data/import/platform-realm.json:ro
+      # Keycloak's directory --import-realm requires the file to be named <realm>-realm.json,
+      # so mount platform-realm.json into the import dir as auth-management-realm.json.
+      - ../keycloak/platform-realm.json:/opt/keycloak/data/import/auth-management-realm.json:ro
     networks:
       - shared-network
 
@@ -249,6 +251,7 @@ services:
 networks:
   shared-network:
     driver: bridge
+    name: telecom-shared-network
 volumes:
   prometheus-data:
   grafana-data:

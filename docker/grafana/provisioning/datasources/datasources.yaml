@@ -15,6 +15,14 @@ datasources:
     access: proxy
     url: http://loki:3100
     editable: true
+    jsonData:
+      # Extract traceId from JSON log lines so Loki log lines link to Tempo traces.
+      derivedFields:
+        - name: TraceID
+          matcherRegex: '"traceId":"(\w+)"'
+          url: '${__value.raw}'
+          datasourceUid: tempo
+          urlDisplayLabel: View in Tempo
 
   - name: Tempo
     uid: tempo
@@ -22,3 +30,32 @@ datasources:
     access: proxy
     url: http://tempo:3200
     editable: true
+    jsonData:
+      httpMethod: GET
+      # Node Graph: read service-graph metrics from Prometheus (fed by Tempo metrics_generator).
+      serviceMap:
+        datasourceUid: prometheus
+      nodeGraph:
+        enabled: true
+      # Drilldown: trace → logs.
+      tracesToLogs:
+        datasourceUid: loki
+        mapTagNamesEnabled: true
+        tags:
+          - key: service.name
+            value: app
+          - key: host.name
+            value: pod
+        filterByTraceID: true
+        filterBySpanID: false
+        lokiSearch: true
+      # Drilldown: trace → metrics.
+      tracesToMetrics:
+        datasourceUid: prometheus
+        tags:
+          - key: service.name
+            value: app
+      search:
+        hide: false
+      lokiSearch:
+        datasourceUid: loki

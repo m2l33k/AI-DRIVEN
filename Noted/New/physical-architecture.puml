@@ -1,0 +1,252 @@
+@startuml physical-architecture
+' =====================================================================
+'  PHYSICAL ARCHITECTURE — Nexo 5G Core Management Platform
+'  Real infrastructure: machines, containers, ports, networks, storage.
+'  "Where and how does every component run?"
+' =====================================================================
+
+title Nexo Platform — Physical Architecture\n(5G Core Management System — Local Development Topology)
+
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam nodeBorderColor      #444444
+skinparam nodeBorderThickness  1.5
+skinparam databaseBorderColor  #666666
+skinparam artifactBorderColor  #555555
+skinparam packageBorderColor   #888888
+skinparam packageBorderThickness 1.2
+skinparam arrowColor           #444444
+skinparam arrowThickness       1.1
+skinparam noteBackgroundColor  #FAFAFA
+skinparam noteBorderColor      #CCCCCC
+
+' =====================================================================
+'  A — CLIENT WORKSTATION
+' =====================================================================
+node "Client Workstation\n(Admin · Operator · Analyst · Auditor)" as CLIENT #F3E8FD {
+  artifact "Web Browser\n──────────\nAngular SPA :4200\nGrafana     :3000\nSwagger UI  :9002/swagger-ui.html\nKeycloak    :8081 (admin)" as BROWSER
+}
+
+' =====================================================================
+'  B — DEVELOPER WORKSTATION  (Windows 11)
+' =====================================================================
+node "Developer Workstation — Windows 11\nIntel / AMD · 16 GB RAM+" as DEVHOST #E8F0FE {
+
+  ' ── B1 · Angular Dev Server ─────────────────────────────────────
+  node "Node.js Runtime\n(ng serve)" as NGSERVE #D0E4FF {
+    artifact "Angular 22 SPA  :4200\n──────────────────────\nRole-based consoles (Admin · Operator\nSecurity Analyst · User)\nProxy /api → Gateway :9000\nProxy /ws  → Messaging :9007" as SPA
+  }
+
+  ' ── B2 · Host JVM Processes (local JARs — not Dockerised) ───────
+  node "JVM 17 — Host Processes  (Spring Boot JARs)\nCommunicate with Docker via host.docker.internal" as JVMS #D0F0E8 {
+
+    artifact "eureka-server\n:8761\n──────────────\nService registry\nHeartbeat / health" as JAR_EUR
+
+    artifact "gateway-service\n:9000  (WebFlux reactive)\n──────────────\nJWT validation (JWKS)\nPERM_* RBAC\nSwagger aggregation\nOTEL spans → Tempo" as JAR_GW
+
+    artifact "auth-service\n:9001\n──────────────\nUser CRUD · OTP flow\nKeycloak Admin REST\nEmail verification" as JAR_AUTH
+
+    artifact "roaming-analysis-service\n:9002\n──────────────\nCDR · KPI · QoS · SLA\nAnomaly + Forecast\nAgreement management\nLoki4j → Loki :3100" as JAR_ROAM
+
+    artifact "anomaly-detection-service\n:9003\n──────────────\nSignalling anomaly\nz-score / rule engine\nLoki4j → Loki :3100" as JAR_AD
+
+    artifact "rate-limiting-service\n:9004\n──────────────\nToken bucket policies\nPer-route counters\nLoki4j → Loki :3100" as JAR_RL
+
+    artifact "distributed-tracing-service\n:9005\n──────────────\nTrace correlation facade\nSpan metadata persistence" as JAR_TR
+
+    artifact "fault-injection-service\n:9006\n──────────────\nChaos: latency · error · drop\nResilience orchestration" as JAR_FI
+
+    artifact "messaging-service\n:9007\n──────────────\nREST + WebSocket  /ws/**\nJWT-secured rooms\nReal-time push notifications\nLoki4j → Loki :3100" as JAR_MSG
+  }
+
+  ' ── B3 · Docker Desktop ─────────────────────────────────────────
+  node "Docker Desktop (Engine)\nBridge network: telecom-shared-network" as DOCKERHOST #FFF3E0 {
+
+    ' ── Identity ────────────────────────────────────────────────
+    package "Identity  (docker-compose-infra.yml)" #FEF7E0 {
+      artifact "keycloak  :8081 → 8080\n──────────────\nRealm: auth-management\nClient: platform-client\nComposite roles → PERM_*\nSMTP email-verify\nmem_limit: —" as C_KC
+      database "keycloak-postgres\n:5437 → 5432\nkeycloak_db\nmem_limit: 256 MB" as C_KCPG
+    }
+
+    ' ── Databases (per-service) ──────────────────────────────────
+    package "Databases — Database-per-Service  (docker-compose-infra.yml)" #FFF3E0 {
+      database "roaming-mysql\n:3307 → 3306\nroaming_db\nmem_limit: 512 MB\nVolume: roaming-mysql-data" as C_MYSQL
+
+      database "postgres (shared)\n:5432\ncourse_db" as C_PG
+
+      database "anomaly-postgres\n:5433 → 5432\nanomaly_db\nmem_limit: 256 MB" as C_APGDB
+
+      database "ratelimit-postgres\n:5434 → 5432\nratelimit_db\nmem_limit: 256 MB" as C_RLPG
+
+      database "tracing-postgres\n:5435 → 5432\ntracing_db\nmem_limit: 256 MB" as C_TRPG
+
+      database "fault-postgres\n:5436 → 5432\nfault_db\nmem_limit: 256 MB" as C_FPGDB
+
+      database "messaging-postgres\n:5438 → 5432\nmessaging_db\nmem_limit: 256 MB" as C_MPGDB
+
+      database "ratelimit-redis\n:6379\nmem_limit: 256 MB\nAOF persistence\nVolume: ratelimit-redis-data" as C_RLR
+
+      database "anomaly-redis\n:6380 → 6379\nmem_limit: 256 MB\nAOF persistence\nVolume: anomaly-redis-data" as C_AR
+
+      database "mongodb\n:27017\nmem_limit: 512 MB" as C_MONGO
+    }
+
+    ' ── Metrics Exporters ────────────────────────────────────────
+    package "Metrics Exporters  (docker-compose-observability.yml)" #FCE8E6 {
+      artifact "redis-exporter  :9121\n(oliver006/redis_exporter)\n──────────────\nmulti-target scrape\nratelimit-redis + anomaly-redis" as C_REDEX
+
+      artifact "postgres-exporter-keycloak  :9187\n(prometheuscommunity)\n──────────────\nkeycloak_db metrics" as C_PGEX_KC
+
+      artifact "postgres-exporter-ratelimit  :9187\n(prometheuscommunity)\n──────────────\nratelimit_db metrics" as C_PGEX_RL
+
+      artifact "mysqld-exporter-roaming  :9104\n(prom/mysqld-exporter)\n──────────────\nroaming_db metrics" as C_MYEX
+    }
+
+    ' ── Observability Stack ──────────────────────────────────────
+    package "Observability Stack  (docker-compose-observability.yml)" #FCE8E6 {
+
+      artifact "prometheus  :9090\n──────────────\nScrape interval: 15 s\n--enable-feature=remote-write-receiver\nTargets: 9 JARs via host.docker.internal\n         + 4 exporters by container name\nVolume: prometheus-data" as C_PROM
+
+      artifact "grafana  :3000\n──────────────\nDatasources: Prometheus · Loki · Tempo\nNode Graph (service topology)\nTrace → Log drilldown\nDashboards: Redis · Storage · Spring Boot\nRefresh: 30 s  |  Range: 1 h\nVolume: grafana-data" as C_GRAF
+
+      artifact "loki  :3100\n──────────────\nlimits_config: volume_enabled: true\nTSDB store (schema v13)\nReceives: Loki4j appender (host JARs)\n          Fluent Bit (Docker containers)\nVolume: loki-data" as C_LOKI
+
+      artifact "tempo  :3200 / :4317 / :4318\n──────────────\nOTLP gRPC :4317 · HTTP :4318\nmetrics_generator:\n  processors: service-graphs, span-metrics\n  remote_write → Prometheus :9090\nBlock storage: /tmp/tempo/blocks" as C_TEMPO
+
+      artifact "fluent-bit  :24224\n──────────────\ngrafana/fluent-bit-plugin-loki\nCollects Docker container stdout\nForwards → Loki :3100" as C_FB
+    }
+  }
+}
+
+' =====================================================================
+'  C — LINUX HOST / WSL2  (5G Core — separate kernel requirement)
+' =====================================================================
+node "Linux Host — Ubuntu 22.04  (VM or WSL2)\nKernel module: gtp5g (required by UPF)\n16 GB RAM · 8 vCPUs" as LINUXHOST #E6F4EA {
+  node "free5gc-compose  (Docker)" as F5GC {
+    artifact "5GC Network Functions\n──────────────\nNRF · AMF · SMF · UPF\nAUSF · UDM · UDR · (PCF · NSSF)" as NFS
+    artifact "UERANSIM\n──────────────\ngNB + UE simulator\nNGAP/NAS (SCTP)\nGTP-U data plane" as UERANSIM
+    database "MongoDB :27017\n(NF subscriber context\nUDM / UDR store)" as MONGO5G
+    artifact "WebConsole :5000\n(IMSI provisioning)" as WEBC
+  }
+}
+
+' =====================================================================
+'  NETWORK FLOWS
+' =====================================================================
+
+' Client → Workstation
+BROWSER --> SPA       : HTTP  :4200
+BROWSER --> C_GRAF    : HTTP  :3000
+BROWSER --> C_KC      : HTTP  :8081  (admin console)
+BROWSER --> JAR_GW    : HTTP  :9000  (direct API / Bruno / curl)
+
+' SPA → Backend
+SPA --> JAR_GW  : HTTP  /api/**  Bearer JWT\n(Angular proxy)
+SPA --> JAR_MSG : WebSocket  /ws/**?token=
+
+' Gateway → Services
+JAR_GW --> JAR_AUTH
+JAR_GW --> JAR_ROAM
+JAR_GW --> JAR_AD
+JAR_GW --> JAR_RL
+JAR_GW --> JAR_TR
+JAR_GW --> JAR_FI
+JAR_GW --> JAR_MSG
+JAR_GW ..> JAR_EUR : Eureka resolve
+
+' Gateway & Auth → Keycloak
+JAR_GW   --> C_KC : validate JWT  (JWKS /certs)
+JAR_AUTH --> C_KC : password grant + Admin REST
+C_KC     --> C_KCPG
+
+' Services → Databases  (host JARs → Docker via host.docker.internal / localhost)
+JAR_AUTH --> C_PG
+JAR_ROAM --> C_MYSQL
+JAR_AD   --> C_APGDB
+JAR_AD   --> C_AR
+JAR_RL   --> C_RLPG
+JAR_RL   --> C_RLR
+JAR_TR   --> C_TRPG
+JAR_FI   --> C_FPGDB
+JAR_MSG  --> C_MPGDB
+
+' Metrics pipeline
+C_PROM --> JAR_EUR  : scrape  host.docker.internal:8761
+C_PROM --> JAR_GW   : scrape  host.docker.internal:9000
+C_PROM --> JAR_AUTH : scrape  host.docker.internal:9001
+C_PROM --> JAR_ROAM : scrape  host.docker.internal:9002
+C_PROM --> JAR_AD   : scrape  host.docker.internal:9003
+C_PROM --> JAR_RL   : scrape  host.docker.internal:9004
+C_PROM --> JAR_TR   : scrape  host.docker.internal:9005
+C_PROM --> JAR_FI   : scrape  host.docker.internal:9006
+C_PROM --> JAR_MSG  : scrape  host.docker.internal:9007
+C_PROM --> C_REDEX  : scrape  redis-exporter:9121
+C_PROM --> C_PGEX_KC : scrape  postgres-exporter-keycloak:9187
+C_PROM --> C_PGEX_RL : scrape  postgres-exporter-ratelimit:9187
+C_PROM --> C_MYEX   : scrape  mysqld-exporter-roaming:9104
+
+' Exporter → Redis / Postgres / MySQL
+C_REDEX    --> C_RLR
+C_REDEX    --> C_AR
+C_PGEX_KC  --> C_KCPG
+C_PGEX_RL  --> C_RLPG
+C_MYEX     --> C_MYSQL
+
+' Logs pipeline
+JAR_GW   ..> C_LOKI : Loki4j appender  HTTP push
+JAR_AUTH ..> C_LOKI : Loki4j appender  HTTP push
+JAR_ROAM ..> C_LOKI : Loki4j appender  HTTP push
+JAR_RL   ..> C_LOKI : Loki4j appender  HTTP push
+JAR_MSG  ..> C_LOKI : Loki4j appender  HTTP push
+JAR_AD   ..> C_LOKI : Loki4j appender  HTTP push
+C_FB       --> C_LOKI : Docker container logs
+
+' Traces pipeline
+JAR_GW --> C_TEMPO   : OTLP spans  (OTel Java Agent  :4318)
+C_TEMPO --> C_PROM   : remote_write  service-graph metrics
+
+' Grafana reads
+C_GRAF --> C_PROM  : PromQL
+C_GRAF --> C_LOKI  : LogQL
+C_GRAF --> C_TEMPO : TraceQL  + Node Graph
+
+' 5G Core integration (roadmap / optional)
+JAR_GW ..> NFS     : /api/nf/** façade NRF (roadmap)
+C_PROM ..> NFS     : scrape NF /metrics
+C_FB   ..> NFS     : collect NF logs
+UERANSIM --> NFS   : NGAP/NAS (SCTP) + GTP-U
+
+' =====================================================================
+'  LEGEND
+' =====================================================================
+legend right
+  **Physical Architecture — Nexo 5GC Management Platform**
+  ─────────────────────────────────────────────────────────
+  Solid arrow  →   active connection / synchronous call / data write
+  Dotted arrow ⇢   background / passive interaction (scrape, push, roadmap)
+
+  **Key physical boundaries**
+  ┌─ Windows 11 workstation ─────────────────────────────────────┐
+  │  JVM host JARs  ←─────────────────→  Docker Desktop         │
+  │  (Spring Boot processes on host)     (bridge: telecom-shared-network)│
+  │  Reach Docker via host.docker.internal / localhost:PORT       │
+  └──────────────────────────────────────────────────────────────┘
+
+  ┌─ Linux VM / WSL2 (separate machine) ─────────────────────────┐
+  │  free5GC (gtp5g kernel module — not available on Windows)    │
+  │  Nexo consumes its APIs / metrics / logs via network          │
+  └──────────────────────────────────────────────────────────────┘
+
+  **Compose file split**
+  docker-compose-infra.yml        → owns telecom-shared-network + all DBs + Keycloak
+  docker-compose-observability.yml → joins telecom-shared-network (external: true)
+  docker-compose-base.yml         → optional full-Docker mode (joins same network)
+
+  **Startup order**
+  1. docker compose -f docker-compose-infra.yml up -d
+  2. docker compose -f docker-compose-observability.yml up -d
+  3. Start JARs (Eureka first, then services)
+  4. ng serve (Frontend)
+endlegend
+
+@enduml

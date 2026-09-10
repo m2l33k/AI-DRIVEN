@@ -1,0 +1,259 @@
+@startuml logical-architecture
+' =====================================================================
+'  LOGICAL ARCHITECTURE — Nexo 5G Core Management Platform
+'  Functional layers, responsibilities, and data flows.
+'  Independent of deployment topology (see architecture-physique for that).
+' =====================================================================
+
+title Nexo Platform — Logical Architecture (5G Core Management System)
+
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam componentStyle rectangle
+skinparam rectangleBorderColor #555555
+skinparam packageBorderColor #999999
+skinparam packageBorderThickness 1.5
+skinparam arrowColor #444444
+skinparam arrowThickness 1.2
+skinparam noteBorderColor #CCCCCC
+skinparam noteBackgroundColor #FAFAFA
+
+' =====================================================================
+'  LAYER 1 — Presentation
+' =====================================================================
+package "① Presentation Layer" #F3E8FD {
+  package "Role-Based Consoles" #EDD9FB {
+    [Admin Console\n─────────────\nUser management · RBAC config\nPlatform settings · Audit logs] as UI_ADMIN
+    [Operator Console\n─────────────\nRoaming KPI dashboard\nAgreement management · QoS monitoring] as UI_OP
+    [Security Analyst Console\n─────────────\nAnomaly alerts · Rate-limit rules\nFault injection scenarios] as UI_SEC
+    [General User Console\n─────────────\nDirect messaging · Notifications\nProfile & session] as UI_USER
+  }
+  [Angular 22 SPA\n─────────────\nSignals · Lazy routes · Role guards\nWebSocket client · Custom SVG charts] as SPA
+}
+
+' =====================================================================
+'  LAYER 2 — Edge & Discovery
+' =====================================================================
+package "② Edge & Discovery Layer" #E8F0FE {
+  [API Gateway  :9000\n─────────────\nSingle entry-point · JWT validation (JWKS)\nPERM_* RBAC enforcement · Rate-limit edge\nSwagger aggregation · WebFlux reactive\nOTEL tracing (span propagation)] as GW
+
+  [Eureka Registry  :8761\n─────────────\nService discovery · Health heartbeat\nLoad-balanced routing table] as EUREKA
+}
+
+' =====================================================================
+'  LAYER 3 — Identity & Authorization
+' =====================================================================
+package "③ Identity & Authorization Layer" #FEF7E0 {
+  [Keycloak  :8081\n─────────────\nRealm: auth-management\nClient: platform-client\nComposite roles → PERM_* permissions\nJWKS endpoint · password/OTP grant\nSMTP email verification] as KC
+
+  note right of KC
+    Roles exposed as permissions (PERM_*):
+    ADMIN       → full platform access
+    OPERATOR    → roaming read/write
+    ANALYST     → KPI/reports read
+    AUDITOR     → read-only all domains
+    USER        → messaging + own profile
+  end note
+}
+
+' =====================================================================
+'  LAYER 4 — Business Domain Services
+' =====================================================================
+package "④ Business Domain Layer" #E6F4EA {
+
+  package "Auth Domain  :9001" #D4EDDA {
+    [Auth Service\n─────────────\nUser registration & OTP flow\nKeycloak delegation (Admin REST)\nJWT issuance · Email verification\nSession-aware authN] as AUTH
+  }
+
+  package "Roaming Domain  :9002" #D4EDDA {
+    [Roaming Analysis Service\n─────────────\nCDR ingestion · Attach event processing\nSession QoS scoring · KPI computation\nSLA compliance · Revenue reconciliation\nPartner-PLMN risk scoring\nRoaming agreement management] as ROAM
+  }
+
+  package "Security Domain  :9003 / :9004 / :9006" #D4EDDA {
+    [Anomaly Detection Service  :9003\n─────────────\nSignalling anomaly alerts\nThreshold-based & ML scoring\nRedis sliding-window cache] as AD
+
+    [Rate-Limiting Service  :9004\n─────────────\nBucket / token policies\nPer-user & per-route limits\nRedis counter storage] as RL
+
+    [Fault Injection Service  :9006\n─────────────\nChaos scenarios (latency/error/drop)\nResilience test orchestration] as FI
+  }
+
+  package "Observability Domain  :9005" #D4EDDA {
+    [Distributed Tracing Service  :9005\n─────────────\nTrace correlation facade\nSpan metadata persistence] as TR
+  }
+
+  package "Collaboration Domain  :9007" #D4EDDA {
+    [Messaging Service  :9007\n─────────────\nDirect messages (REST + WebSocket)\nJWT-secured rooms\nReal-time push notifications\nMessage persistence] as MSG
+  }
+
+  [util (shared library)\n─────────────\nDTO · exception hierarchy\nShared security helpers] as UTIL
+}
+
+' =====================================================================
+'  LAYER 5 — Persistence (Database-per-Service pattern)
+' =====================================================================
+package "⑤ Persistence Layer  —  Database-per-Service" #FFF3E0 {
+
+  database "MySQL  :3307\nroaming_db\n─────────────\nCDR · attach events\nsession QoS · agreements\nKPI windows" as DB_ROAM
+
+  database "Postgres  :5432\ncourse_db (shared)\n─────────────\n(legacy / general)" as DB_PG
+
+  database "Postgres  :5433\nanomaly_db\n─────────────\nAlert records\ndetection windows" as DB_ANOM
+
+  database "Postgres  :5434\nratelimit_db\n─────────────\nPolicy definitions\nconfigured limits" as DB_RL
+
+  database "Postgres  :5435\ntracing_db\n─────────────\nSpan & trace metadata" as DB_TR
+
+  database "Postgres  :5436\nfault_db\n─────────────\nFault scenario configs\nexecution logs" as DB_FAULT
+
+  database "Postgres  :5438\nmessaging_db\n─────────────\nMessages · rooms\nuser presence" as DB_MSG
+
+  database "Postgres  :5437\nkeycloak_db\n─────────────\nRealm · users · sessions\ncredentials" as DB_KC
+
+  database "Redis  :6379\nratelimit-redis\n─────────────\nToken bucket counters\nsliding windows" as R_RL
+
+  database "Redis  :6380\nanomaly-redis\n─────────────\nAnomaly score cache\nreplay buffers" as R_AD
+}
+
+' =====================================================================
+'  LAYER 6 — Observability (cross-cutting)
+' =====================================================================
+package "⑥ Observability Layer  —  Cross-cutting" #FCE8E6 {
+
+  package "Metrics pipeline" #F9D7D4 {
+    [Prometheus  :9090\n─────────────\nScrape: Actuator /prometheus\nremote_write receiver\n(Tempo metrics_generator)] as PROM
+    [Redis Exporter  :9121\n─────────────\nmulti-target scrape\nboth Redis instances] as REDEX
+    [Postgres Exporters\n─────────────\nkeycloak · ratelimit] as PGEX
+    [MySQL Exporter  :9104\n─────────────\nroaming_db] as MYEX
+  }
+
+  package "Logs pipeline" #F9D7D4 {
+    [Loki4j Appender\n(embedded in each service)\n─────────────\nStructured JSON push\ntraceId · spanId labels] as LOKI4J
+    [Loki  :3100\n─────────────\nLabel-based log store\nvolume_enabled] as LOKI
+    [Fluent Bit  :24224\n─────────────\nDocker container logs\n(for Dockerised services)] as FB
+  }
+
+  package "Traces pipeline" #F9D7D4 {
+    [Tempo  :3200 / :4317 / :4318\n─────────────\nOTLP receiver (gRPC + HTTP)\nmetrics_generator:\n  service-graphs\n  span-metrics\nBlock storage] as TEMPO
+  }
+
+  package "Visualization" #F9D7D4 {
+    [Grafana  :3000\n─────────────\nDatasources: Prometheus · Loki · Tempo\nNode Graph (service topology)\nDrilldown: trace → logs → metrics\nDashboards: Redis · Storage · Spring Boot\nRefresh: 30s · Time range: 1h] as GRAF
+  }
+}
+
+' =====================================================================
+'  FLOWS — Presentation → Edge
+' =====================================================================
+UI_ADMIN --> SPA
+UI_OP    --> SPA
+UI_SEC   --> SPA
+UI_USER  --> SPA
+
+SPA --> GW : /api/** Bearer JWT\n+ /ws/** WebSocket
+
+' =====================================================================
+'  FLOWS — Edge
+' =====================================================================
+GW ..> EUREKA : resolve service instance
+GW --> KC     : validate JWT (JWKS /certs)
+GW --> AUTH
+GW --> ROAM
+GW --> RL
+GW --> MSG
+GW --> AD
+GW --> TR
+GW --> FI
+
+' =====================================================================
+'  FLOWS — Identity
+' =====================================================================
+AUTH --> KC : password grant\nOTP verify\nAdmin REST API
+KC   --> DB_KC
+
+' =====================================================================
+'  FLOWS — Domain Services → Persistence
+' =====================================================================
+AUTH --> DB_PG
+ROAM --> DB_ROAM
+AD   --> DB_ANOM
+AD   --> R_AD
+RL   --> DB_RL
+RL   --> R_RL
+TR   --> DB_TR
+FI   --> DB_FAULT
+MSG  --> DB_MSG
+
+' =====================================================================
+'  FLOWS — Shared library
+' =====================================================================
+AUTH ..> UTIL
+ROAM ..> UTIL
+RL   ..> UTIL
+MSG  ..> UTIL
+AD   ..> UTIL
+
+' =====================================================================
+'  FLOWS — Observability
+' =====================================================================
+
+' Metrics
+GW   ..> PROM : scrape /actuator/prometheus
+AUTH ..> PROM
+ROAM ..> PROM
+RL   ..> PROM
+MSG  ..> PROM
+AD   ..> PROM
+TR   ..> PROM
+FI   ..> PROM
+REDEX --> R_RL
+REDEX --> R_AD
+PROM ..> REDEX
+PROM ..> PGEX
+PROM ..> MYEX
+
+' Logs (Loki4j — each service pushes directly)
+AUTH ..> LOKI4J
+ROAM ..> LOKI4J
+RL   ..> LOKI4J
+MSG  ..> LOKI4J
+AD   ..> LOKI4J
+TR   ..> LOKI4J
+FI   ..> LOKI4J
+GW   ..> LOKI4J
+LOKI4J --> LOKI : HTTP push /loki/api/v1/push
+
+' Container logs via Fluent Bit (for Docker deployments)
+FB --> LOKI
+
+' Traces
+GW   --> TEMPO : OTLP spans (OpenTelemetry Java Agent)
+TEMPO --> PROM : remote_write\nservice-graph metrics
+
+' Grafana reads all three backends
+GRAF --> PROM  : PromQL queries
+GRAF --> LOKI  : LogQL queries
+GRAF --> TEMPO : trace queries\n+ service graph (Node Graph)
+
+' =====================================================================
+'  LEGEND
+' =====================================================================
+legend right
+  **Logical Architecture — Nexo 5GC Management Platform**
+  ──────────────────────────────────────────────────────
+  Solid arrow  →  synchronous call / data write
+  Dotted arrow ⇢  background / passive interaction
+               (scrape, resolve, push, shared lib)
+
+  **Cross-cutting concerns (resolved once at platform level)**
+  · Discovery         Eureka registry, resolved by Gateway
+  · Single entry      API Gateway (reactive WebFlux, port 9000)
+  · AuthN/AuthZ       Keycloak OIDC + PERM_* permission model
+  · Defense-in-depth  JWT check at Gateway AND at each service
+  · Observability     Metrics · Logs (Loki4j) · Traces (OTEL)
+  · DB isolation      One datastore per bounded context
+  · Redis caching     Per-domain instance (rate-limit / anomaly)
+
+  **Physical mapping → see Noted/architecture-physique/**
+endlegend
+
+@enduml

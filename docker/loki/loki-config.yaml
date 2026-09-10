@@ -1,6 +1,9 @@
 auth_enabled: false
 server:
   http_listen_port: 3100
+
+limits_config:
+  volume_enabled: true
 ingester:
   lifecycler:
     address: 0.0.0.0

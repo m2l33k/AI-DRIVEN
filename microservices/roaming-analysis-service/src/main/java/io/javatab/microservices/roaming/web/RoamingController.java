@@ -1,13 +1,18 @@
 package io.javatab.microservices.roaming.web;
 
 import io.javatab.microservices.roaming.domain.Direction;
+import io.javatab.microservices.roaming.domain.KpiWindow;
 import io.javatab.microservices.roaming.domain.RiskLevel;
+import io.javatab.microservices.roaming.service.PerformanceAssuranceService;
 import io.javatab.microservices.roaming.service.RoamingAnalysisService;
 import io.javatab.microservices.roaming.service.RoamingInsightsService;
+import io.javatab.microservices.roaming.web.dto.AgreementDto;
 import io.javatab.microservices.roaming.web.dto.AnomalyDto;
 import io.javatab.microservices.roaming.web.dto.CsvAnalysisDto;
 import io.javatab.microservices.roaming.web.dto.ExperienceDto;
 import io.javatab.microservices.roaming.web.dto.ForecastDto;
+import io.javatab.microservices.roaming.web.dto.KpiSetDto;
+import io.javatab.microservices.roaming.web.dto.KpiTimeseriesDto;
 import io.javatab.microservices.roaming.web.dto.LiveMonitorDto;
 import io.javatab.microservices.roaming.web.dto.OptimizationDto;
 import io.javatab.microservices.roaming.web.dto.PartnerSummaryDto;
@@ -16,6 +21,8 @@ import io.javatab.microservices.roaming.web.dto.RevenueDto;
 import io.javatab.microservices.roaming.web.dto.RoamingEventDto;
 import io.javatab.microservices.roaming.web.dto.RoamingSummaryDto;
 import io.javatab.microservices.roaming.web.dto.SimulationResultDto;
+import io.javatab.microservices.roaming.web.dto.SlaEvaluationDto;
+import io.javatab.microservices.roaming.web.dto.SyntheticTestResultDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,10 +51,13 @@ public class RoamingController {
 
 	private final RoamingAnalysisService service;
 	private final RoamingInsightsService insights;
+	private final PerformanceAssuranceService assurance;
 
-	public RoamingController(RoamingAnalysisService service, RoamingInsightsService insights) {
+	public RoamingController(RoamingAnalysisService service, RoamingInsightsService insights,
+							 PerformanceAssuranceService assurance) {
 		this.service = service;
 		this.insights = insights;
+		this.assurance = assurance;
 	}
 
 	@Operation(summary = "List roaming events",
@@ -184,5 +194,66 @@ public class RoamingController {
 	@GetMapping("/revenue")
 	public RevenueDto revenue() {
 		return insights.revenue();
+	}
+
+	// =====================================================================
+	//  Performance Assurance Engine (§5.2)
+	// =====================================================================
+
+	@Operation(summary = "Performance-assurance KPIs",
+			description = "KPI set (registration success, ASR, NER, ACD, session setup success, latency "
+					+ "P50/P95/P99, drop rate, throughput) for the latest completed aggregation window. "
+					+ "window = FIVE_MIN | HOUR | DAY | MONTH; partner optional (default = all). "
+					+ "Requires roaming-events:read.",
+			security = @SecurityRequirement(name = "bearerAuth"))
+	@PreAuthorize("hasAuthority('PERM_roaming-events:read')")
+	@GetMapping("/kpis")
+	public KpiSetDto kpis(@RequestParam(required = false) String partner,
+						  @RequestParam(defaultValue = "DAY") KpiWindow window) {
+		return assurance.kpis(partner, window);
+	}
+
+	@Operation(summary = "KPI time-series",
+			description = "KPI set across the last N consecutive aggregation windows (oldest → newest), "
+					+ "for trend/reporting. Requires roaming-events:read.",
+			security = @SecurityRequirement(name = "bearerAuth"))
+	@PreAuthorize("hasAuthority('PERM_roaming-events:read')")
+	@GetMapping("/kpis/timeseries")
+	public KpiTimeseriesDto kpisTimeseries(@RequestParam(required = false) String partner,
+										   @RequestParam(defaultValue = "DAY") KpiWindow window,
+										   @RequestParam(defaultValue = "12") int count) {
+		return assurance.timeseries(partner, window, count);
+	}
+
+	@Operation(summary = "Roaming agreements",
+			description = "Per-partner roaming agreements: SLA thresholds, rolling performance score and "
+					+ "steering tier. Requires roaming-events:read.",
+			security = @SecurityRequirement(name = "bearerAuth"))
+	@PreAuthorize("hasAuthority('PERM_roaming-events:read')")
+	@GetMapping("/agreements")
+	public List<AgreementDto> agreements() {
+		return assurance.agreements();
+	}
+
+	@Operation(summary = "SLA evaluation",
+			description = "Evaluate each agreement's latest window against its SLA_KPIs thresholds: breached "
+					+ "KPIs, consecutive-breach count, alarm flag, rolling score and tier (worst first). "
+					+ "Requires roaming-events:read.",
+			security = @SecurityRequirement(name = "bearerAuth"))
+	@PreAuthorize("hasAuthority('PERM_roaming-events:read')")
+	@GetMapping("/sla")
+	public List<SlaEvaluationDto> sla(@RequestParam(defaultValue = "DAY") KpiWindow window) {
+		return assurance.evaluateSla(window);
+	}
+
+	@Operation(summary = "Run synthetic test-calls",
+			description = "Execute IREG-style synthetic test transactions (registration, MO/MT call, SMS, "
+					+ "data session) against each active agreement. Results are flagged Synthetic_Test and "
+					+ "excluded from live KPI denominators. Requires roaming-events:read.",
+			security = @SecurityRequirement(name = "bearerAuth"))
+	@PreAuthorize("hasAuthority('PERM_roaming-events:read')")
+	@PostMapping("/test-calls/run")
+	public List<SyntheticTestResultDto> runTestCalls() {
+		return assurance.runSyntheticTests();
 	}
 }

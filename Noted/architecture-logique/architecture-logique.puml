@@ -1,0 +1,120 @@
+@startuml architecture-logique
+' =====================================================================
+'  ARCHITECTURE LOGIQUE — Nexo Platform
+'  Couches fonctionnelles et responsabilites logiques, independantes
+'  du materiel/deploiement (voir Noted/architecture-physique pour le physique).
+' =====================================================================
+title Architecture Logique — Plateforme Nexo (5G Core Management)
+
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam componentStyle rectangle
+skinparam rectangleBorderColor #444444
+skinparam packageBorderColor #888888
+
+' ---------------------------------------------------------------------
+'  1 · Couche Presentation
+' ---------------------------------------------------------------------
+package "1 · Couche Presentation" #F3E8FD {
+  [Console Angular\nconsoles par role :\nAdmin · Operateur · Analyste · Auditeur] as UI
+}
+
+' ---------------------------------------------------------------------
+'  2 · Couche Passerelle & Securite (Edge)
+' ---------------------------------------------------------------------
+package "2 · Couche Passerelle & Securite" #E8F0FE {
+  [API Gateway\nrouting · validation JWT · RBAC PERM_*\naggregation Swagger · rate-limit edge] as GW
+  [Service Registry (Eureka)\ndecouverte logique des services] as REG
+}
+
+' ---------------------------------------------------------------------
+'  3 · Couche Identite
+' ---------------------------------------------------------------------
+package "3 · Couche Identite" #FEF7E0 {
+  [Keycloak (OIDC/OAuth2)\nrealm auth-management · platform-client\nroles composites -> permissions PERM_*] as IDP
+}
+
+' ---------------------------------------------------------------------
+'  4 · Couche Services Metier / Domaine
+' ---------------------------------------------------------------------
+package "4 · Couche Services Metier / Domaine" #E6F4EA {
+  [Auth Service\nauthN state-aware · OTP · CRUD utilisateurs] as AUTH
+  [Roaming Analysis Service\nKPI/SLA · anomalies · QoS · revenus] as ROAM
+  [Rate-Limiting Service\npolitiques de protection · compteurs] as RL
+  [Messaging Service\nmessages directs · notifications live] as MSG
+  [Anomaly Detection Service\nalertes de securite] as AD
+  [Distributed Tracing Service\ncorrelation des traces] as TR
+  [Fault Injection Service\nchaos / resilience] as FI
+  [Util (librairie partagee)\nDTO · securite · exceptions communes] as UTIL
+}
+
+' ---------------------------------------------------------------------
+'  5 · Couche Persistance (logique — 1 magasin par service)
+' ---------------------------------------------------------------------
+package "5 · Couche Persistance (1 magasin par service)" #FFF3E0 {
+  database "Roaming Store\n(CDR · attach · session QoS · accords)" as D_ROAM
+  database "Auth/Identity Store" as D_AUTH
+  database "Rate-Limit Store\n(politiques + compteurs)" as D_RL
+  database "Messaging Store" as D_MSG
+  database "Anomaly / Tracing / Fault Stores" as D_PH
+}
+
+' ---------------------------------------------------------------------
+'  6 · Couche Observabilite (transversale)
+' ---------------------------------------------------------------------
+package "6 · Couche Observabilite (transversale)" #FCE8E6 {
+  [Metriques (Actuator/Micrometer -> Prometheus)] as MET
+  [Journaux (Loki)] as LOG
+  [Traces (Tempo)] as TRC
+  [Tableaux de bord (Grafana)] as DASH
+}
+
+' =====================================================================
+'  Flux logiques
+' =====================================================================
+UI --> GW : /api/** (Bearer JWT) + /ws/**
+
+GW --> AUTH
+GW --> ROAM
+GW --> RL
+GW --> MSG
+GW --> AD
+GW --> TR
+GW --> FI
+GW ..> REG : resolution logique
+
+GW  --> IDP : valider le JWT (JWKS)
+AUTH --> IDP : password grant + Admin REST
+
+AUTH ..> UTIL
+ROAM ..> UTIL
+RL   ..> UTIL
+MSG  ..> UTIL
+
+AUTH --> D_AUTH
+ROAM --> D_ROAM
+RL   --> D_RL
+MSG  --> D_MSG
+AD   --> D_PH
+TR   --> D_PH
+FI   --> D_PH
+
+' Observabilite transversale (tous les services exposent metriques/logs/traces)
+AUTH ..> MET
+ROAM ..> MET
+GW   ..> MET
+GW   ..> TRC
+AUTH ..> LOG
+DASH --> MET
+DASH --> LOG
+DASH --> TRC
+
+legend right
+  Vue **logique** : responsabilites fonctionnelles et flux, sans notion de machine/port.
+  Preoccupations transversales resolues une fois au niveau plateforme :
+  decouverte · point d'entree securise unique · OAuth2/OIDC · autorisation par
+  permissions (edge + service, defense en profondeur) · metriques/journaux/traces.
+  La correspondance materielle est detaillee dans Noted/architecture-physique.
+endlegend
+
+@enduml

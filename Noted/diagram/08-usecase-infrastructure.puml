@@ -1,0 +1,202 @@
+@startuml 08-usecase-infrastructure
+' =====================================================================
+'  DIAGRAMME DE CAS D'UTILISATION — plateforme complete (tous les services)
+'  Un rectangle = une frontiere systeme (un microservice de l'infrastructure).
+'  Grounded on the actual controllers + PERM_* method-security and RBAC model.
+' =====================================================================
+title Nexo Platform — Diagramme de cas d'utilisation (infrastructure complete)
+
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+left to right direction
+
+' ---------------- Acteurs ----------------
+actor "Administrateur\nplateforme"   as ADMIN
+actor "Operateur\nreseau"            as OPER
+actor "Analyste\nsecurite"           as ANALYST
+actor "Auditeur"                     as AUDIT
+
+' Acteurs secondaires (systemes)
+actor "Keycloak (IdP)"               as KC   <<system>>
+actor "API Gateway"                  as GW   <<system>>
+actor "Eureka (registry)"            as EUR  <<system>>
+actor "Ordonnanceur\n(@Scheduled)"   as SCHED <<system>>
+
+' =====================================================================
+'  AUTH SERVICE
+' =====================================================================
+rectangle "Auth Service" as SYS_AUTH {
+  usecase "Se connecter (state-aware)"     as UC_LOGIN
+  usecase "Rafraichir / se deconnecter"    as UC_TOKEN
+  usecase "Reinitialiser le mot de passe (OTP)" as UC_RESET
+  usecase "Changer son mot de passe"       as UC_CHPW
+  usecase "Verifier l'email"               as UC_VERIFY
+  usecase "Gerer les utilisateurs (CRUD)"  as UC_USERS
+  usecase "Consulter utilisateurs & roles" as UC_ROLES
+}
+
+' =====================================================================
+'  MESSAGING SERVICE
+' =====================================================================
+rectangle "Messaging Service" as SYS_MSG {
+  usecase "Envoyer un message direct"      as UC_MSG
+  usecase "Consulter ses conversations"    as UC_CONV
+  usecase "Recevoir les notifications live\n(WebSocket)" as UC_NOTIF
+}
+
+' =====================================================================
+'  ROAMING ANALYSIS SERVICE
+' =====================================================================
+rectangle "Roaming Analysis Service" as SYS_ROAM {
+  usecase "Analyser les evenements de roaming" as UC_ROAM
+  usecase "Consulter le monitor temps reel"    as UC_LIVE
+  usecase "Detecter les anomalies / fraude"    as UC_ANOM
+  usecase "Prevoir le trafic (forecast)"       as UC_FCAST
+  usecase "Analyser une CSV importee"          as UC_CSV
+  usecase "Simuler du trafic de roaming"       as UC_SIM
+  usecase "Evaluer QoS & experience client"    as UC_QOS
+  usecase "Consulter revenus & marges"         as UC_REV
+  usecase "Optimiser les accords partenaires"  as UC_OPT
+  usecase "Consulter les KPIs d'assurance"     as UC_KPI
+  usecase "Evaluer les SLA (breaches/alarmes)" as UC_SLA
+  usecase "Lancer des test-calls synthetiques" as UC_TEST
+}
+
+' =====================================================================
+'  RATE-LIMITING SERVICE
+' =====================================================================
+rectangle "Rate-Limiting Service" as SYS_RL {
+  usecase "Consulter l'etat de protection"     as UC_RLSTAT
+  usecase "Tester une regle de protection"     as UC_RLTEST
+  usecase "Gerer les politiques de rate-limit" as UC_RLMAN
+}
+
+' =====================================================================
+'  ANOMALY DETECTION SERVICE
+' =====================================================================
+rectangle "Anomaly Detection Service" as SYS_AD {
+  usecase "Investiguer les alertes de securite" as UC_ALERT
+  usecase "Detecter les anomalies (arriere-plan)" as UC_ADRUN
+}
+
+' =====================================================================
+'  DISTRIBUTED TRACING SERVICE
+' =====================================================================
+rectangle "Distributed Tracing Service" as SYS_TR {
+  usecase "Consulter les traces distribuees"   as UC_TRACE
+  usecase "Collecter les traces (arriere-plan)" as UC_TRCOL
+}
+
+' =====================================================================
+'  FAULT INJECTION SERVICE
+' =====================================================================
+rectangle "Fault Injection Service" as SYS_FI {
+  usecase "Injecter des pannes (chaos)"        as UC_FAULT
+}
+
+' =====================================================================
+'  PLATEFORME / OBSERVABILITE (Gateway + Eureka + Actuator/Prometheus)
+' =====================================================================
+rectangle "Plateforme & Observabilite" as SYS_OBS {
+  usecase "Superviser la sante systeme"        as UC_HEALTH
+  usecase "Consulter les metriques API"        as UC_METRICS
+  usecase "Superviser les fonctions reseau"    as UC_NF
+  usecase "Redemarrer une fonction reseau"     as UC_NFR
+  usecase "Appliquer la config du core"        as UC_CFG
+}
+
+' =====================================================================
+'  Associations acteur -> cas d'utilisation
+' =====================================================================
+
+' ---- partages : tout acteur authentifie ----
+ADMIN   --> UC_LOGIN
+OPER    --> UC_LOGIN
+ANALYST --> UC_LOGIN
+AUDIT   --> UC_LOGIN
+ADMIN   --> UC_CHPW
+OPER    --> UC_CHPW
+ANALYST --> UC_CHPW
+AUDIT   --> UC_CHPW
+ADMIN   --> UC_MSG
+OPER    --> UC_MSG
+ANALYST --> UC_MSG
+AUDIT   --> UC_MSG
+ANALYST --> UC_NOTIF
+ADMIN   --> UC_NOTIF
+
+' ---- Administrateur plateforme ----
+ADMIN --> UC_USERS
+ADMIN --> UC_ROLES
+ADMIN --> UC_HEALTH
+ADMIN --> UC_METRICS
+ADMIN --> UC_FAULT
+ADMIN --> UC_TRACE
+
+' ---- Operateur reseau ----
+OPER --> UC_NF
+OPER --> UC_NFR
+OPER --> UC_CFG
+
+' ---- Analyste securite ----
+ANALYST --> UC_ROAM
+ANALYST --> UC_LIVE
+ANALYST --> UC_ANOM
+ANALYST --> UC_FCAST
+ANALYST --> UC_CSV
+ANALYST --> UC_SIM
+ANALYST --> UC_QOS
+ANALYST --> UC_REV
+ANALYST --> UC_OPT
+ANALYST --> UC_KPI
+ANALYST --> UC_SLA
+ANALYST --> UC_TEST
+ANALYST --> UC_ALERT
+ANALYST --> UC_RLSTAT
+ANALYST --> UC_RLTEST
+ANALYST --> UC_RLMAN
+
+' ---- Auditeur (lecture seule transversale) ----
+AUDIT --> UC_ROLES
+AUDIT --> UC_ROAM
+AUDIT --> UC_QOS
+AUDIT --> UC_REV
+AUDIT --> UC_KPI
+AUDIT --> UC_SLA
+AUDIT --> UC_ALERT
+AUDIT --> UC_TRACE
+AUDIT --> UC_HEALTH
+
+' =====================================================================
+'  Relations <<include>> / <<extend>> et acteurs systemes
+' =====================================================================
+UC_LOGIN  ..> KC : <<include>> authentifier
+UC_TOKEN  ..> KC : <<include>>
+UC_RESET  ..> KC : <<include>>
+UC_VERIFY ..> KC : <<include>>
+UC_USERS  ..> KC : <<include>> Admin REST
+
+UC_RESET  .> UC_LOGIN  : <<extend>>
+UC_ANOM   .> UC_ALERT  : <<include>>
+
+' Cas declenches par l'ordonnanceur (arriere-plan, non-humain)
+SCHED --> UC_SLA    : tick 5 min
+SCHED --> UC_ADRUN
+SCHED --> UC_TRCOL
+
+' Toute requete protegee transite par la gateway (JWT + rate-limit)
+GW  --> UC_RLTEST
+EUR --> GW           : service discovery
+
+note bottom
+  Autorisation = permissions **PERM_*** (client roles Keycloak), pas les noms de roles —
+  verifiees a la gateway ET dans chaque service (defense en profondeur) :
+  users:read/write, roles:read, nf:read/restart, core-config:read/write, platform-config:*,
+  security-alerts:read, roaming-events:read, detection-rules:read/write, audit:read.
+  * rate-limiting reutilise roaming-events:read (lecture) + detection-rules:write (ecriture)
+    => l'Analyste securite gere les politiques ; l'Admin ne le peut pas (403 verifie).
+  * audit:delete est defini mais mappe a AUCUN role => journaux append-only / infalsifiables.
+end note
+
+@enduml

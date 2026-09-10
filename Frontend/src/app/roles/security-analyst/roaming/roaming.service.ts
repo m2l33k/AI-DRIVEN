@@ -63,6 +63,31 @@ export interface SimulationResult {
 }
 export interface EventFilter { direction?: Direction | ''; partnerPlmn?: string; riskLevel?: RiskLevel | ''; }
 
+// --- Performance Assurance Engine (§5.2) -----------------------------------
+export type KpiWindow = 'FIVE_MIN' | 'HOUR' | 'DAY' | 'MONTH';
+export interface KpiSet {
+  partner: string; window: KpiWindow; windowStart: string; windowEnd: string;
+  registrationSuccessRate: number; asr: number; ner: number; acdSeconds: number;
+  sessionSetupSuccessRate: number; avgLatencyMs: number; latencyP50Ms: number;
+  latencyP95Ms: number; latencyP99Ms: number; dropRatePct: number; throughputMbps: number;
+  attachAttempts: number; voiceAttempts: number; sessionAttempts: number;
+}
+export interface KpiTimeseries { partner: string; window: KpiWindow; points: KpiSet[]; }
+export interface Agreement {
+  partnerOperatorId: string; partnerName: string; ir21Ref: string;
+  regSuccessMinPct: number; asrMinPct: number; sessionSuccessMinPct: number;
+  latencyP95MaxMs: number; dropRateMaxPct: number; throughputMinMbps: number;
+  rollingPerformanceScore: number; consecutiveBreaches: number; tier: string;
+}
+export interface SlaEvaluation {
+  partner: string; kpis: KpiSet; breaches: string[]; breached: boolean;
+  consecutiveBreaches: number; alarm: boolean; rollingScore: number; tier: string;
+}
+export interface SyntheticTestResult {
+  partner: string; transactionType: string; sessionType: string; success: boolean;
+  latencyMs: number; executedAt: string; detail: string;
+}
+
 /** Typed client for every roaming-analysis endpoint (all require roaming-events:read). */
 @Injectable({ providedIn: 'root' })
 export class RoamingService {
@@ -102,5 +127,24 @@ export class RoamingService {
   simulate(count = 20, minutesSpread = 60, windowMinutes = 60): Observable<SimulationResult> {
     const params = new HttpParams().set('count', count).set('minutesSpread', minutesSpread).set('windowMinutes', windowMinutes);
     return this.http.post<SimulationResult>(`${API}/simulate`, null, { params });
+  }
+
+  // --- Performance Assurance Engine (§5.2) ---------------------------------
+  kpis(window: KpiWindow = 'DAY', partner?: string): Observable<KpiSet> {
+    let params = new HttpParams().set('window', window);
+    if (partner) params = params.set('partner', partner);
+    return this.http.get<KpiSet>(`${API}/kpis`, { params });
+  }
+  kpisTimeseries(window: KpiWindow = 'DAY', count = 12, partner?: string): Observable<KpiTimeseries> {
+    let params = new HttpParams().set('window', window).set('count', count);
+    if (partner) params = params.set('partner', partner);
+    return this.http.get<KpiTimeseries>(`${API}/kpis/timeseries`, { params });
+  }
+  agreements(): Observable<Agreement[]> { return this.http.get<Agreement[]>(`${API}/agreements`); }
+  sla(window: KpiWindow = 'DAY'): Observable<SlaEvaluation[]> {
+    return this.http.get<SlaEvaluation[]>(`${API}/sla`, { params: new HttpParams().set('window', window) });
+  }
+  runTestCalls(): Observable<SyntheticTestResult[]> {
+    return this.http.post<SyntheticTestResult[]>(`${API}/test-calls/run`, null);
   }
 }

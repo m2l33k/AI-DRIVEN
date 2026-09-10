@@ -1,0 +1,83 @@
+@startuml roaming-architecture
+' =====================================================================
+'  4.1 — Roaming Assurance & Steering (SoR) Reference Architecture
+'  Layered view: Border network → Mediation → Engines → Store → Outputs
+' =====================================================================
+title 4.1 Roaming Service — Architecture Overview (Assurance & Steering)
+
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam rectangleBorderColor #444444
+skinparam packageStyle rectangle
+skinparam ArrowColor #666666
+
+' --- Layer 1: Roaming Border Network -----------------------------------------
+package "1 · Roaming Border Network" #E8F0FE {
+  rectangle "HLR / HSS / UDM" as HLR
+  rectangle "MSC / VLR" as MSC
+  rectangle "MME / AMF" as MME
+  rectangle "SGSN" as SGSN
+  rectangle "SGW / PGW / UPF" as UPF
+  rectangle "DRA / DEA" as DRA
+  rectangle "STP" as STP
+  rectangle "SMSC" as SMSC
+  rectangle "IMS" as IMS
+}
+note right of HLR
+  Data acquisition:
+  passive taps · mirrored ports ·
+  Diameter Gx/Rx probes · CDR feeds
+end note
+
+' --- Layer 2: Mediation & Collection -----------------------------------------
+package "2 · Mediation & Collection Layer" #E6F4EA {
+  rectangle "Protocol Decoders\nMAP/CAP · Diameter · SIP/IMS\nGTP-C/U · SS7-over-IP · HTTP/2 (SBI)" as DEC
+}
+
+' --- Layer 3: Processing Engines ---------------------------------------------
+package "3 · Processing Engines" #FFF3E0 {
+  rectangle "Steering Protection Engine\n• SoR dispatch orchestration\n• Ack / timeout detection\n• Anti-steering detection\n• Compliance scoring" as STEER
+  rectangle "Performance Assurance Engine\n• KPI computation\n• SLA breach detection\n• Test-call scheduler\n• Trend & reporting" as PERF
+}
+
+' --- Layer 4: Metadata & Correlation Store -----------------------------------
+package "4 · Metadata & Correlation Store" #FEF7E0 {
+  database "NE metadata · Session metadata\nUser metadata · Terminal metadata\nRoaming Agreement metadata\n(RAEX/RADB link · IR.21 · SLA)" as STORE
+}
+
+' --- Layer 5: Consumers ------------------------------------------------------
+package "5 · Consumers" #FCE8E6 {
+  rectangle "Alarming / Ticketing\n(NOC)" as NOC
+  rectangle "Dashboards / Reporting\n(BI)" as BI
+}
+
+' --- Flows -------------------------------------------------------------------
+HLR --> DEC
+MSC --> DEC
+MME --> DEC
+SGSN --> DEC
+UPF --> DEC
+DRA --> DEC
+STP --> DEC
+SMSC --> DEC
+IMS --> DEC
+
+DEC --> STEER
+DEC --> PERF
+
+' Feedback loops between the two engines
+STEER --> PERF : compliance data / risk ratings
+PERF --> STEER : priority signal
+
+STEER --> STORE
+PERF --> STORE
+STORE --> STEER : correlation lookups
+STORE --> PERF : correlation lookups
+
+STEER --> NOC
+PERF --> NOC
+STEER --> BI
+PERF --> BI
+STORE --> BI
+
+@enduml

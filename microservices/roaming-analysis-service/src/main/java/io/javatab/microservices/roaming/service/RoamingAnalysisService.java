@@ -4,7 +4,6 @@ import io.javatab.microservices.roaming.analysis.RiskAnalyzer;
 import io.javatab.microservices.roaming.domain.Direction;
 import io.javatab.microservices.roaming.domain.RiskLevel;
 import io.javatab.microservices.roaming.domain.RoamingEvent;
-import io.javatab.microservices.roaming.repository.RoamingEventRepository;
 import io.javatab.microservices.roaming.web.dto.PartnerSummaryDto;
 import io.javatab.microservices.roaming.web.dto.RoamingEventDto;
 import io.javatab.microservices.roaming.web.dto.RoamingSummaryDto;
@@ -29,18 +28,18 @@ public class RoamingAnalysisService {
 	private static final DateTimeFormatter HOUR_LABEL =
 			DateTimeFormatter.ofPattern("HH:00").withZone(ZoneOffset.UTC);
 
-	private final RoamingEventRepository repository;
+	private final RoamingEventProjection projection;
 	private final RiskAnalyzer riskAnalyzer;
 
-	public RoamingAnalysisService(RoamingEventRepository repository, RiskAnalyzer riskAnalyzer) {
-		this.repository = repository;
+	public RoamingAnalysisService(RoamingEventProjection projection, RiskAnalyzer riskAnalyzer) {
+		this.projection = projection;
 		this.riskAnalyzer = riskAnalyzer;
 	}
 
 	/** Lists events (newest first), optionally filtered. Any argument may be {@code null}. */
 	public List<RoamingEventDto> listEvents(Direction direction, String partnerPlmn, RiskLevel riskLevel) {
 		String plmn = partnerPlmn == null ? null : partnerPlmn.trim().toLowerCase();
-		return repository.findAll().stream()
+		return projection.events().stream()
 				.filter(e -> direction == null || e.direction() == direction)
 				.filter(e -> plmn == null || plmn.isEmpty() || e.partnerPlmn().toLowerCase().contains(plmn))
 				.map(this::toDto)
@@ -51,14 +50,16 @@ public class RoamingAnalysisService {
 
 	/** @throws NoSuchElementException if no event has the given id (→ 404). */
 	public RoamingEventDto getEvent(String id) {
-		return repository.findById(id)
+		return projection.events().stream()
+				.filter(e -> e.id().equals(id))
+				.findFirst()
 				.map(this::toDto)
 				.orElseThrow(() -> new NoSuchElementException("Roaming event not found: " + id));
 	}
 
 	/** Aggregate analytics for dashboards, computed over all persisted events. */
 	public RoamingSummaryDto summary() {
-		return summary(repository.findAll());
+		return summary(projection.events());
 	}
 
 	/** Aggregate analytics over an arbitrary set of events (DB, uploaded CSV or simulated batch). */
@@ -91,7 +92,7 @@ public class RoamingAnalysisService {
 	/** Per-partner-PLMN roll-up, ordered by average risk (highest first). */
 	public List<PartnerSummaryDto> partners() {
 		Map<String, List<RoamingEventDto>> byPlmn = new LinkedHashMap<>();
-		repository.findAll().stream()
+		projection.events().stream()
 				.map(this::toDto)
 				.forEach(e -> byPlmn.computeIfAbsent(e.partnerPlmn(), k -> new java.util.ArrayList<>()).add(e));
 

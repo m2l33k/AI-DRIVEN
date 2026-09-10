@@ -54,6 +54,7 @@ export const routes: Routes = [
       { path: 'roaming/anomalies', loadComponent: () => import('./roles/security-analyst/roaming/roaming-anomalies').then((m) => m.RoamingAnomalies) },
       { path: 'roaming/partners', loadComponent: () => import('./roles/security-analyst/roaming/roaming-partners').then((m) => m.RoamingPartners) },
       { path: 'roaming/qos', loadComponent: () => import('./roles/security-analyst/roaming/roaming-qos').then((m) => m.RoamingQos) },
+      { path: 'roaming/kpis', loadComponent: () => import('./roles/security-analyst/roaming/roaming-kpis').then((m) => m.RoamingKpis) },
       { path: 'roaming/revenue', loadComponent: () => import('./roles/security-analyst/roaming/roaming-revenue').then((m) => m.RoamingRevenue) },
       { path: 'roaming/tools', loadComponent: () => import('./roles/security-analyst/roaming/roaming-tools').then((m) => m.RoamingTools) },
       { path: 'detection-rules', loadComponent: () => import('./roles/security-analyst/detection-rules/detection-rules').then((m) => m.DetectionRules) },

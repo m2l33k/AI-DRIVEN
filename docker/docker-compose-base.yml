@@ -147,4 +147,5 @@ services:
 
 networks:
   shared-network:
-    driver: bridge
+    external: true
+    name: telecom-shared-network   # defined in docker-compose-infra.yml
