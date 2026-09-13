@@ -8,6 +8,8 @@ import { GaugeChart } from '../../../shared/charts/gauge-chart';
 import { AsyncState } from '../../../shared/ui/async-state';
 import { RoamingService, Revenue, Optimization } from './roaming.service';
 
+const PAGE_SIZE = 10;
+
 @Component({
   selector: 'app-roaming-revenue',
   standalone: true,
@@ -45,11 +47,14 @@ import { RoamingService, Revenue, Optimization } from './roaming.service';
     }
 
     <div class="hw-card panel">
-      <div class="panel-head"><h3>Agreement optimization</h3><span class="tag">recommendation per partner</span></div>
+      <div class="panel-head">
+        <h3>Agreement optimization</h3>
+        <span class="tag">{{ optimization().length }} partners · recommendation per partner</span>
+      </div>
       <table class="tbl">
         <thead><tr><th>PLMN</th><th>Country</th><th>Revenue</th><th>Margin</th><th>Margin %</th><th>Risk</th><th>Exp.</th><th>Action</th><th>Recommendation</th></tr></thead>
         <tbody>
-          @for (o of optimization(); track o.partnerPlmn) {
+          @for (o of pagedOptimization(); track o.partnerPlmn) {
             <tr>
               <td class="mono">{{ o.partnerPlmn }}</td><td>{{ o.country }}</td>
               <td>{{ o.revenueEur | number:'1.0-0' }}€</td>
@@ -62,6 +67,13 @@ import { RoamingService, Revenue, Optimization } from './roaming.service';
           } @empty { <tr><td class="empty" colspan="9">No optimization data.</td></tr> }
         </tbody>
       </table>
+      @if (totalPages() > 1) {
+        <div class="pager">
+          <button class="hw-btn pager-btn" [disabled]="page() === 0" (click)="page.set(page() - 1)">← Prev</button>
+          <span class="pager-info">Page {{ page() + 1 }} / {{ totalPages() }}</span>
+          <button class="hw-btn pager-btn" [disabled]="page() >= totalPages() - 1" (click)="page.set(page() + 1)">Next →</button>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -73,7 +85,6 @@ import { RoamingService, Revenue, Optimization } from './roaming.service';
     .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
     .panel-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
     .tag { font-size: 12px; color: var(--hw-text-3); }
-    .banner-err { padding: 12px 16px; margin-bottom: 16px; background: rgba(245,63,63,.1); color: var(--hw-danger); font-size: 13px; }
     .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
     .tbl th { text-align: left; color: var(--hw-text-3); font-weight: 500; padding: 10px 12px; border-bottom: 1px solid var(--hw-border); }
     .tbl td { padding: 11px 12px; border-bottom: 1px solid var(--hw-border); color: var(--hw-text-2); }
@@ -85,6 +96,9 @@ import { RoamingService, Revenue, Optimization } from './roaming.service';
     .action.RENEGOTIATE { background: rgba(245,63,63,.12); color: var(--hw-danger); }
     .action.PREFERRED { background: rgba(0,168,112,.12); color: var(--hw-success); }
     .action.IMPROVE_QOS, .action.MONITOR { background: rgba(255,143,31,.14); color: var(--hw-warning); }
+    .pager { display: flex; align-items: center; gap: 12px; justify-content: center; padding: 14px 0 4px; }
+    .pager-btn { min-width: 80px; }
+    .pager-info { font-size: 13px; color: var(--hw-text-3); min-width: 110px; text-align: center; }
     @media (max-width: 1000px) { .stats, .g3 { grid-template-columns: 1fr; } }
   `],
 })
@@ -95,6 +109,14 @@ export class RoamingRevenue implements OnInit {
   optimization = signal<Optimization[]>([]);
   error = signal<string | null>(null);
   loading = signal(true);
+  page = signal(0);
+  readonly pageSize = PAGE_SIZE;
+
+  pagedOptimization = computed(() => {
+    const p = this.page(), ps = this.pageSize;
+    return this.optimization().slice(p * ps, (p + 1) * ps);
+  });
+  totalPages = computed(() => Math.ceil(this.optimization().length / this.pageSize));
 
   barData = computed(() => this.revenue()?.topPartners.map((p) => Math.round(p.revenueEur)) ?? []);
   barLabels = computed(() => this.revenue()?.topPartners.map((p) => p.partnerPlmn) ?? []);
@@ -112,6 +134,7 @@ export class RoamingRevenue implements OnInit {
   load() {
     this.error.set(null);
     this.loading.set(true);
+    this.page.set(0);
     this.api.revenue().subscribe({
       next: (v) => { this.revenue.set(v); this.loading.set(false); },
       error: (e) => { this.fail(e); this.loading.set(false); },

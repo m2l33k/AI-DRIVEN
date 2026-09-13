@@ -6,22 +6,18 @@
 #  observability, etc.) so the harness can reach them (gateway → NRF, Prometheus →
 #  NF metrics, Fluent Bit → NF logs).
 #
-#  ⚠️ LINUX ONLY — the UPF needs the host `gtp5g` kernel module (see scripts/5GC.sh).
+#  ⚠️ LINUX ONLY — the UPF needs the host `gtp5g` kernel module.
+#     On Windows/Mac: ./infra.sh 5gc up  (automatically skips UPF)
 #
-#  ⚠️ CONFIG REUSE — the NF *config* and *cert* files are NOT re-authored here; they
-#     are mounted from a cloned upstream free5gc-compose so its maintainers own them.
-#     Set F5GC_DIR to that clone (default ../free5gc-compose, created by scripts/5GC.sh).
+#  ⚠️ CONFIG SOURCE — NF config and cert files are mounted from a cloned copy of
+#     the upstream free5gc-compose repo. One-time setup (already done):
+#       git clone https://github.com/free5gc/free5gc-compose.git E:/My-project/free5gc-compose
+#     F5GC_DIR and F5GC_TAG are set in docker/.env
 #
-#  Interpolated env (compose ${VAR:-default}):
-#     F5GC_TAG   free5GC image tag    (default v3.4.4 — must match your gtp5g version)
-#     F5GC_DIR   free5gc-compose dir  (default ../free5gc-compose — source of config/ + cert/)
-#
-#  Run (with the platform infra) as ONE stack via:
-#     ./scripts/5GC.sh compose
-#  or manually:
-#     docker compose -f docker/docker-compose-infra.yml \
-#                    -f docker/docker-compose-observability.yml \
-#                    -f docker/docker-compose-5gc.yml up -d
+#  Run standalone via:
+#     ./infra.sh 5gc up
+#  Run with full infra via:
+#     ./infra.sh up --5gc
 # =============================================================================
 
 services:
@@ -39,6 +35,8 @@ services:
       shared-network: {}
       privnet:
         ipv4_address: 10.100.200.10
+        aliases:
+          - db
 
   # --- NRF (registry + OAuth2 authz server) ----------------------------------
   free5gc-nrf:
@@ -46,49 +44,83 @@ services:
     image: free5gc/nrf:${F5GC_TAG:-v3.4.4}
     command: ./nrf -c ./config/nrfcfg.yaml
     environment:
-      - DB_URI=mongodb://free5gc-db:27017/free5gc
+      - DB_URI=mongodb://db/free5gc
       - GIN_MODE=release
     volumes:
-      - ${F5GC_DIR:-../free5gc-compose}/config/nrfcfg.yaml:/free5gc/config/nrfcfg.yaml
-      - ${F5GC_DIR:-../free5gc-compose}/cert:/free5gc/cert
+      - ${F5GC_DIR}/config:/free5gc/config
+      - ${F5GC_DIR}/cert:/free5gc/cert
     expose:
       - "8000"
+    ports:
+      - "19001:9091"   # Prometheus metrics
     depends_on:
       - free5gc-db
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "host.docker.internal:24224"
+        tag: "free5gc.nrf"
+        fluentd-async: "true"
     networks:
       shared-network: {}
       privnet:
         ipv4_address: 10.100.200.20
+        aliases:
+          - nrf.free5gc.org
 
   # --- AUSF ------------------------------------------------------------------
   free5gc-ausf:
     container_name: free5gc-ausf
     image: free5gc/ausf:${F5GC_TAG:-v3.4.4}
     command: ./ausf -c ./config/ausfcfg.yaml
+    environment:
+      - GIN_MODE=release
     volumes:
-      - ${F5GC_DIR:-../free5gc-compose}/config/ausfcfg.yaml:/free5gc/config/ausfcfg.yaml
-      - ${F5GC_DIR:-../free5gc-compose}/cert:/free5gc/cert
+      - ${F5GC_DIR}/config:/free5gc/config
+      - ${F5GC_DIR}/cert:/free5gc/cert
+    ports:
+      - "19004:9091"   # Prometheus metrics
     depends_on:
       - free5gc-nrf
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "host.docker.internal:24224"
+        tag: "free5gc.ausf"
+        fluentd-async: "true"
     networks:
       shared-network: {}
       privnet:
         ipv4_address: 10.100.200.21
+        aliases:
+          - ausf.free5gc.org
 
   # --- UDM -------------------------------------------------------------------
   free5gc-udm:
     container_name: free5gc-udm
     image: free5gc/udm:${F5GC_TAG:-v3.4.4}
     command: ./udm -c ./config/udmcfg.yaml
+    environment:
+      - GIN_MODE=release
     volumes:
-      - ${F5GC_DIR:-../free5gc-compose}/config/udmcfg.yaml:/free5gc/config/udmcfg.yaml
-      - ${F5GC_DIR:-../free5gc-compose}/cert:/free5gc/cert
+      - ${F5GC_DIR}/config:/free5gc/config
+      - ${F5GC_DIR}/cert:/free5gc/cert
+    ports:
+      - "19005:9091"   # Prometheus metrics
     depends_on:
       - free5gc-nrf
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "host.docker.internal:24224"
+        tag: "free5gc.udm"
+        fluentd-async: "true"
     networks:
       shared-network: {}
       privnet:
         ipv4_address: 10.100.200.22
+        aliases:
+          - udm.free5gc.org
 
   # --- UDR -------------------------------------------------------------------
   free5gc-udr:
@@ -96,64 +128,109 @@ services:
     image: free5gc/udr:${F5GC_TAG:-v3.4.4}
     command: ./udr -c ./config/udrcfg.yaml
     environment:
-      - DB_URI=mongodb://free5gc-db:27017/free5gc
+      - DB_URI=mongodb://db/free5gc
       - GIN_MODE=release
     volumes:
-      - ${F5GC_DIR:-../free5gc-compose}/config/udrcfg.yaml:/free5gc/config/udrcfg.yaml
-      - ${F5GC_DIR:-../free5gc-compose}/cert:/free5gc/cert
+      - ${F5GC_DIR}/config:/free5gc/config
+      - ${F5GC_DIR}/cert:/free5gc/cert
+    ports:
+      - "19006:9091"   # Prometheus metrics
     depends_on:
       - free5gc-nrf
       - free5gc-db
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "host.docker.internal:24224"
+        tag: "free5gc.udr"
+        fluentd-async: "true"
     networks:
       shared-network: {}
       privnet:
         ipv4_address: 10.100.200.23
+        aliases:
+          - udr.free5gc.org
 
   # --- PCF -------------------------------------------------------------------
   free5gc-pcf:
     container_name: free5gc-pcf
     image: free5gc/pcf:${F5GC_TAG:-v3.4.4}
     command: ./pcf -c ./config/pcfcfg.yaml
+    environment:
+      - GIN_MODE=release
     volumes:
-      - ${F5GC_DIR:-../free5gc-compose}/config/pcfcfg.yaml:/free5gc/config/pcfcfg.yaml
-      - ${F5GC_DIR:-../free5gc-compose}/cert:/free5gc/cert
+      - ${F5GC_DIR}/config:/free5gc/config
+      - ${F5GC_DIR}/cert:/free5gc/cert
+    ports:
+      - "19007:9091"   # Prometheus metrics
     depends_on:
       - free5gc-nrf
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "host.docker.internal:24224"
+        tag: "free5gc.pcf"
+        fluentd-async: "true"
     networks:
       shared-network: {}
       privnet:
         ipv4_address: 10.100.200.24
+        aliases:
+          - pcf.free5gc.org
 
   # --- NSSF ------------------------------------------------------------------
   free5gc-nssf:
     container_name: free5gc-nssf
     image: free5gc/nssf:${F5GC_TAG:-v3.4.4}
     command: ./nssf -c ./config/nssfcfg.yaml
+    environment:
+      - GIN_MODE=release
     volumes:
-      - ${F5GC_DIR:-../free5gc-compose}/config/nssfcfg.yaml:/free5gc/config/nssfcfg.yaml
-      - ${F5GC_DIR:-../free5gc-compose}/cert:/free5gc/cert
+      - ${F5GC_DIR}/config:/free5gc/config
+      - ${F5GC_DIR}/cert:/free5gc/cert
+    ports:
+      - "19008:9091"   # Prometheus metrics
     depends_on:
       - free5gc-nrf
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "host.docker.internal:24224"
+        tag: "free5gc.nssf"
+        fluentd-async: "true"
     networks:
       shared-network: {}
       privnet:
         ipv4_address: 10.100.200.25
+        aliases:
+          - nssf.free5gc.org
 
   # --- SMF (session mgmt; PFCP to UPF) ---------------------------------------
   free5gc-smf:
     container_name: free5gc-smf
     image: free5gc/smf:${F5GC_TAG:-v3.4.4}
     command: ./smf -c ./config/smfcfg.yaml -u ./config/uerouting.yaml
+    environment:
+      - GIN_MODE=release
     volumes:
-      - ${F5GC_DIR:-../free5gc-compose}/config/smfcfg.yaml:/free5gc/config/smfcfg.yaml
-      - ${F5GC_DIR:-../free5gc-compose}/config/uerouting.yaml:/free5gc/config/uerouting.yaml
-      - ${F5GC_DIR:-../free5gc-compose}/cert:/free5gc/cert
+      - ${F5GC_DIR}/config:/free5gc/config
+      - ${F5GC_DIR}/cert:/free5gc/cert
+    ports:
+      - "19003:9091"   # Prometheus metrics
     depends_on:
       - free5gc-nrf
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "host.docker.internal:24224"
+        tag: "free5gc.smf"
+        fluentd-async: "true"
     networks:
       shared-network: {}
       privnet:
         ipv4_address: 10.100.200.26
+        aliases:
+          - smf.free5gc.org
 
   # --- AMF (access & mobility; NGAP/SCTP to the gNB) -------------------------
   free5gc-amf:
@@ -163,16 +240,26 @@ services:
     environment:
       - GIN_MODE=release
     volumes:
-      - ${F5GC_DIR:-../free5gc-compose}/config/amfcfg.yaml:/free5gc/config/amfcfg.yaml
-      - ${F5GC_DIR:-../free5gc-compose}/cert:/free5gc/cert
+      - ${F5GC_DIR}/config:/free5gc/config
+      - ${F5GC_DIR}/cert:/free5gc/cert
     expose:
       - "38412/sctp"
+    ports:
+      - "19002:9091"   # Prometheus metrics
     depends_on:
       - free5gc-nrf
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "host.docker.internal:24224"
+        tag: "free5gc.amf"
+        fluentd-async: "true"
     networks:
       shared-network: {}
       privnet:
         ipv4_address: 10.100.200.27
+        aliases:
+          - amf.free5gc.org
 
   # --- UPF (user plane; GTP-U — REQUIRES gtp5g on the host) ------------------
   free5gc-upf:
@@ -187,52 +274,65 @@ services:
     sysctls:
       - net.ipv4.ip_forward=1
     volumes:
-      - ${F5GC_DIR:-../free5gc-compose}/config/upfcfg.yaml:/free5gc/config/upfcfg.yaml
+      - ${F5GC_DIR}/config:/free5gc/config
     depends_on:
       - free5gc-smf
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "host.docker.internal:24224"
+        tag: "free5gc.upf"
+        fluentd-async: "true"
     networks:
       shared-network: {}
       privnet:
         ipv4_address: 10.100.200.101
+        aliases:
+          - upf.free5gc.org
 
   # --- WebConsole (subscriber provisioning UI + REST) ------------------------
   free5gc-webui:
     container_name: free5gc-webui
     image: free5gc/webui:${F5GC_TAG:-v3.4.4}
-    command: ./webconsole -c ./config/webuicfg.yaml
+    command: ./webui -c ./config/webuicfg.yaml
     environment:
       - GIN_MODE=release
     volumes:
-      - ${F5GC_DIR:-../free5gc-compose}/config/webuicfg.yaml:/free5gc/config/webuicfg.yaml
+      - ${F5GC_DIR}/config:/free5gc/config
     ports:
       - "5000:5000"
     depends_on:
       - free5gc-db
       - free5gc-nrf
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "host.docker.internal:24224"
+        tag: "free5gc.webui"
+        fluentd-async: "true"
     networks:
       shared-network: {}
       privnet:
         ipv4_address: 10.100.200.30
+        aliases:
+          - webui
 
 # -----------------------------------------------------------------------------
 #  Networks
-#   • shared-network — the platform's existing bridge. Declared identically to the
-#     infra compose so that, when both files are passed in ONE `docker compose`
-#     invocation, the definitions MERGE into a single network the NFs share with
-#     Keycloak / Prometheus / the gateway.
-#   • privnet        — free5GC's private subnet with STATIC IPs (the NF cfg files
-#     reference these addresses; the UPF GTP-U path needs a stable address).
+#   • shared-network — joined as EXTERNAL so the NFs share the existing platform
+#     bridge (Keycloak, observability, etc.) without creating a new isolated one.
+#   • privnet        — free5GC's private subnet with STATIC IPs and DNS aliases
+#     so NFs find each other by hostname (e.g. nrf.free5gc.org → 10.100.200.20).
 # -----------------------------------------------------------------------------
 networks:
   shared-network:
-    driver: bridge
+    external: true
+    name: docker_shared-network
   privnet:
     ipam:
       driver: default
       config:
         - subnet: 10.100.200.0/24
-    driver_opts:
-      com.docker.network.bridge.name: br-free5gc
 
 volumes:
   free5gc-dbdata:

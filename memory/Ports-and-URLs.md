@@ -1,7 +1,7 @@
 ---
 title: Ports and URLs (quick reference)
 tags: [reference, ports, infra]
-updated: 2026-08-15
+updated: 2026-09-10
 ---
 
 # Ports & URLs — Quick Reference
@@ -40,6 +40,29 @@ row here. Local = running on the host; docker = the container name on `shared-ne
 | anomaly Redis | `6380` | `anomaly-redis:6379` | real-time windows |
 | Postgres (shared) | `5432` | `postgres:5432` | legacy / optional (`course_db`) |
 | MongoDB | `27017` | `mongodb:27017` | legacy / optional |
+
+## ML service
+
+| Component | Local | Docker | Notes |
+|-----------|-------|--------|-------|
+| ml-service (Django) | `8000` | `ml-service:8000` | LSTM+Prophet+ARIMA forecasting; `/api/health/`, `/api/forecast/`, `/api/train/` |
+
+## free5GC control-plane NFs
+
+| NF | Local metrics port | Docker container | Notes |
+|----|-------------------|-----------------|-------|
+| NRF | `19001` | `free5gc-nrf` | NF registry, SBI OAuth2 |
+| AMF | `19002` | `free5gc-amf` | Access & Mobility |
+| SMF | `19003` | `free5gc-smf` | Session Management |
+| AUSF | `19004` | `free5gc-ausf` | Authentication Server |
+| UDM | `19005` | `free5gc-udm` | Unified Data Mgmt |
+| UDR | `19006` | `free5gc-udr` | Unified Data Repository |
+| PCF | `19007` | `free5gc-pcf` | Policy Control |
+| NSSF | `19008` | `free5gc-nssf` | Network Slice Selection |
+| WebConsole | `5000` | `free5gc-webui` | Subscriber provisioning UI + REST API (admin/free5gc) |
+| UPF | — | `free5gc-upf` | User Plane — **skipped on Windows** (`--scale free5gc-upf=0`) |
+
+NF configs in `E:/My-project/free5gc-compose/config/`. Platform API bridge at `/api/5gc/**` → `roaming-analysis-service:9002`.
 
 ## Observability
 

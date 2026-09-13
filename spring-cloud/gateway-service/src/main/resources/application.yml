@@ -37,7 +37,7 @@ spring:
             - id: roaming-analysis-service
               uri: lb://roaming-analysis-service
               predicates:
-                - Path=/api/roaming/**
+                - Path=/api/roaming/**,/api/5gc/**
             - id: roaming-analysis-service-docs
               uri: lb://roaming-analysis-service
               predicates:
@@ -202,7 +202,7 @@ spring:
             - id: roaming-analysis-service
               uri: lb://roaming-analysis-service
               predicates:
-                - Path=/api/roaming/**
+                - Path=/api/roaming/**,/api/5gc/**
             - id: roaming-analysis-service-docs
               uri: lb://roaming-analysis-service
               predicates:

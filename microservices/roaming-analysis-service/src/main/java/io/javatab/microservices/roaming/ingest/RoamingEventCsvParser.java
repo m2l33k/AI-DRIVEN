@@ -80,7 +80,11 @@ public class RoamingEventCsvParser {
 		Direction dir = direction(str(r, "direction", "roaming_direction"));
 		String plmn = firstNonNull(str(r, "partner_plmn", "partnerplmn", "visited_operator_id", "plmn"), "UNKNOWN");
 		String country = firstNonNull(str(r, "country", "country_code"), "Unknown");
-		int subscribers = (int) num(r, 0, "subscribers", "subscriber_count");
+		// CDR files have one IMSI per row — treat each as 1 subscriber when no aggregate column exists
+		int subscribers = (int) num(r, 0, "subscribers", "subscriber_count", "imsi_count");
+		if (subscribers == 0) {
+			subscribers = 1;
+		}
 		int signalingErrors = (int) num(r, 0, "signaling_errors", "signalling_errors", "errors");
 		double newDeviceRatio = num(r, 0, "new_device_ratio", "newdeviceratio");
 		boolean impossibleTravel = bool(r, "impossible_travel", "impossibletravel");

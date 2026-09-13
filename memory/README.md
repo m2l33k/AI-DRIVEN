@@ -1,7 +1,7 @@
 ---
 title: Memory Vault — Home
 tags: [index, moc]
-updated: 2026-08-15
+updated: 2026-09-10
 ---
 
 # 🗄️ Memory Vault
@@ -34,6 +34,7 @@ Every note is Markdown with `[[wiki-links]]`, so use the Graph View to navigate.
   - [[Roaming-Analysis-Service]] — roaming events + risk scoring API (port 9002)
   - [[Platform-Services]] — 4 new placeholder services: anomaly/rate-limit/tracing/fault (9003–9006)
   - [[Messaging-Service]] — direct messaging between users (port 9007, `/api/messages`)
+  - [[ML-Forecasting-Service]] — Django LSTM+Prophet+ARIMA forecasting service (port 8000, Docker only)
   - [[5GC-Core]] — **free5GC** as the real 5G Core substrate + UERANSIM; this repo = the harness (ADR-13)
 
 **Docs & process**
@@ -42,6 +43,7 @@ Every note is Markdown with `[[wiki-links]]`, so use the Graph View to navigate.
 - [[Git-Workflow-and-History]] — branches, what was deleted, commit rules ⚠️
 - [[Session-Log]] — chronological log of what we did each session
 - [[Next-Steps]] — open threads and the backlog
+- [[report]] — full structured content for drafting the PFE technical report
 
 ## ⚠️ Golden rules
 

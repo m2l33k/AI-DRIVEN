@@ -1,7 +1,7 @@
 ---
 title: Roaming Analysis Service
 tags: [backend, microservice, roaming, security]
-updated: 2026-08-15
+updated: 2026-09-10
 ---
 
 # Roaming Analysis Service
@@ -177,5 +177,33 @@ package a trimmed copy under `src/main/resources/seed/` for docker. Idempotent p
   the synthetic `RoamingEvent`/seeder (see the Redesign section + [[Next-Steps]]).
 - Tests were intentionally omitted (project currently has no tests).
 
+## free5GC proxy (added 2026-09-10)
+
+Package `io.javatab.microservices.roaming.fivegc`:
+- `Free5gcService` — authenticates to free5GC WebConsole (`POST /api/login`), caches JWT (55-min TTL), proxies three endpoints
+- `NfStatusDto` — record `(type, instanceId, description, status, up)`
+- `Free5gcController` — `@RequestMapping("/api/5gc")`, gated by `PERM_roaming-events:read`
+  - `GET /api/5gc/nf-status` — NF up/down (derived from WebConsole reachability — not real NRF query)
+  - `GET /api/5gc/subscribers` — provisioned IMSIs from WebConsole `/api/subscriber`
+  - `GET /api/5gc/ue-contexts` — active UEs from `/api/registered-ue-context`
+
+**WebConsole auth detail:** uses `Token: <jwt>` header (NOT `Authorization: Bearer`). Config:
+```yaml
+free5gc.webconsole.url: http://localhost:5000
+free5gc.webconsole.username: admin
+free5gc.webconsole.password: free5gc
+```
+
+Gateway routes both `/api/roaming/**` and `/api/5gc/**` to this service.
+
+## ML forecasting (added)
+
+Endpoints proxied to the Django `ml-service` (port 8000):
+- `POST /api/roaming/forecast/train` — trigger background training
+- `GET  /api/roaming/forecast/train/status` — poll training state
+- `GET  /api/roaming/forecast/ml?hoursAhead=6` — multi-model forecast (LSTM+Prophet+ARIMA+ensemble)
+
+See [[ml-forecasting-service]] in Claude memory for full details.
+
 ## Related notes
-- [[Backend-and-Infra]] · [[Roles-and-Permissions]] · [[Frontend-Components]] · [[Next-Steps]]
+- [[Backend-and-Infra]] · [[Roles-and-Permissions]] · [[Frontend-Components]] · [[Next-Steps]] · [[5GC-Core]]

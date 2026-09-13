@@ -1,7 +1,7 @@
 ---
 title: Grafana Dashboards (design)
 tags: [observability, grafana, prometheus, loki, tempo, 5g, security, design]
-updated: 2026-08-15
+updated: 2026-09-10
 ---
 
 # Grafana Dashboards — detailed design
@@ -10,6 +10,17 @@ Design for the **observability + security dashboards** (proposal **D6**) coverin
 **harness** (already Prometheus-scraped) and the **[[5GC-Core|free5GC]]** core once it's up. Grafana
 :3000 (admin/admin), datasources provisioned, JSON dashboards live in `grafana-dashboard/`. Sources:
 **Prometheus** :9090 (metrics), **Loki** :3100 (logs), **Tempo** (traces). See [[Backend-and-Infra]].
+
+## What already exists on disk (updated 2026-09-10)
+
+- ✅ **`grafana-dashboard/free5gc-5g-core.json`** — **custom, built 2026-09-10.** UID `free5gc-5g-core`, title "free5GC — 5G Core Network Functions". 20 panels / 5 rows:
+  - **Row 1 — NF Health:** 8 individual stat panels (NRF/AMF/SMF/AUSF/UDM/UDR/PCF/NSSF), each using `up{job="free5gc-<nf>"}`, green=UP / red=DOWN, background colour mode.
+  - **Row 2 — SBI Traffic:** SBI inbound request rate per NF (`sum by (job) (rate(free5gc_sbi_inbound_request_total[2m]))`), + request rate broken down by `nf_type/path/method`.
+  - **Row 3 — Latency:** P95 + P50 histogram quantile per NF (`histogram_quantile(0.95/0.50, ...free5gc_sbi_inbound_request_duration_seconds_bucket...)`).
+  - **Row 4 — Errors:** 4xx/5xx error rate timeseries + donut of request counts by status code.
+  - **Row 5 — NF Logs:** Loki log stream panel, query `{job=~"free5gc.*"}`.
+  - Template variable `$nf_type`: multi-select from `label_values(up{free5gc="true"}, job)`.
+  - Datasources: `prometheus` (UID) + `loki` (UID). No Grafana restart needed — auto-provisioned.
 
 ## What already exists on disk (2026-08-15)
 - ✅ **`grafana-dashboard/Business Services.json`** — **custom, built 2026-08-15.** Cross-service board
@@ -145,11 +156,13 @@ D2+D3 = NF-KPI dashboards · D4 = security dashboard (alerts, anomalies) · D5 =
 ## TODO (see [[Next-Steps]])
 - [x] Add rate-limiting (9004) + anomaly (9003) [+ tracing 9005, fault 9006] to `prometheus.yml` (2026-08-15).
 - [x] Cross-service **Business Services** dashboard built (`grafana-dashboard/Business Services.json`).
-- [ ] Stand up **cAdvisor + node-exporter** for free5GC container metrics.
-- [ ] Add **Fluent Bit/promtail → Loki** for free5GC NF logs; build LogQL counters for D3.
-- [ ] Build D2/D3 once NRF facade + a metrics/log-exporter exist.
+- [x] **free5GC NF health/traffic/latency/logs** dashboard built (`grafana-dashboard/free5gc-5g-core.json`) — 2026-09-10.
+- [x] free5GC NF logs shipped to Loki via fluentd driver (`free5gc.*` tags) — 2026-09-10.
+- [x] 8 free5GC Prometheus scrape jobs added (NRF=19001 … NSSF=19008) — 2026-09-10.
+- [ ] Stand up **cAdvisor + node-exporter** for free5GC container CPU/mem/net.
+- [ ] Build D3 (Signalling/Procedures) once real NRF facade exists (currently WebConsole-reachability proxy only).
 - [ ] Build D4 once anomaly-detection-service consumes real free5GC signals.
-- [ ] Build D5 when PKI/mesh lands.
+- [ ] Build D5 when PKI/mesh lands (zero-trust SBI TLS/OAuth2).
 - [ ] Export all JSON to `grafana-dashboard/`.
 
 ## Related notes

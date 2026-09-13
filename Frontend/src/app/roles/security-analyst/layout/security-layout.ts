@@ -28,6 +28,7 @@ export class SecurityLayout {
         { label: 'Tools', path: 'roaming/tools', icon: '' },
       ],
     },
+    { label: '5G Core', path: '5gc', icon: 'M12 2L3 7v10l9 5 9-5V7l-9-5zm0 2.18L19 8v8l-7 3.89L5 16V8l7-3.82z' },
     { label: 'Detection Rules', path: 'detection-rules', icon: 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z' },
     { label: 'Rate Limiting', path: 'rate-limiting', icon: 'M12 2a10 10 0 100 20 10 10 0 000-20zm0 18a8 8 0 110-16 8 8 0 010 16zm1-13h-2v6l5 3 1-1.6-4-2.4V7z' },
   ];

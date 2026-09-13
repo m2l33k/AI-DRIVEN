@@ -59,6 +59,7 @@ export const routes: Routes = [
       { path: 'roaming/tools', loadComponent: () => import('./roles/security-analyst/roaming/roaming-tools').then((m) => m.RoamingTools) },
       { path: 'detection-rules', loadComponent: () => import('./roles/security-analyst/detection-rules/detection-rules').then((m) => m.DetectionRules) },
       { path: 'rate-limiting', loadComponent: () => import('./roles/security-analyst/rate-limiting/rate-limiting').then((m) => m.RateLimiting) },
+      { path: '5gc', loadComponent: () => import('./roles/security-analyst/fivegc/fivegc-dashboard').then((m) => m.FiveGcDashboard) },
       { path: 'messages', loadComponent: () => import('./messaging/messages').then((m) => m.Messages) },
     ],
   },

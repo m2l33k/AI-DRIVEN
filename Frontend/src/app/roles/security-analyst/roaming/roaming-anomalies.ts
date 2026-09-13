@@ -7,6 +7,8 @@ import { DonutChart, DonutSlice } from '../../../shared/charts/donut-chart';
 import { AsyncState } from '../../../shared/ui/async-state';
 import { RoamingService, Anomaly } from './roaming.service';
 
+const PAGE_SIZE = 10;
+
 @Component({
   selector: 'app-roaming-anomalies',
   standalone: true,
@@ -38,11 +40,14 @@ import { RoamingService, Anomaly } from './roaming.service';
     </div>
 
     <div class="hw-card panel">
-      <div class="panel-head"><h3>Detected anomalies</h3><span class="tag">by anomaly score</span></div>
+      <div class="panel-head">
+        <h3>Detected anomalies</h3>
+        <span class="tag">{{ anomalies().length }} total · sorted by score</span>
+      </div>
       <table class="tbl">
         <thead><tr><th>Time</th><th>PLMN</th><th>Country</th><th>Score</th><th>Risk</th><th>σ dev</th><th>Severity</th><th>Reasons</th></tr></thead>
         <tbody>
-          @for (a of anomalies(); track a.id) {
+          @for (a of pagedAnomalies(); track a.id) {
             <tr>
               <td>{{ a.timestamp | date:'MMM d, HH:mm' }}</td>
               <td class="mono">{{ a.partnerPlmn }}</td><td>{{ a.country }}</td>
@@ -55,6 +60,13 @@ import { RoamingService, Anomaly } from './roaming.service';
           } @empty { <tr><td class="empty" colspan="8">No anomalies detected.</td></tr> }
         </tbody>
       </table>
+      @if (totalPages() > 1) {
+        <div class="pager">
+          <button class="hw-btn pager-btn" [disabled]="page() === 0" (click)="page.set(page() - 1)">← Prev</button>
+          <span class="pager-info">Page {{ page() + 1 }} / {{ totalPages() }}</span>
+          <button class="hw-btn pager-btn" [disabled]="page() >= totalPages() - 1" (click)="page.set(page() + 1)">Next →</button>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -65,7 +77,6 @@ import { RoamingService, Anomaly } from './roaming.service';
     .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
     .panel-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
     .tag { font-size: 12px; color: var(--hw-text-3); }
-    .banner-err { padding: 12px 16px; margin-bottom: 16px; background: rgba(245,63,63,.1); color: var(--hw-danger); font-size: 13px; }
     .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
     .tbl th { text-align: left; color: var(--hw-text-3); font-weight: 500; padding: 10px 12px; border-bottom: 1px solid var(--hw-border); }
     .tbl td { padding: 11px 12px; border-bottom: 1px solid var(--hw-border); color: var(--hw-text-2); }
@@ -81,6 +92,9 @@ import { RoamingService, Anomaly } from './roaming.service';
     .sev.CRITICAL { background: rgba(245,63,63,.14); color: var(--hw-danger); }
     .sev.WARNING { background: rgba(255,143,31,.14); color: var(--hw-warning); }
     .sev.INFO { background: rgba(52,145,250,.12); color: var(--hw-info); }
+    .pager { display: flex; align-items: center; gap: 12px; justify-content: center; padding: 14px 0 4px; }
+    .pager-btn { min-width: 80px; }
+    .pager-info { font-size: 13px; color: var(--hw-text-3); min-width: 110px; text-align: center; }
     @media (max-width: 1000px) { .stats, .g21 { grid-template-columns: 1fr; } }
   `],
 })
@@ -90,6 +104,14 @@ export class RoamingAnomalies implements OnInit {
   anomalies = signal<Anomaly[]>([]);
   error = signal<string | null>(null);
   loading = signal(true);
+  page = signal(0);
+  readonly pageSize = PAGE_SIZE;
+
+  pagedAnomalies = computed(() => {
+    const p = this.page(), ps = this.pageSize;
+    return this.anomalies().slice(p * ps, (p + 1) * ps);
+  });
+  totalPages = computed(() => Math.ceil(this.anomalies().length / this.pageSize));
 
   count = (sev: string) => this.anomalies().filter((a) => a.severity === sev).length;
 
@@ -107,6 +129,7 @@ export class RoamingAnomalies implements OnInit {
   load() {
     this.error.set(null);
     this.loading.set(true);
+    this.page.set(0);
     this.api.anomalies().subscribe({
       next: (data) => { this.anomalies.set(data); this.loading.set(false); },
       error: (err) => {

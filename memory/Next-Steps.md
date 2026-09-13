@@ -1,7 +1,7 @@
 ---
 title: Next Steps
 tags: [todo, backlog]
-updated: 2026-08-15
+updated: 2026-09-10
 ---
 
 # Next Steps
@@ -91,24 +91,24 @@ protected endpoints land.
       See ADR-01 in [[Architecture-Decisions]].
 - [ ] **fault-injection-service** (9006) — chaos testing (latency/errors/NF outages).
 
-## 5GC Core — free5GC integration (see [[5GC-Core]] for the full plan · ADR-13) — NEW 2026-08-15
-Decision: adopt **free5GC** + **UERANSIM**; this repo stays the **harness**. Not started. The
-per-service role mapping + open decisions are in [[5GC-Core]]; the phased checklist below mirrors it.
+## 5GC Core — free5GC integration (see [[5GC-Core]] for the full plan · ADR-13) — PHASE 0-1 DONE 2026-09-10
 
-**Phase 0 — Host & baseline (BLOCKER, user's Linux box):**
-- [ ] Ubuntu 22.04 VM (or WSL2) with **`gtp5g`** built vs kernel headers; `insmod`/`modprobe`;
-      verify `lsmod | grep gtp5g`. ⚠️ free5GC UPF won't run without it — **no bare Windows/mac Docker**.
-- [ ] `free5gc/free5gc-compose` up (NRF/AMF/SMF/UPF/AUSF/UDM/UDR + Mongo + WebConsole).
-- [ ] Provision a subscriber in WebConsole (IMSI, key/OPc, S-NSSAI, DNN).
-- [ ] UERANSIM gNB+UE → confirm clean **Initial Registration + PDU session** (ping via UPF).
-      **Build nothing until this passes.**
+**Phase 0 — Host & baseline:**
+- [x] `free5gc-compose` cloned to `E:/My-project/free5gc-compose` (v4.2.3)
+- [x] `docker/docker-compose-5gc.yml` wired; Windows mode (no UPF) working
+- [x] `infra.sh` updated: `./infra.sh up --5gc`, `./infra.sh 5gc up/down/status`
+- [ ] Provision a subscriber in WebConsole (IMSI, key/OPc) — still TODO
+- [ ] UERANSIM full test (needs Linux + UPF) — still TODO
 
 **Phase 1 — Observe (NF facade + dashboards):**
-- [ ] `NfController` in the gateway: `GET /api/nf/*` (WebClient → NRF `nnrf-nfm/v1/nf-instances`),
-      secure `PERM_nf:read`, graceful-empty when NRF down.
-- [ ] Wire the operator **Network Functions** page to `/api/nf/*` (replace the mock signal data).
-- [ ] Add cAdvisor + node-exporter + rate-limiting(9004)/anomaly(9003) to `prometheus.yml`; ship
-      free5GC logs → Loki. Build **Grafana D2/D3** (see [[Grafana-Dashboards]]).
+- [x] free5GC metric endpoints in Prometheus (19001–19008, `free5gc="true"` labels)
+- [x] NF config patched for `enable: true` + `bindingIPv4: 0.0.0.0`
+- [x] Grafana dashboard `free5gc-5g-core.json` (NF health, SBI traffic, latency, errors, Loki logs)
+- [x] Backend proxy: `Free5gcService` + `Free5gcController` + `NfStatusDto` in roaming-analysis-service
+- [x] Angular: Security Analyst `/security/5gc` + Network Operator `/operator/network-functions`
+- [x] NF logs → Loki via fluentd driver (`free5gc.*` tags)
+- [ ] cAdvisor + node-exporter for container CPU/mem/net (TODO)
+- [ ] Real NRF facade (`nnrf-nfm/v1/nf-instances`) — current impl uses WebConsole reachability proxy only
 
 **Phase 2 — Zero-Trust (Layer 01 / SEC-01/02):**
 - [ ] Enable free5GC **SBI TLS + NRF OAuth2** (scoped tokens) → demo SEC-01 (no cert) / SEC-02 (403).

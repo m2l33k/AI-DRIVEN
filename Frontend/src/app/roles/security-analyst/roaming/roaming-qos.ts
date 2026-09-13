@@ -6,6 +6,8 @@ import { GaugeChart } from '../../../shared/charts/gauge-chart';
 import { AsyncState } from '../../../shared/ui/async-state';
 import { RoamingService, Qos, Experience } from './roaming.service';
 
+const PAGE_SIZE = 10;
+
 @Component({
   selector: 'app-roaming-qos',
   standalone: true,
@@ -38,11 +40,14 @@ import { RoamingService, Qos, Experience } from './roaming.service';
     </div>
 
     <div class="hw-card panel">
-      <div class="panel-head"><h3>Customer experience</h3><span class="tag">{{ experience().length }} partners</span></div>
+      <div class="panel-head">
+        <h3>Customer experience</h3>
+        <span class="tag">{{ experience().length }} partners</span>
+      </div>
       <table class="tbl">
         <thead><tr><th>PLMN</th><th>Country</th><th>Events</th><th>Latency</th><th>Throughput</th><th>Drops</th><th>Score</th><th>Rating</th></tr></thead>
         <tbody>
-          @for (x of experience(); track x.partnerPlmn) {
+          @for (x of pagedExperience(); track x.partnerPlmn) {
             <tr>
               <td class="mono">{{ x.partnerPlmn }}</td><td>{{ x.country }}</td><td>{{ x.events }}</td>
               <td class="muted">{{ x.avgLatencyMs }} ms</td><td class="muted">{{ x.throughputMbps }} Mbps</td>
@@ -53,6 +58,13 @@ import { RoamingService, Qos, Experience } from './roaming.service';
           } @empty { <tr><td class="empty" colspan="8">No experience data.</td></tr> }
         </tbody>
       </table>
+      @if (totalPages() > 1) {
+        <div class="pager">
+          <button class="hw-btn pager-btn" [disabled]="page() === 0" (click)="page.set(page() - 1)">← Prev</button>
+          <span class="pager-info">Page {{ page() + 1 }} / {{ totalPages() }}</span>
+          <button class="hw-btn pager-btn" [disabled]="page() >= totalPages() - 1" (click)="page.set(page() + 1)">Next →</button>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -64,7 +76,6 @@ import { RoamingService, Qos, Experience } from './roaming.service';
     .panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
     .panel-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
     .tag { font-size: 12px; color: var(--hw-text-3); }
-    .banner-err { padding: 12px 16px; margin-bottom: 16px; background: rgba(245,63,63,.1); color: var(--hw-danger); font-size: 13px; }
     .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
     .tbl th { text-align: left; color: var(--hw-text-3); font-weight: 500; padding: 10px 12px; border-bottom: 1px solid var(--hw-border); }
     .tbl td { padding: 11px 12px; border-bottom: 1px solid var(--hw-border); color: var(--hw-text-2); }
@@ -74,6 +85,9 @@ import { RoamingService, Qos, Experience } from './roaming.service';
     .rating.Excellent, .rating.Good { color: var(--hw-success); font-weight: 600; }
     .rating.Fair { color: var(--hw-warning); font-weight: 600; }
     .rating.Poor { color: var(--hw-danger); font-weight: 600; }
+    .pager { display: flex; align-items: center; gap: 12px; justify-content: center; padding: 14px 0 4px; }
+    .pager-btn { min-width: 80px; }
+    .pager-info { font-size: 13px; color: var(--hw-text-3); min-width: 110px; text-align: center; }
     @media (max-width: 1000px) { .g13, .stats3 { grid-template-columns: 1fr; } }
   `],
 })
@@ -84,6 +98,14 @@ export class RoamingQos implements OnInit {
   experience = signal<Experience[]>([]);
   error = signal<string | null>(null);
   loading = signal(true);
+  page = signal(0);
+  readonly pageSize = PAGE_SIZE;
+
+  pagedExperience = computed(() => {
+    const p = this.page(), ps = this.pageSize;
+    return this.experience().slice(p * ps, (p + 1) * ps);
+  });
+  totalPages = computed(() => Math.ceil(this.experience().length / this.pageSize));
 
   barData = computed(() => this.experience().map((x) => x.experienceScore));
   barLabels = computed(() => this.experience().map((x) => x.partnerPlmn));
@@ -93,6 +115,7 @@ export class RoamingQos implements OnInit {
   load() {
     this.error.set(null);
     this.loading.set(true);
+    this.page.set(0);
     this.api.qos().subscribe({
       next: (v) => { this.qos.set(v); this.loading.set(false); },
       error: (e) => { this.fail(e); this.loading.set(false); },

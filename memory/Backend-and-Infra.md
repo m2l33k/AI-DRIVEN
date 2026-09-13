@@ -1,7 +1,7 @@
 ---
 title: Backend and Infra
 tags: [backend, infra, observability]
-updated: 2026-08-10
+updated: 2026-09-10
 ---
 
 # Backend and Infra
@@ -65,6 +65,25 @@ Full table (incl. observability + data + URLs) → [[Ports-and-URLs]].
 - **Two separate SMTP setups:** (1) auth-service's own mail (`MAIL_USERNAME`/`MAIL_PASSWORD`,
   Gmail App Password, from repo-root `.env`) sends OTP + temp-password emails; (2) Keycloak's
   **realm SMTP** (realm settings) is what actually sends the `send-verify-email` link — still TODO.
+
+## ML service (Django, added)
+- Location: `ml-service/` (repo root)
+- Port: `8000` (Docker only — not a JAR, runs as `ml-service` container in `docker-compose-infra.yml`)
+- LSTM + Prophet + ARIMA + ensemble forecasting for roaming traffic
+- Endpoints: `/api/health/`, `POST /api/forecast/`, `POST /api/train/` (triggers background training), `GET /api/train/` (status + metrics)
+- First build takes 3–5 min (TensorFlow ~500 MB). `mem_limit: 2g` in compose.
+- Spring Boot integration: `RestTemplate` with 5s/30s timeouts; `roaming.ml-service.url=http://localhost:8000` (host) / `http://ml-service:8000` (docker profile)
+- Always set `Content-Type: application/json` on POST requests to Django (see [[spring-boot-4-compat]])
+
+## free5GC 5G Core (added 2026-09-10)
+- `docker/docker-compose-5gc.yml` — 8 control-plane NFs + WebConsole + MongoDB (no UPF on Windows)
+- `docker/.env` — `F5GC_DIR=E:/My-project/free5gc-compose`, `F5GC_TAG=v4.2.3`
+- NF metric ports 19001–19008 scraped by Prometheus with `free5gc="true"` label
+- Backend proxy in `roaming-analysis-service` (`fivegc/` package): `Free5gcService` + `Free5gcController`
+- Gateway route: `/api/5gc/**` → `lb://roaming-analysis-service`
+- Angular pages: Security Analyst `/security/5gc` + Network Operator `/operator/network-functions`
+- Grafana dashboard: `grafana-dashboard/free5gc-5g-core.json`
+- See [[5GC-Core]] and [[Ports-and-URLs]] for full details
 
 ## Observability (from commit `5ab6c0b`, `96edc40`)
 - **Prometheus** — scrapes gateway + eureka (+ auth, roaming via `host.docker.internal`).

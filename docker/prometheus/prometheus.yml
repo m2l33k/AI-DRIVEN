@@ -86,3 +86,44 @@ scrape_configs:
   - job_name: 'tempo'
     static_configs:
       - targets: ['tempo:3200']
+
+  # ---- free5GC 5G Core NF metrics (port 9091 per NF, exposed to host) ----
+  - job_name: 'free5gc-nrf'
+    static_configs:
+      - targets: ['host.docker.internal:19001']
+        labels: { nf: 'NRF', free5gc: 'true' }
+
+  - job_name: 'free5gc-amf'
+    static_configs:
+      - targets: ['host.docker.internal:19002']
+        labels: { nf: 'AMF', free5gc: 'true' }
+
+  - job_name: 'free5gc-smf'
+    static_configs:
+      - targets: ['host.docker.internal:19003']
+        labels: { nf: 'SMF', free5gc: 'true' }
+
+  - job_name: 'free5gc-ausf'
+    static_configs:
+      - targets: ['host.docker.internal:19004']
+        labels: { nf: 'AUSF', free5gc: 'true' }
+
+  - job_name: 'free5gc-udm'
+    static_configs:
+      - targets: ['host.docker.internal:19005']
+        labels: { nf: 'UDM', free5gc: 'true' }
+
+  - job_name: 'free5gc-udr'
+    static_configs:
+      - targets: ['host.docker.internal:19006']
+        labels: { nf: 'UDR', free5gc: 'true' }
+
+  - job_name: 'free5gc-pcf'
+    static_configs:
+      - targets: ['host.docker.internal:19007']
+        labels: { nf: 'PCF', free5gc: 'true' }
+
+  - job_name: 'free5gc-nssf'
+    static_configs:
+      - targets: ['host.docker.internal:19008']
+        labels: { nf: 'NSSF', free5gc: 'true' }

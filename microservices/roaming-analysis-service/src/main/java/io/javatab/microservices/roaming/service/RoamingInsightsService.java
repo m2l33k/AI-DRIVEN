@@ -12,12 +12,23 @@ import io.javatab.microservices.roaming.web.dto.CsvAnalysisDto;
 import io.javatab.microservices.roaming.web.dto.ExperienceDto;
 import io.javatab.microservices.roaming.web.dto.ForecastDto;
 import io.javatab.microservices.roaming.web.dto.LiveMonitorDto;
+import io.javatab.microservices.roaming.web.dto.MlTrainStatusDto;
+import io.javatab.microservices.roaming.web.dto.MultiModelForecastDto;
 import io.javatab.microservices.roaming.web.dto.OptimizationDto;
 import io.javatab.microservices.roaming.web.dto.QosDto;
 import io.javatab.microservices.roaming.web.dto.RevenueDto;
 import io.javatab.microservices.roaming.web.dto.RoamingEventDto;
 import io.javatab.microservices.roaming.web.dto.SimulationResultDto;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
@@ -30,6 +41,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 /**
  * Business analytics over roaming events, covering: real-time monitoring, anomaly detection,
@@ -39,7 +51,9 @@ import java.util.TreeMap;
 @Service
 public class RoamingInsightsService {
 
+	private static final Logger log = LoggerFactory.getLogger(RoamingInsightsService.class);
 	private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH:00").withZone(ZoneOffset.UTC);
+	private static final DateTimeFormatter ISO_HOUR = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:00:00'Z'").withZone(ZoneOffset.UTC);
 
 	private final RoamingEventProjection projection;
 	private final RiskAnalyzer riskAnalyzer;
@@ -47,16 +61,22 @@ public class RoamingInsightsService {
 	private final RoamingAnalysisService analysisService;
 	private final RoamingEventCsvParser csvParser;
 	private final RoamingSimulator simulator;
+	private final RestTemplate restTemplate;
+	private final String mlServiceUrl;
 
 	public RoamingInsightsService(RoamingEventProjection projection, RiskAnalyzer riskAnalyzer,
 								  AnomalyDetector anomalyDetector, RoamingAnalysisService analysisService,
-								  RoamingEventCsvParser csvParser, RoamingSimulator simulator) {
+								  RoamingEventCsvParser csvParser, RoamingSimulator simulator,
+								  RestTemplate restTemplate,
+								  @Value("${roaming.ml-service.url:http://localhost:8000}") String mlServiceUrl) {
 		this.projection = projection;
 		this.riskAnalyzer = riskAnalyzer;
 		this.anomalyDetector = anomalyDetector;
 		this.analysisService = analysisService;
 		this.csvParser = csvParser;
 		this.simulator = simulator;
+		this.restTemplate = restTemplate;
+		this.mlServiceUrl = mlServiceUrl;
 	}
 
 	/** ✅ Monitor roaming in real time — snapshot over the last {@code windowMinutes}. */
@@ -235,6 +255,117 @@ public class RoamingInsightsService {
 				round(subs > 0 ? revenue / subs : 0, 2), round(inbound, 2), round(outbound, 2), top);
 	}
 
+	/**
+	 * Calls the Django ML service with the hourly subscriber history and returns forecasts from
+	 * LSTM, Prophet, ARIMA and their ensemble average.
+	 * Falls back to an empty result with an error message if Django is unreachable.
+	 */
+	public MultiModelForecastDto forecastMl(int hoursAhead) {
+		// Build hourly buckets sorted by time (ISO timestamp → total subscribers)
+		Map<String, Long> buckets = new TreeMap<>();
+		projection.events().forEach(e ->
+				buckets.merge(ISO_HOUR.format(e.timestamp()), (long) e.subscribers(), Long::sum));
+
+		List<Map<String, Object>> history = buckets.entrySet().stream()
+				.map(en -> Map.<String, Object>of("timestamp", en.getKey(), "subscribers", en.getValue()))
+				.collect(Collectors.toList());
+
+		if (history.size() < 4) {
+			log.warn("Not enough history for ML forecast ({} points)", history.size());
+			List<MultiModelForecastDto.Point> hp = history.stream()
+					.map(h -> new MultiModelForecastDto.Point((String) h.get("timestamp"),
+							((Number) h.get("subscribers")).longValue(), false))
+					.toList();
+			return new MultiModelForecastDto(hp, List.of(), List.of(), List.of(), List.of());
+		}
+
+		Map<String, Object> requestBody = Map.of("history", history, "hours_ahead", hoursAhead);
+		try {
+			var response = restTemplate.exchange(
+					mlServiceUrl + "/api/forecast/",
+					HttpMethod.POST,
+					jsonEntity(requestBody),
+					new ParameterizedTypeReference<Map<String, Object>>() {});
+
+			Map<String, Object> body = response.getBody();
+			if (body == null) throw new IllegalStateException("Empty response from ML service");
+
+			return new MultiModelForecastDto(
+					parsePoints(body, "history"),
+					parsePoints(body, "lstm"),
+					parsePoints(body, "prophet"),
+					parsePoints(body, "arima"),
+					parsePoints(body, "ensemble"));
+		} catch (Exception ex) {
+			log.warn("ML forecast service unavailable ({}): {}", mlServiceUrl, ex.getMessage());
+			List<MultiModelForecastDto.Point> hp = history.stream()
+					.map(h -> new MultiModelForecastDto.Point((String) h.get("timestamp"),
+							((Number) h.get("subscribers")).longValue(), false))
+					.toList();
+			return new MultiModelForecastDto(hp, List.of(), List.of(), List.of(), List.of());
+		}
+	}
+
+	/**
+	 * Triggers training of all 3 ML models on the full historical dataset.
+	 * Training runs in the background inside Django; returns immediately with status="started".
+	 */
+	public MlTrainStatusDto trainMl() {
+		Map<String, Long> buckets = new TreeMap<>();
+		projection.events().forEach(e ->
+				buckets.merge(ISO_HOUR.format(e.timestamp()), (long) e.subscribers(), Long::sum));
+
+		List<Map<String, Object>> history = buckets.entrySet().stream()
+				.map(en -> Map.<String, Object>of("timestamp", en.getKey(), "subscribers", en.getValue()))
+				.collect(Collectors.toList());
+
+		Map<String, Object> requestBody = Map.of("history", history);
+		try {
+			var response = restTemplate.exchange(
+					mlServiceUrl + "/api/train/",
+					HttpMethod.POST,
+					jsonEntity(requestBody),
+					MlTrainStatusDto.class);
+			return response.getBody() != null ? response.getBody()
+					: new MlTrainStatusDto("error", null, null, 0, 0, 0, null, "Empty response");
+		} catch (Exception ex) {
+			log.warn("ML train call failed: {}", ex.getMessage());
+			return new MlTrainStatusDto("error", null, null, 0, 0, 0, null, ex.getMessage());
+		}
+	}
+
+	/** Returns the current training state + metrics from the Django ML service. */
+	public MlTrainStatusDto trainStatus() {
+		try {
+			var response = restTemplate.exchange(
+					mlServiceUrl + "/api/train/",
+					HttpMethod.GET,
+					null,
+					MlTrainStatusDto.class);
+			return response.getBody() != null ? response.getBody()
+					: new MlTrainStatusDto("error", null, null, 0, 0, 0, null, "Empty response");
+		} catch (Exception ex) {
+			log.warn("ML status call failed: {}", ex.getMessage());
+			return new MlTrainStatusDto("unavailable", null, null, 0, 0, 0, null, ex.getMessage());
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private List<MultiModelForecastDto.Point> parsePoints(Map<String, Object> body, String key) {
+		Object raw = body.get(key);
+		if (!(raw instanceof List<?> list)) return List.of();
+		return list.stream()
+				.filter(item -> item instanceof Map)
+				.map(item -> {
+					Map<String, Object> m = (Map<String, Object>) item;
+					String ts = (String) m.getOrDefault("timestamp", "");
+					long subs = ((Number) m.getOrDefault("subscribers", 0)).longValue();
+					boolean predicted = Boolean.TRUE.equals(m.get("predicted"));
+					return new MultiModelForecastDto.Point(ts, subs, predicted);
+				})
+				.collect(Collectors.toList());
+	}
+
 	// ---- helpers ----
 
 	private Map<String, List<RoamingEvent>> groupByPlmn() {
@@ -268,6 +399,12 @@ public class RoamingInsightsService {
 				e.subscribers(), e.signalingErrors(), e.newDeviceRatio(), e.impossibleTravel(),
 				e.dataVolumeGb(), e.avgLatencyMs(), e.throughputMbps(), e.droppedSessionRatio(),
 				e.revenueEur(), e.costEur(), score, RiskLevel.fromScore(score));
+	}
+
+	private static HttpEntity<Object> jsonEntity(Object body) {
+		HttpHeaders h = new HttpHeaders();
+		h.setContentType(MediaType.APPLICATION_JSON);
+		return new HttpEntity<>(body, h);
 	}
 
 	private static double clamp(double v) { return Math.max(0, Math.min(100, v)); }

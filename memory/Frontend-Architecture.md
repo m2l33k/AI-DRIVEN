@@ -1,7 +1,7 @@
 ---
 title: Frontend Architecture
 tags: [frontend, angular, architecture]
-updated: 2026-08-15
+updated: 2026-09-10
 ---
 
 # Frontend Architecture
@@ -150,12 +150,42 @@ npm run build    # production build (verified clean)
   — each rich with line/bar/donut/gauge charts. Replaces the old single mock `roaming-events` page.
 - `ng build` (dev) → clean; all roaming + rate-limiting chunks emitted.
 
+## 5GC integration (2026-09-10)
+- **`/security/5gc`** — new page `fivegc-dashboard.ts` (Security Analyst): NF health pill row, summary stat cards, active UE contexts table, subscriber list. Uses `FiveGcService` (shared).
+- **`/operator/network-functions`** — rewritten to use real free5GC data (NF card grid with SVG icons, up/down badge, 4 summary stat cards, subscriber + UE context tables).
+- **`shared/fivegc/fivegc.service.ts`** — `FiveGcService` singleton: `nfStatus()`, `subscribers()`, `ueContexts()` → `/api/5gc/*`. Uses plain `'/api/5gc'` (no environment.ts in this project).
+- **`security-layout.ts`** nav gains: `{ label: '5G Core', path: '5gc', icon: '...' }`.
+- **`app.routes.ts`** gains: `{ path: '5gc', loadComponent: fivegc-dashboard }` under the security tree.
+
+## Roaming — KPIs panel additions (2026-09-10)
+- **IREG Synthetic Test panel** added to `roaming-kpis.ts`: summary cards (total/pass/fail/pass-rate/avg-latency), transaction-type badges (REGISTRATION=purple, SMS=green, DATA=orange, MO/MT CALL=blue), PASS/FAIL result labels, empty state with 4 probe-type chips, spinner on Run button.
+- Results flagged `Synthetic_Test` — excluded from live KPI denominators.
+
+## Full folder structure (current)
+```
+Frontend/src/app/
+├── shared/
+│   ├── charts/   line-chart · bar-chart · donut-chart · gauge-chart · multi-line-chart
+│   ├── ui/       stat-card · page-header · async-state
+│   ├── layout/   role-shell (config-driven sidebar + topbar; nested submenus; i18n)
+│   └── fivegc/   fivegc.service.ts (FiveGcService)
+├── auth/         login/ · reset-password/ · first-login/
+├── messaging/    messages.ts (direct-message page, shared by all roles)
+├── errors/       not-found/ · server-error/
+└── roles/
+    ├── admin/               dashboard · users · roles · monitoring · metrics
+    ├── network-operator/    dashboard · network-functions (live 5GC) · core-config
+    ├── security-analyst/    dashboard · security-alerts · detection-rules · rate-limiting ·
+    │                        roaming/ (overview · events · anomalies · partners · qos · kpis · revenue · tools)
+    │                        fivegc/ (fivegc-dashboard)
+    └── auditor/             dashboard · audit-logs
+```
+
 ## Integration TODO (remaining)
-- Remaining **mock** pages: security dashboard, security-alerts, detection-rules; operator NFs +
-  core-config; auditor logs; admin misc. (Roaming + Rate Limiting are now **live**.)
+- Remaining **mock** pages: security dashboard, security-alerts, detection-rules; auditor logs; admin misc. (Roaming, Rate Limiting, 5GC are now **live**.)
 - Global HTTP error handling → route to `/error/500` (404 already handled by `**`).
-- Main nav icons are still filled glyphs (chrome icons are line-style); optional: convert them.
 - Optional: real "Users by role" needs backend role data (see [[Auth-Service]] TODO).
+- Wire real NRF facade (replace WebConsole-reachability proxy) when Linux free5GC host is available.
 
 ## Related notes
 - [[Frontend-Components]]

@@ -1,7 +1,7 @@
 ---
 title: Project Overview
 tags: [overview, architecture]
-updated: 2026-08-10
+updated: 2026-09-10
 ---
 
 # Project Overview
@@ -18,11 +18,13 @@ a role-based Angular console on top.
 
 | Area | Tech | Location |
 |------|------|----------|
-| Business microservices | Spring Boot | `microservices/` (auth 9001, roaming 9002, + 4 placeholders 9003–9006 — see [[Platform-Services]]) |
+| Business microservices | Spring Boot | `microservices/` (auth 9001, roaming 9002 + 5GC proxy, + 4 placeholders 9003–9006 — see [[Platform-Services]]) |
 | Platform microservices | Spring Boot | `spring-cloud/` (eureka 8761, gateway 9000) |
 | API gateway | Spring Cloud Gateway | `spring-cloud/gateway-service` |
 | Service discovery | Eureka | `spring-cloud/` |
 | Auth / IAM | Keycloak | `keycloak/platform-realm.json` |
+| ML forecasting service | Django / Python | `ml-service/` (port 8000, Docker only; LSTM+Prophet+ARIMA) |
+| 5G Core | free5GC v4.2.3 | `docker/docker-compose-5gc.yml` + `E:/My-project/free5gc-compose/` |
 | Observability | Prometheus, Grafana, Loki, Tempo, Fluent Bit, OpenTelemetry | `docker/`, `grafana-dashboard/` |
 | Orchestration | Docker, Kubernetes, Tilt | `docker/`, `kubernetes/`, `Tiltfile` |
 | Frontend | Angular 22 console | `Frontend/` |

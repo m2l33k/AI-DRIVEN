@@ -1,7 +1,7 @@
 ---
 title: Frontend Components
 tags: [frontend, components, reference]
-updated: 2026-08-15
+updated: 2026-09-10
 ---
 
 # Frontend Components (file-by-file)
@@ -128,6 +128,43 @@ See [[Frontend-Architecture]] for the big picture.
 - `app.routes.ts` — lazy routes (see [[Frontend-Architecture]] routing table).
 - `app.config.ts` — providers: global error listeners + `provideRouter(routes)`.
 
+## Shared — fivegc (`shared/fivegc/`) — added 2026-09-10
+- `fivegc.service.ts` → `FiveGcService`. `providedIn: 'root'`. Three methods:
+  - `nfStatus(): Observable<NfStatus[]>` → `GET /api/5gc/nf-status`
+  - `subscribers(): Observable<Subscriber[]>` → `GET /api/5gc/subscribers`
+  - `ueContexts(): Observable<UeContext[]>` → `GET /api/5gc/ue-contexts`
+  - All wrap with `catchError(() => of([]))` — never throw, return empty on failure.
+  - Interfaces exported: `NfStatus { type, instanceId, description, status, up }`, `Subscriber { plmnID, ueId, gpsi? }`, `UeContext { supi?, guti?, accessType?, [key]: unknown }`
+
+## Shared — charts (addition)
+- `multi-line-chart.ts` → `hw-multi-line-chart`. Multiple series on one SVG canvas.
+  - Inputs: `series: { label, color, data: number[] }[]`, `labels: string[]`, `dividerIndex?: number`
+  - `dividerIndex` draws a vertical dashed line separating historical from predicted data
+  - Used in Roaming Overview for LSTM/Prophet/ARIMA/Ensemble forecast + CSV upload forecast modal
+
+## Role: security-analyst — additions (2026-09-10)
+- **`fivegc/fivegc-dashboard.ts`** — Security Analyst 5GC page (`/security/5gc`, **live**).
+  - NF health pill row (coloured pills per NF, green=UP / grey=DOWN)
+  - Summary stat cards: NFs running, NFs down, provisioned subscribers, active UE sessions
+  - Active UE contexts table (`supi`, `guti`, `accessType`)
+  - Subscriber list table (`ueId`, `plmnID`, `gpsi`)
+  - All data from `FiveGcService`; graceful empty state when free5GC is not running
+- **`roaming/roaming-kpis.ts`** — KPIs + SLA page updated with IREG Synthetic Test panel:
+  - Summary cards: total tests / passed / failed / pass-rate / avg-latency
+  - Results table with transaction-type badge (REGISTRATION=purple, SMS=green, DATA=orange, MO/MT CALL=blue)
+  - PASS/FAIL result chip per row
+  - Empty state with 4 probe-type chips; spinner on Run button
+  - Results flagged `Synthetic_Test`, excluded from KPI denominators
+
+## Role: network-operator — additions (2026-09-10)
+- **`network-functions/network-functions.ts`** — rewritten to use real free5GC data:
+  - NF card grid — each card has SVG icon per NF type, UP (green) / DOWN (red/grey) badge
+  - 4 summary stat cards: NFs running / NFs down / provisioned subscribers / active UE sessions
+  - Subscriber table (IMSI/ueId, PLMN, GPSI)
+  - UE context table (SUPI, GUTI, access type)
+  - Loaded via `FiveGcService`; empty state when 5GC is offline
+
 ## Related notes
 - [[Frontend-Architecture]]
 - [[Roles-and-Permissions]]
+- [[5GC-Core]]

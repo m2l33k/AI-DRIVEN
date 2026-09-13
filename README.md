@@ -70,6 +70,8 @@ The platform consists of these components:
 - **Keycloak** — identity provider (authn) and source of roles/permissions (authz), port `8081`
 - **Frontend** — Angular 22 role-based console (`Frontend/`)
 - **Observability stack** — Prometheus, Grafana, Loki, Tempo, Fluent Bit, OpenTelemetry
+- **ML Forecasting Service** (`8000`) — Django/Python service providing LSTM + Prophet + ARIMA traffic forecasting (`ml-service/`)
+- **free5GC 5G Core** — 8 control-plane NFs (NRF, AMF, SMF, AUSF, UDM, UDR, PCF, NSSF) integrated via `docker/docker-compose-5gc.yml`; Windows-compatible (no UPF)
 
 ---
 
@@ -153,7 +155,7 @@ Local = running on the host; Docker = the container name on `shared-network`.
 | Eureka server | `8761` | `eureka-server:8761` | dashboard `/` |
 | Gateway service | `9000` | `gateway-service:9000` | all `/api/**`, `GET /api/metrics/overview` |
 | Auth service | `9001` | `auth-service:9001` | `/api/auth/**`, `/api/users/**` |
-| Roaming analysis service | `9002` | `roaming-analysis-service:9002` | `/api/roaming/**` |
+| Roaming analysis service | `9002` | `roaming-analysis-service:9002` | `/api/roaming/**`, `/api/5gc/**` |
 | Anomaly detection service | `9003` | `anomaly-detection-service:9003` | `/api/anomaly/health` |
 | Rate-limiting service | `9004` | `rate-limiting-service:9004` | `/api/protection/**` |
 | Distributed tracing service | `9005` | `distributed-tracing-service:9005` | `/api/tracing/health` |
@@ -180,6 +182,9 @@ Keycloak and each stateful service owns a **dedicated database container**
 | Rate-limit Redis | `6379` | `ratelimit-redis:6379` | token-bucket counters |
 | Anomaly Redis | `6380` | `anomaly-redis:6379` | real-time windows |
 | Postgres / MongoDB | `5432` / `27017` | `postgres` / `mongodb` | legacy / optional |
+| ML service (Django) | `8000` | `ml-service:8000` | LSTM+Prophet+ARIMA forecasting |
+| free5GC WebConsole | `5000` | `free5gc-webui:5000` | subscriber provisioning (admin/free5gc) |
+| free5GC NF metrics | `19001`–`19008` | `free5gc-nrf`…`free5gc-nssf` | Prometheus metrics per NF |
 
 > The placeholder services (anomaly, tracing, fault) create no tables until real logic lands
 > (`ddl-auto=update`, no entities yet), but Postgres **must be up at startup**. Redis is lazy
@@ -295,12 +300,66 @@ to the right dashboard per role. Highlights:
 
 - **Admin** — users management (live CRUD), roles matrix, System Health, API Metrics dashboards
 - **Security Analyst** — Roaming group (Overview, Events, Anomalies, Partners, QoS, Revenue,
-  Tools — all live) and a live Rate Limiting page (policy CRUD + decision tester)
+  Tools — all live), live Rate Limiting page (policy CRUD + decision tester), and **5G Core
+  dashboard** (`/security/5gc` — NF health, active UE sessions, subscriber list)
+- **Network Operator** — **Network Functions** page with live free5GC NF status, summary stat
+  cards, subscriber table, and UE context table
 - **Messaging** — a shared direct-message page available to every role, with a topbar
   notification bell driven by a live WebSocket
 - **Design** — a custom, dependency-free "Huawei console" look with hand-rolled SVG charts
 
 Build a production bundle with `npm run build`.
+
+---
+
+## ML Forecasting Service
+
+The ML service runs as a Docker container (not a JAR):
+
+```bash
+# First time — build the image (~3–5 min, TensorFlow download ~500 MB)
+docker compose -f docker/docker-compose-infra.yml build ml-service
+
+# Start
+docker compose -f docker/docker-compose-infra.yml up ml-service -d
+```
+
+The Spring Boot roaming service auto-detects it at `http://localhost:8000`. Trigger training from
+the **Roaming Tools** page in the Angular console, then view predictions on the **Overview** page.
+
+See [`ml-service/README.md`](ml-service/README.md) for full documentation.
+
+---
+
+## free5GC 5G Core (Windows mode — no UPF)
+
+**Prerequisite:** clone the free5GC compose repo as a sibling:
+
+```bash
+cd E:/My-project
+git clone https://github.com/free5gc/free5gc-compose.git
+```
+
+Then start the 8 control-plane NFs alongside the platform:
+
+```bash
+./infra.sh up --5gc          # start infra + observability + free5GC in one command
+# or separately:
+./infra.sh 5gc up            # start only free5GC containers
+./infra.sh 5gc status        # check NF container status
+./infra.sh 5gc down          # stop free5GC containers
+```
+
+On Windows, the UPF is automatically excluded (`--scale free5gc-upf=0`). The control-plane NFs
+(NRF, AMF, SMF, AUSF, UDM, UDR, PCF, NSSF) all start and are observable.
+
+- **WebConsole:** `http://localhost:5000` (admin / free5gc)
+- **Platform 5G Core API:** `http://localhost:9000/api/5gc/nf-status`
+- **Grafana dashboard:** open `free5GC — 5G Core Network Functions` in Grafana at `:3000`
+
+> The UPF requires the `gtp5g` Linux kernel module — full user-plane traffic needs an Ubuntu VM
+> or WSL2 with a custom kernel. The control-plane functions (registration, authentication, session
+> management policy) work without it.
 
 ---
 
@@ -357,7 +416,9 @@ tilt up
   user CRUD, plus a lightweight `/api/users/directory` (any authenticated user)
 - **Roaming analysis** (`/api/roaming`) — `/events`, `/summary`, `/partners`, `/live`,
   `/anomalies`, `/forecast`, `/experience`, `/qos`, `/optimization`, `/revenue`, `POST /upload`
-  (CSV), `POST /simulate`
+  (CSV), `POST /simulate`, `POST /forecast/train`, `GET /forecast/train/status`, `GET /forecast/ml`
+- **5G Core proxy** (`/api/5gc`) — `/nf-status` (NF up/down), `/subscribers` (provisioned IMSIs),
+  `/ue-contexts` (active UE sessions); all gated by `PERM_roaming-events:read`
 - **Rate limiting** (`/api/protection`) — `/check`, `/policies` (GET/PUT/DELETE), `/stats`,
   `/health`
 - **Messaging** (`/api/messages`) — send, `/conversations`, `/conversation/{peer}`,

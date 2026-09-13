@@ -31,11 +31,16 @@ spring:
           jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/auth-management/protocol/openid-connect/certs}
 
 roaming:
-  # Directory holding the source CSV dataset (devices, network_cells, roaming CDRs, attach,
-  # session_qos, handover). Loaded once on first start when the tables are empty.
   data-dir: ${ROAMING_DATA_DIR:E:/My-project/spring-boot-based-microservices/Data/Data}
-  # Operator ids treated as "home" (our network) → their outbound roaming vs partner inbound.
   home-operators: ${ROAMING_HOME_OPERATORS:OPRITWND,OPRGBEE,OPRESORE}
+  ml-service:
+    url: ${ML_SERVICE_URL:http://localhost:8000}
+
+free5gc:
+  webconsole:
+    url: ${FREE5GC_WEBCONSOLE_URL:http://localhost:5000}
+    username: ${FREE5GC_USERNAME:admin}
+    password: ${FREE5GC_PASSWORD:free5gc}
 
 eureka:
   client:
@@ -86,3 +91,6 @@ eureka:
   client:
     service-url:
       defaultZone: http://eureka-server:8761/eureka/
+roaming:
+  ml-service:
+    url: http://ml-service:8000

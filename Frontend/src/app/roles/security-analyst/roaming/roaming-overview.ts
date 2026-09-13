@@ -3,15 +3,16 @@ import { DecimalPipe } from '@angular/common';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { StatCard } from '../../../shared/ui/stat-card';
 import { LineChart } from '../../../shared/charts/line-chart';
+import { MultiLineChart, ChartSeries } from '../../../shared/charts/multi-line-chart';
 import { DonutChart, DonutSlice } from '../../../shared/charts/donut-chart';
 import { GaugeChart } from '../../../shared/charts/gauge-chart';
 import { AsyncState } from '../../../shared/ui/async-state';
-import { RoamingService, RoamingSummary, LiveMonitor, Forecast } from './roaming.service';
+import { RoamingService, RoamingSummary, LiveMonitor, MultiModelForecast } from './roaming.service';
 
 @Component({
   selector: 'app-roaming-overview',
   standalone: true,
-  imports: [DecimalPipe, PageHeader, StatCard, LineChart, DonutChart, GaugeChart, AsyncState],
+  imports: [DecimalPipe, PageHeader, StatCard, LineChart, MultiLineChart, DonutChart, GaugeChart, AsyncState],
   template: `
     <hw-page-header title="Roaming · Overview"
       subtitle="Traffic, risk mix, live monitor and traffic forecast">
@@ -61,15 +62,39 @@ import { RoamingService, RoamingSummary, LiveMonitor, Forecast } from './roaming
         }
       </div>
 
-      @if (forecast(); as f) {
-        <div class="hw-card panel">
-          <div class="panel-head">
-            <h3>Traffic forecast</h3>
-            <span class="tag">{{ f.method }} · trend {{ f.trendPerHour }}/h · right of divider = predicted</span>
-          </div>
-          <hw-line-chart [data]="forecastData()" [labels]="forecastLabels()" [smooth]="true" color="#722ed1" ariaLabel="Forecast" />
+      <div class="hw-card panel">
+        <div class="panel-head">
+          <h3>Traffic forecast — ML models</h3>
+          <span class="tag">
+            @if (mlLoading()) {
+              Loading ML models…
+            } @else if (mlHasPredictions()) {
+              LSTM · Prophet · ARIMA · Ensemble &nbsp;|&nbsp; {{ mlForecast()!.history.length }} history pts · right of divider = predicted
+            } @else if (mlForecast()) {
+              {{ mlForecast()!.history.length }} history pts loaded — train models in Tools tab
+            } @else {
+              Roaming service unavailable
+            }
+          </span>
         </div>
-      }
+        @if (mlHasPredictions()) {
+          <hw-multi-line-chart
+            [series]="mlSeries()"
+            [labels]="mlLabels()"
+            [dividerIndex]="mlForecast()!.history.length"
+            ariaLabel="ML traffic forecast" />
+        } @else if (!mlLoading() && mlForecast()) {
+          <div class="ml-hint">
+            <div class="ml-hint-icon">🤖</div>
+            <div>
+              <strong>{{ mlForecast()!.history.length }} data points loaded.</strong>
+              Go to <strong>Tools</strong> to train LSTM · Prophet · ARIMA — predictions will appear here automatically.
+            </div>
+          </div>
+        } @else if (!mlLoading()) {
+          <p class="muted-note">Cannot reach roaming service. Check that the roaming-analysis JAR is running and the ML service is up: <code>docker compose -f docker/docker-compose-infra.yml up ml-service -d</code></p>
+        }
+      </div>
     }
   `,
   styles: [`
@@ -87,6 +112,10 @@ import { RoamingService, RoamingSummary, LiveMonitor, Forecast } from './roaming
     .mini-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .mini-stats div { display: flex; flex-direction: column; font-size: 12px; color: var(--hw-text-3); }
     .mini-stats span { font-size: 22px; font-weight: 700; color: var(--hw-text); }
+    .muted-note { font-size: 13px; color: var(--hw-text-3); padding: 8px 0; }
+    .muted-note code { background: var(--hw-bg-2); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+    .ml-hint { display: flex; align-items: center; gap: 14px; padding: 18px; background: rgba(52,145,250,.06); border-radius: 8px; border: 1px solid rgba(52,145,250,.15); font-size: 13px; color: var(--hw-text-2); }
+    .ml-hint-icon { font-size: 28px; }
     @media (max-width: 1000px) { .stats, .g21, .g3 { grid-template-columns: 1fr; } }
   `],
 })
@@ -95,7 +124,12 @@ export class RoamingOverview implements OnInit {
 
   summary = signal<RoamingSummary | null>(null);
   live = signal<LiveMonitor | null>(null);
-  forecast = signal<Forecast | null>(null);
+  mlForecast = signal<MultiModelForecast | null>(null);
+  mlLoading = signal(true);
+  mlHasPredictions = computed(() => {
+    const f = this.mlForecast();
+    return !!(f && (f.lstm.length || f.prophet.length || f.arima.length || f.ensemble.length));
+  });
   error = signal<string | null>(null);
   loading = signal(true);
 
@@ -116,13 +150,28 @@ export class RoamingOverview implements OnInit {
       { label: 'Outbound', value: s?.outboundCount ?? 0, color: '#722ed1' },
     ];
   });
-  forecastData = computed(() => {
-    const f = this.forecast(); if (!f) return [];
-    return [...f.history.map((p) => p.subscribers), ...f.forecast.map((p) => p.subscribers)];
+  mlLabels = computed(() => {
+    const f = this.mlForecast();
+    if (!f) return [];
+    const histLabels = f.history.map((p) => p.timestamp.slice(11, 16));
+    const predLabels = (f.ensemble.length ? f.ensemble : f.lstm.length ? f.lstm : f.arima)
+      .map((p) => p.timestamp.slice(11, 16));
+    return [...histLabels, ...predLabels];
   });
-  forecastLabels = computed(() => {
-    const f = this.forecast(); if (!f) return [];
-    return [...f.history.map((p) => p.hour), ...f.forecast.map((p) => p.hour)];
+
+  mlSeries = computed<ChartSeries[]>(() => {
+    const f = this.mlForecast();
+    if (!f) return [];
+    const histVals = f.history.map((p) => p.subscribers);
+    const pad = (arr: typeof f.lstm) =>
+      arr.length ? [...Array(f.history.length).fill(null as unknown as number), ...arr.map((p) => p.subscribers)] : [];
+    return [
+      { label: 'History', color: '#c9cdd4', data: [...histVals, ...Array(f.ensemble.length || f.lstm.length || 0).fill(null as unknown as number)] },
+      { label: 'LSTM', color: '#3491fa', data: pad(f.lstm) },
+      { label: 'Prophet', color: '#00a870', data: pad(f.prophet) },
+      { label: 'ARIMA', color: '#ff8f1f', data: pad(f.arima) },
+      { label: 'Ensemble', color: '#722ed1', data: pad(f.ensemble), dashed: true },
+    ].filter((s) => s.data.some((v) => v !== null && v > 0));
   });
 
   ngOnInit() { this.load(); }
@@ -130,12 +179,16 @@ export class RoamingOverview implements OnInit {
   load() {
     this.error.set(null);
     this.loading.set(true);
+    this.mlLoading.set(true);
     this.api.summary().subscribe({
       next: (v) => { this.summary.set(v); this.loading.set(false); },
       error: (e) => { this.fail(e); this.loading.set(false); },
     });
     this.api.live(60).subscribe({ next: (v) => this.live.set(v), error: () => {} });
-    this.api.forecast(6).subscribe({ next: (v) => this.forecast.set(v), error: () => {} });
+    this.api.forecastMl(6).subscribe({
+      next: (v) => { this.mlForecast.set(v); this.mlLoading.set(false); },
+      error: () => { this.mlLoading.set(false); },
+    });
   }
 
   private fail(err: { status?: number; error?: { error?: string } }) {

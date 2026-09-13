@@ -1,7 +1,7 @@
 ---
 title: Scripts and Tooling
 tags: [infra, scripts, docker, tooling]
-updated: 2026-08-14
+updated: 2026-09-10
 ---
 
 # Scripts & Tooling
@@ -15,7 +15,7 @@ URLs live in [[Ports-and-URLs]]; the *why* behind the infra shape is in [[Archit
 | Script | Purpose | Covers |
 |--------|---------|--------|
 | `run.sh` | Build (Maven) + run the app services | ⚠️ **eureka + gateway + auth only** |
-| `infra.sh` | Bring up/down infra + observability containers | all of `docker-compose-infra.yml` + `-observability.yml` |
+| `infra.sh` | Bring up/down infra + observability + free5GC containers | `docker-compose-infra.yml` + `-observability.yml` + optional `-5gc.yml` |
 | `build-images.sh` | Build Docker images into Minikube's daemon | ⚠️ **eureka + gateway + auth only** |
 | `create-project.sh` | Scaffold a new Spring Boot module | n/a |
 | `Tiltfile` | Local k8s dev loop (Tilt) with live-update | ⚠️ **eureka + gateway + auth only** |
@@ -60,15 +60,30 @@ URLs live in [[Ports-and-URLs]]; the *why* behind the infra shape is in [[Archit
   gateway. ⚠️ Also **only those three** app services + the legacy infra set — not updated for the
   per-service Postgres/Redis/MySQL or the new services (ADR-09 "not yet wired for Kubernetes").
 
+### `infra.sh` — free5GC additions (2026-09-10)
+New subcommand and flag added:
+```bash
+./infra.sh up --5gc          # start infra + observability + free5GC (8 control-plane NFs)
+./infra.sh 5gc up            # start only free5GC containers
+./infra.sh 5gc down          # stop only free5GC containers
+./infra.sh 5gc status        # show only free5GC container status
+```
+Auto-detects OS: on non-Linux, appends `--scale free5gc-upf=0` (skips UPF which requires `gtp5g`).
+`print_5gc_urls()` prints WebConsole URL + NF metric ports.
+
+**Prerequisite:** `free5gc-compose` must be cloned at `E:/My-project/free5gc-compose` and `docker/.env` must set `F5GC_DIR` + `F5GC_TAG=v4.2.3`. See [[5GC-Core]].
+
 ## Docker Compose files (`docker/`)
 
 | File | What it defines |
 |------|-----------------|
 | `docker-compose-base.yml` | The **app services** (eureka, gateway, auth, roaming, + 9003–9006) on `shared-network`, fluentd logging → Fluent Bit, `depends_on: eureka`. |
-| `docker-compose-infra.yml` | **Stateful infra:** Keycloak + `keycloak-postgres`, `roaming-mysql`, the 4 per-service Postgres (5433–5436), 2 Redis (6379/6380), legacy `postgres`/`mongodb`, named volumes. |
+| `docker-compose-infra.yml` | **Stateful infra:** Keycloak + `keycloak-postgres`, `roaming-mysql`, the 4 per-service Postgres (5433–5436), 2 Redis (6379/6380), legacy `postgres`/`mongodb`, **ml-service** (Django, port 8000), named volumes. |
 | `docker-compose-observability.yml` | Prometheus, Grafana, Loki, Tempo, Fluent Bit. |
+| `docker-compose-5gc.yml` | **free5GC 5G Core:** 8 control-plane NFs (NRF/AMF/SMF/AUSF/UDM/UDR/PCF/NSSF) + WebConsole + MongoDB. Shares `docker_shared-network` (external). Each NF has a `privnet` alias + metric port mapping. Config comes from `F5GC_DIR` (env var). |
 | `dashboard-1.yml` | Extra Grafana dashboard definition. |
-| `prometheus/`, `grafana/`, `loki/`, `tempo/`, `fluent-bit/`, `postgresql/` | Per-tool config mounted into the containers. `prometheus/prometheus.yml` scrapes host apps via `host.docker.internal` (gateway/eureka/auth/roaming) so metrics flow while services run locally. |
+| `.env` | `F5GC_DIR=E:/My-project/free5gc-compose`, `F5GC_TAG=v4.2.3` — **must be in `docker/` directory** (Docker Compose v2 reads .env from compose file dir, not CWD). |
+| `prometheus/`, `grafana/`, `loki/`, `tempo/`, `fluent-bit/`, `postgresql/` | Per-tool config. `prometheus/prometheus.yml` scrapes host apps (gateway/eureka/auth/roaming/ml) via `host.docker.internal` + 8 free5GC NF metric endpoints (19001–19008). |
 
 - `infra.sh` = infra + observability compose files together; `run.sh docker` = base compose only.
 - Validate a compose file: `docker compose -f docker/<file> config`.

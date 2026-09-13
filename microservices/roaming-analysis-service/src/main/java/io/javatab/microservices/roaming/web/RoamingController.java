@@ -7,6 +7,8 @@ import io.javatab.microservices.roaming.service.PerformanceAssuranceService;
 import io.javatab.microservices.roaming.service.RoamingAnalysisService;
 import io.javatab.microservices.roaming.service.RoamingInsightsService;
 import io.javatab.microservices.roaming.web.dto.AgreementDto;
+import io.javatab.microservices.roaming.web.dto.MlTrainStatusDto;
+import io.javatab.microservices.roaming.web.dto.MultiModelForecastDto;
 import io.javatab.microservices.roaming.web.dto.AnomalyDto;
 import io.javatab.microservices.roaming.web.dto.CsvAnalysisDto;
 import io.javatab.microservices.roaming.web.dto.ExperienceDto;
@@ -150,13 +152,43 @@ public class RoamingController {
 		return insights.simulate(count, minutesSpread, windowMinutes);
 	}
 
-	@Operation(summary = "Traffic forecast",
+	@Operation(summary = "Traffic forecast (linear)",
 			description = "Linear-trend forecast of subscribers/hour for the next N hours (default 6). Requires roaming-events:read.",
 			security = @SecurityRequirement(name = "bearerAuth"))
 	@PreAuthorize("hasAuthority('PERM_roaming-events:read')")
 	@GetMapping("/forecast")
 	public ForecastDto forecast(@RequestParam(defaultValue = "6") int hoursAhead) {
 		return insights.forecast(hoursAhead);
+	}
+
+	@Operation(summary = "Train ML models",
+			description = "Triggers background training of LSTM, Prophet and ARIMA on the full historical dataset. "
+					+ "Returns immediately with status=started. Poll /forecast/train/status for progress and metrics. "
+					+ "Requires roaming-events:read.",
+			security = @SecurityRequirement(name = "bearerAuth"))
+	@PreAuthorize("hasAuthority('PERM_roaming-events:read')")
+	@PostMapping("/forecast/train")
+	public MlTrainStatusDto trainMl() {
+		return insights.trainMl();
+	}
+
+	@Operation(summary = "ML training status",
+			description = "Returns current training state (idle | training | trained | error) with evaluation "
+					+ "metrics (MAE, RMSE, AIC) per model. Requires roaming-events:read.",
+			security = @SecurityRequirement(name = "bearerAuth"))
+	@PreAuthorize("hasAuthority('PERM_roaming-events:read')")
+	@GetMapping("/forecast/train/status")
+	public MlTrainStatusDto trainStatus() {
+		return insights.trainStatus();
+	}
+
+	@Operation(summary = "ML traffic forecast (LSTM + Prophet + ARIMA)",
+			description = "Multi-model forecast: LSTM, Prophet, ARIMA and ensemble average. Delegates to the Python ML service. Requires roaming-events:read.",
+			security = @SecurityRequirement(name = "bearerAuth"))
+	@PreAuthorize("hasAuthority('PERM_roaming-events:read')")
+	@GetMapping("/forecast/ml")
+	public MultiModelForecastDto forecastMl(@RequestParam(defaultValue = "6") int hoursAhead) {
+		return insights.forecastMl(hoursAhead);
 	}
 
 	@Operation(summary = "Customer experience",

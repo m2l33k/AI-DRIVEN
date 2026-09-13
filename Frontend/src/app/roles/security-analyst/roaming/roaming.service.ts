@@ -54,6 +54,30 @@ export interface Revenue {
   revenuePerSubscriberEur: number; inboundRevenueEur: number; outboundRevenueEur: number;
   topPartners: PartnerRevenue[];
 }
+export interface MlForecastPoint { timestamp: string; subscribers: number; predicted: boolean; }
+export interface MultiModelForecast {
+  history: MlForecastPoint[];
+  lstm: MlForecastPoint[];
+  prophet: MlForecastPoint[];
+  arima: MlForecastPoint[];
+  ensemble: MlForecastPoint[];
+  model_status?: string;
+  trained_at?: string;
+}
+
+export type TrainStatus = 'idle' | 'training' | 'trained' | 'error' | 'unavailable' | 'started';
+export interface ModelMetrics { mae?: number; rmse?: number; aic?: number; final_loss?: number; lookback?: number; epochs?: number; order?: number[]; error?: string; weekly_seasonality?: boolean; daily_seasonality?: boolean; }
+export interface MlTrainState {
+  status: TrainStatus;
+  started_at: string | null;
+  finished_at: string | null;
+  data_points: number;
+  train_points: number;
+  test_points: number;
+  metrics: { lstm?: ModelMetrics; prophet?: ModelMetrics; arima?: ModelMetrics };
+  error: string | null;
+}
+
 export interface CsvAnalysis {
   fileName: string; rowsParsed: number; rowsSkipped: number; columns: string[];
   summary: RoamingSummary; anomalies: Anomaly[]; forecast: Forecast;
@@ -128,6 +152,12 @@ export class RoamingService {
     const params = new HttpParams().set('count', count).set('minutesSpread', minutesSpread).set('windowMinutes', windowMinutes);
     return this.http.post<SimulationResult>(`${API}/simulate`, null, { params });
   }
+
+  forecastMl(hoursAhead = 6): Observable<MultiModelForecast> {
+    return this.http.get<MultiModelForecast>(`${API}/forecast/ml`, { params: new HttpParams().set('hoursAhead', hoursAhead) });
+  }
+  trainMl(): Observable<MlTrainState> { return this.http.post<MlTrainState>(`${API}/forecast/train`, null); }
+  trainStatus(): Observable<MlTrainState> { return this.http.get<MlTrainState>(`${API}/forecast/train/status`); }
 
   // --- Performance Assurance Engine (§5.2) ---------------------------------
   kpis(window: KpiWindow = 'DAY', partner?: string): Observable<KpiSet> {
