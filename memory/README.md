@@ -37,6 +37,8 @@ Every note is Markdown with `[[wiki-links]]`, so use the Graph View to navigate.
   - [[Messaging-Service]] — direct messaging between users (port 9007, `/api/messages`)
   - [[ML-Forecasting-Service]] — Django LSTM+Prophet+ARIMA forecasting service (port 8000, Docker only)
   - [[5GC-Core]] — **free5GC** as the real 5G Core substrate + UERANSIM; this repo = the harness (ADR-13)
+  - [[Zero-Trust-Phase2]] — SBI TLS + NRF OAuth2 inside free5GC; SEC-01 / SEC-02 demo scenarios; impact analysis
+  - [[Phase3-Attack-Scenarios]] — UERANSIM registration flood (ATK-01) + IMSI enumeration (ATK-02); live anomaly detection; dashboard visuals
   - fivegc-service (port 9008) — 5GC proxy + **VM MongoDB console** (see [[Backend-and-Infra]])
 
 **Docs & process**
