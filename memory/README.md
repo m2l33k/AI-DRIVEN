@@ -22,27 +22,29 @@ Every note is Markdown with `[[wiki-links]]`, so use the Graph View to navigate.
 
 **Roles & frontend**
 - [[Roles-and-Permissions]] — the 4 Keycloak roles and what each can do
-- [[Frontend-Architecture]] — Angular app: stack, structure, routing, design system
-- [[Frontend-Components]] — detailed, file-by-file breakdown of every UI component
+- [[Frontend-Architecture]] — Angular app: stack, structure, routing, design system (updated 2026-09-15)
+- [[Frontend-Components]] — detailed, file-by-file breakdown of every UI component (updated 2026-09-15)
 
 **Backend & infra**
-- [[Backend-and-Infra]] — microservices, Keycloak, observability, infra tooling
+- [[Backend-and-Infra]] — microservices, Keycloak, observability, infra tooling (updated 2026-09-15)
+- [[All-Endpoints]] — **complete API endpoint catalogue** for every service (NEW 2026-09-15)
+- [[Ports-and-URLs]] — quick reference: every port, URL, and key endpoint (updated 2026-09-15)
 - [[Grafana-Dashboards]] — detailed dashboard design (NF KPIs, security/anomaly, zero-trust, D6)
 - [[Scripts-and-Tooling]] — every helper script + compose file, and which are stale ⚠️
-- [[Ports-and-URLs]] — quick reference: every port, URL, and key endpoint
   - [[Auth-Service]] — login state machine, first-login, OTP reset, user mgmt (port 9001)
   - [[Roaming-Analysis-Service]] — roaming events + risk scoring API (port 9002)
-  - [[Platform-Services]] — 4 new placeholder services: anomaly/rate-limit/tracing/fault (9003–9006)
+  - [[Platform-Services]] — 4 placeholder services: anomaly/rate-limit/tracing/fault (9003–9006)
   - [[Messaging-Service]] — direct messaging between users (port 9007, `/api/messages`)
   - [[ML-Forecasting-Service]] — Django LSTM+Prophet+ARIMA forecasting service (port 8000, Docker only)
   - [[5GC-Core]] — **free5GC** as the real 5G Core substrate + UERANSIM; this repo = the harness (ADR-13)
+  - fivegc-service (port 9008) — 5GC proxy + **VM MongoDB console** (see [[Backend-and-Infra]])
 
 **Docs & process**
 - [[Proposal-Internship]] — the full internship proposal (Cloud-Native 5G Core; 3 differentiating layers)
 - [[Presentation]] — the academic / internship defense deck (`Noted/PRESENTATION.md`)
 - [[Git-Workflow-and-History]] — branches, what was deleted, commit rules ⚠️
 - [[Session-Log]] — chronological log of what we did each session
-- [[Next-Steps]] — open threads and the backlog
+- [[Next-Steps]] — open threads and the backlog (updated 2026-09-15)
 - [[report]] — full structured content for drafting the PFE technical report
 
 ## ⚠️ Golden rules
