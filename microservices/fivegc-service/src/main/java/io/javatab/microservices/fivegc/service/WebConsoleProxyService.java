@@ -271,6 +271,217 @@ public class WebConsoleProxyService {
 		rest.exchange(baseUrl + "/api/profile/" + name, HttpMethod.DELETE, new HttpEntity<>(h), Void.class);
 	}
 
+	// ── network config (aggregate from UDR) ─────────────────────────────────────
+
+	@SuppressWarnings("unchecked")
+	public java.util.Map<String, Object> getNetworkConfig() {
+		List<java.util.Map<String, Object>> subs = getSubscribers();
+		com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+
+		String mcc = "", mnc = "";
+		java.util.Map<String, java.util.Map<String, Object>> sliceMap = new java.util.LinkedHashMap<>();
+		java.util.Map<String, java.util.Map<String, Object>> qosMap  = new java.util.LinkedHashMap<>();
+
+		for (java.util.Map<String, Object> sub : subs) {
+			String ueId   = (String) sub.getOrDefault("ueId",   "");
+			String plmnId = (String) sub.getOrDefault("plmnID", "");
+			if (ueId.isBlank()) continue;
+
+			if (mcc.isEmpty() && plmnId.length() >= 5) {
+				mcc = plmnId.substring(0, 3);
+				mnc = plmnId.substring(3);
+			}
+
+			java.util.Map<String, Object> details = getSubscriberDetails(ueId, plmnId);
+
+			// ── slices from AccessAndMobilitySubscriptionData ──────────────────────
+			try {
+				com.fasterxml.jackson.databind.JsonNode amData =
+						om.valueToTree(details.get("AccessAndMobilitySubscriptionData"));
+				com.fasterxml.jackson.databind.JsonNode defaultSlices =
+						amData.path("nssai").path("defaultSingleNssais");
+				if (defaultSlices.isArray()) {
+					for (com.fasterxml.jackson.databind.JsonNode s : defaultSlices) {
+						int    sst = s.path("sst").asInt();
+						String sd  = s.path("sd").asText("");
+						sliceMap.computeIfAbsent(sst + "-" + sd, k -> {
+							java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+							m.put("sst",    sst);
+							m.put("sd",     sd);
+							m.put("snssai", String.format("%02d-%s", sst, sd));
+							m.put("active", true);
+							m.put("_dnns",  new java.util.ArrayList<String>());
+							return m;
+						});
+					}
+				}
+			} catch (Exception e) {
+				log.warn("Could not parse AM subscription for {}: {}", ueId, e.getMessage());
+			}
+
+			// ── QoS + DNN from SessionManagementSubscriptionData ──────────────────
+			try {
+				com.fasterxml.jackson.databind.JsonNode smData =
+						om.valueToTree(details.get("SessionManagementSubscriptionData"));
+				if (smData != null && smData.isArray()) {
+					for (com.fasterxml.jackson.databind.JsonNode session : smData) {
+						int    sst      = session.path("singleNssai").path("sst").asInt();
+						String sd       = session.path("singleNssai").path("sd").asText("");
+						String sliceKey = sst + "-" + sd;
+
+						java.util.Iterator<java.util.Map.Entry<String, com.fasterxml.jackson.databind.JsonNode>> it =
+								session.path("dnnConfigurations").fields();
+						while (it.hasNext()) {
+							java.util.Map.Entry<String, com.fasterxml.jackson.databind.JsonNode> e = it.next();
+							String dnn     = e.getKey();
+							com.fasterxml.jackson.databind.JsonNode dnnCfg = e.getValue();
+
+							// attach DNN to slice
+							java.util.Map<String, Object> sliceEntry = sliceMap.get(sliceKey);
+							if (sliceEntry != null) {
+								@SuppressWarnings("unchecked")
+								java.util.List<String> dnns = (java.util.List<String>) sliceEntry.get("_dnns");
+								if (!dnns.contains(dnn)) dnns.add(dnn);
+							}
+
+							int    fiveqi  = dnnCfg.path("5gQosProfile").path("5qi").asInt(9);
+							String uplink  = dnnCfg.path("sessionAmbr").path("uplink").asText("1 Gbps");
+							String downlink = dnnCfg.path("sessionAmbr").path("downlink").asText("2 Gbps");
+							String qosKey  = fiveqi + "-" + dnn;
+							qosMap.computeIfAbsent(qosKey, k -> {
+								java.util.Map<String, Object> q = new java.util.LinkedHashMap<>();
+								q.put("name",     dnn + " (5QI-" + fiveqi + ")");
+								q.put("dnn",      dnn);
+								q.put("fiveqi",   fiveqi);
+								q.put("type",     fiveqi <= 4 ? "GBR" : "Non-GBR");
+								q.put("uplink",   uplink);
+								q.put("downlink", downlink);
+								return q;
+							});
+						}
+					}
+				}
+			} catch (Exception e) {
+				log.warn("Could not parse SM subscription for {}: {}", ueId, e.getMessage());
+			}
+		}
+
+		// flatten _dnns → dnn string
+		java.util.List<java.util.Map<String, Object>> slices = new java.util.ArrayList<>();
+		for (java.util.Map<String, Object> s : sliceMap.values()) {
+			@SuppressWarnings("unchecked")
+			java.util.List<String> dnns = (java.util.List<String>) s.remove("_dnns");
+			s.put("dnn", String.join(", ", dnns));
+			slices.add(s);
+		}
+
+		java.util.Map<String, Object> plmn = new java.util.LinkedHashMap<>();
+		plmn.put("mcc",         mcc.isEmpty() ? "208" : mcc);
+		plmn.put("mnc",         mnc.isEmpty() ? "93"  : mnc);
+		plmn.put("tac",         "0x0001");
+		plmn.put("amfRegionId", "128");
+		plmn.put("amfSetId",    "1");
+		plmn.put("nrfEndpoint", "https://nrf.5gc.svc:8443");
+
+		java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+		result.put("plmn",        plmn);
+		result.put("slices",      slices);
+		result.put("qosProfiles", new java.util.ArrayList<>(qosMap.values()));
+		return result;
+	}
+
+	@SuppressWarnings("unchecked")
+	public java.util.Map<String, Object> applyNetworkConfig(java.util.Map<String, Object> patch) {
+		com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+		List<java.util.Map<String, Object>> subs = getSubscribers();
+		int updated = 0;
+		java.util.List<String> errors = new java.util.ArrayList<>();
+
+		// build dnn → qos-patch lookup
+		java.util.List<java.util.Map<String, Object>> qosPatches =
+				(java.util.List<java.util.Map<String, Object>>) patch.getOrDefault("qosProfiles", List.of());
+		java.util.Map<String, java.util.Map<String, Object>> qosByDnn = new java.util.LinkedHashMap<>();
+		for (java.util.Map<String, Object> q : qosPatches) {
+			String dnn = (String) q.getOrDefault("dnn", "");
+			if (!dnn.isBlank()) qosByDnn.put(dnn, q);
+		}
+
+		for (java.util.Map<String, Object> sub : subs) {
+			String ueId   = (String) sub.getOrDefault("ueId",   "");
+			String plmnId = (String) sub.getOrDefault("plmnID", "20893");
+			if (ueId.isBlank()) continue;
+			try {
+				java.util.Map<String, Object> details = getSubscriberDetails(ueId, plmnId);
+				boolean dirty = false;
+
+				com.fasterxml.jackson.databind.JsonNode smRaw =
+						om.valueToTree(details.get("SessionManagementSubscriptionData"));
+				if (smRaw != null && smRaw.isArray()) {
+					com.fasterxml.jackson.databind.node.ArrayNode smArr =
+							(com.fasterxml.jackson.databind.node.ArrayNode) smRaw.deepCopy();
+					for (com.fasterxml.jackson.databind.JsonNode session : smArr) {
+						java.util.Iterator<java.util.Map.Entry<String, com.fasterxml.jackson.databind.JsonNode>> it =
+								session.path("dnnConfigurations").fields();
+						while (it.hasNext()) {
+							java.util.Map.Entry<String, com.fasterxml.jackson.databind.JsonNode> entry = it.next();
+							String dnn = entry.getKey();
+							if (!qosByDnn.containsKey(dnn)) continue;
+							java.util.Map<String, Object> qp = qosByDnn.get(dnn);
+							com.fasterxml.jackson.databind.node.ObjectNode dnnNode =
+									(com.fasterxml.jackson.databind.node.ObjectNode) entry.getValue();
+
+							com.fasterxml.jackson.databind.JsonNode ambrNode = dnnNode.path("sessionAmbr");
+							if (!ambrNode.isMissingNode()) {
+								com.fasterxml.jackson.databind.node.ObjectNode ambr =
+										(com.fasterxml.jackson.databind.node.ObjectNode) ambrNode;
+								if (qp.containsKey("uplink"))
+									ambr.put("uplink",   (String) qp.get("uplink"));
+								if (qp.containsKey("downlink"))
+									ambr.put("downlink", (String) qp.get("downlink"));
+								dirty = true;
+							}
+							com.fasterxml.jackson.databind.JsonNode qosNode = dnnNode.path("5gQosProfile");
+							if (!qosNode.isMissingNode() && qp.containsKey("fiveqi")) {
+								((com.fasterxml.jackson.databind.node.ObjectNode) qosNode)
+										.put("5qi", ((Number) qp.get("fiveqi")).intValue());
+								dirty = true;
+							}
+						}
+					}
+					if (dirty) {
+						details.put("SessionManagementSubscriptionData",
+								om.convertValue(smArr, java.util.List.class));
+					}
+				}
+
+				if (dirty) {
+					putSubscriber(ueId, plmnId, details);
+					updated++;
+				}
+			} catch (Exception e) {
+				log.warn("Could not apply config to {}: {}", ueId, e.getMessage());
+				errors.add(ueId + ": " + e.getMessage());
+			}
+		}
+
+		java.util.Map<String, Object> result = new java.util.LinkedHashMap<>();
+		result.put("updated", updated);
+		result.put("total",   subs.size());
+		result.put("status",  errors.isEmpty() ? "ok" : "partial");
+		if (!errors.isEmpty()) result.put("errors", errors);
+		return result;
+	}
+
+	private void putSubscriber(String ueId, String plmnId, java.util.Map<String, Object> body) {
+		String token = resolveToken();
+		HttpHeaders h = new HttpHeaders();
+		h.set("Token", token);
+		h.set("Content-Type", "application/json");
+		String url = baseUrl + "/api/subscriber/" + ueId + "/" + plmnId;
+		log.info("PUT {} ueId={}", url, ueId);
+		rest.exchange(url, HttpMethod.PUT, new HttpEntity<>(body, h), String.class);
+	}
+
 	public boolean isReachable() {
 		try {
 			rest.headForHeaders(baseUrl + "/api/login");

@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -179,6 +180,28 @@ public class FiveGcController {
 	@GetMapping("/charging")
 	public List<Map<String, Object>> chargingRecords() {
 		return webconsole.getChargingRecords();
+	}
+
+	// ── network config (aggregate + apply) ───────────────────────────────────────
+
+	@Operation(summary = "Get aggregated network configuration",
+			description = "Returns PLMN parameters, network slices, and QoS profiles derived from the UDR subscriber data.",
+			security = @SecurityRequirement(name = "bearerAuth"))
+	@PreAuthorize("isAuthenticated()")
+	@GetMapping("/network-config")
+	public Map<String, Object> networkConfig() {
+		return webconsole.getNetworkConfig();
+	}
+
+	@Operation(summary = "Apply network configuration",
+			description = "Pushes updated QoS / AMBR settings to all provisioned subscribers in the UDR. Requires NETWORK_OPERATOR role.",
+			security = @SecurityRequirement(name = "bearerAuth"))
+	@PreAuthorize("hasRole('NETWORK_OPERATOR')")
+	@PutMapping("/network-config")
+	public ResponseEntity<Map<String, Object>> applyNetworkConfig(@RequestBody Map<String, Object> body) {
+		Map<String, Object> result = webconsole.applyNetworkConfig(body);
+		HttpStatus status = "partial".equals(result.get("status")) ? HttpStatus.MULTI_STATUS : HttpStatus.OK;
+		return ResponseEntity.status(status).body(result);
 	}
 
 	// ── UE contexts ──────────────────────────────────────────────────────────────

@@ -57,6 +57,45 @@ export interface ChargingRecord {
   [key: string]: unknown;
 }
 
+export interface NetworkSlice {
+  snssai: string;
+  sst: number;
+  sd: string;
+  dnn: string;
+  active: boolean;
+}
+
+export interface QosProfile {
+  name: string;
+  dnn: string;
+  fiveqi: number;
+  type: string;
+  uplink: string;
+  downlink: string;
+}
+
+export interface PlmnConfig {
+  mcc: string;
+  mnc: string;
+  tac: string;
+  amfRegionId: string;
+  amfSetId: string;
+  nrfEndpoint: string;
+}
+
+export interface NetworkConfig {
+  plmn: PlmnConfig;
+  slices: NetworkSlice[];
+  qosProfiles: QosProfile[];
+}
+
+export interface ApplyResult {
+  updated: number;
+  total: number;
+  status: 'ok' | 'partial';
+  errors?: string[];
+}
+
 export interface SubscriberProfile {
   profileName?: string;
   AccessAndMobilitySubscriptionData?: unknown;
@@ -115,6 +154,15 @@ export class FiveGcService {
 
   deleteTenant(tenantId: string): Observable<void> {
     return this.http.delete<void>(`${BASE}/tenants/${encodeURIComponent(tenantId)}`);
+  }
+
+  // ── network config ────────────────────────────────────────────────────────────
+  getNetworkConfig(): Observable<NetworkConfig> {
+    return this.http.get<NetworkConfig>(`${BASE}/network-config`);
+  }
+
+  applyNetworkConfig(config: NetworkConfig): Observable<ApplyResult> {
+    return this.http.put<ApplyResult>(`${BASE}/network-config`, config);
   }
 
   // ── profiles ──────────────────────────────────────────────────────────────────
