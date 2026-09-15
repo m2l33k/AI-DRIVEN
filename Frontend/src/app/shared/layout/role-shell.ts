@@ -400,7 +400,7 @@ export interface NavItem {
     .np-time { font-size: 11px; color: #9a7d83; }
     .np-preview { font-size: 12px; color: #6a565b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .np-empty { padding: 26px 16px; text-align: center; color: #9a7d83; font-size: 13px; }
-    .content { flex: 1; overflow-y: auto; padding: 20px 24px 24px; }
+    .content { flex: 1; overflow-y: auto; padding: 20px 24px 24px; position: relative; }
 
     /* ---- Mobile ---- */
     .mobile-toggle {

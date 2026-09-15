@@ -48,6 +48,10 @@ spring:
               uri: lb://fivegc-service
               predicates:
                 - Path=/api/5gc/**
+            - id: vm-service
+              uri: lb://fivegc-service
+              predicates:
+                - Path=/api/vm/**
             - id: fivegc-service-docs
               uri: lb://fivegc-service
               predicates:
@@ -225,6 +229,10 @@ spring:
               uri: lb://fivegc-service
               predicates:
                 - Path=/api/5gc/**
+            - id: vm-service
+              uri: lb://fivegc-service
+              predicates:
+                - Path=/api/vm/**
             - id: fivegc-service-docs
               uri: lb://fivegc-service
               predicates:

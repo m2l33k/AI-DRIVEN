@@ -13,6 +13,9 @@ spring:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/auth-management}
           jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/auth-management/protocol/openid-connect/certs}
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017}
 
 free5gc:
   webconsole:
@@ -20,9 +23,6 @@ free5gc:
     username: ${FREE5GC_USERNAME:admin}
     password: ${FREE5GC_PASSWORD:free5gc}
 
-# Docker daemon connection.
-# Windows dev: tcp://localhost:2375 (Docker Desktop → Settings → General → "Expose daemon on tcp")
-# Docker container / Linux: unix:///var/run/docker.sock
 docker:
   host: ${DOCKER_HOST:tcp://localhost:2375}
 
@@ -44,6 +44,9 @@ management:
   endpoint:
     health:
       show-details: always
+  health:
+    mongo:
+      enabled: false
 
 springdoc:
   api-docs:
@@ -67,6 +70,9 @@ spring:
         jwt:
           issuer-uri: http://keycloak:8080/realms/auth-management
           jwk-set-uri: http://keycloak:8080/realms/auth-management/protocol/openid-connect/certs
+  data:
+    mongodb:
+      uri: mongodb://mongodb:27017
 
 free5gc:
   webconsole:

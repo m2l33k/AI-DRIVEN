@@ -38,6 +38,7 @@ export const routes: Routes = [
       { path: '5gc', loadComponent: () => import('./roles/security-analyst/fivegc/fivegc-dashboard').then((m) => m.FiveGcDashboard) },
       { path: '5gc-topology', loadComponent: () => import('./roles/security-analyst/fivegc/fivegc-topology').then((m) => m.FiveGcTopology) },
       { path: 'messages', loadComponent: () => import('./messaging/messages').then((m) => m.Messages) },
+      { path: 'vm', loadComponent: () => import('./roles/shared/vm/vm-desktop').then((m) => m.VmDesktop) },
     ],
   },
 
@@ -64,6 +65,7 @@ export const routes: Routes = [
       { path: '5gc', loadComponent: () => import('./roles/security-analyst/fivegc/fivegc-dashboard').then((m) => m.FiveGcDashboard) },
       { path: '5gc-topology', loadComponent: () => import('./roles/security-analyst/fivegc/fivegc-topology').then((m) => m.FiveGcTopology) },
       { path: 'messages', loadComponent: () => import('./messaging/messages').then((m) => m.Messages) },
+      { path: 'vm', loadComponent: () => import('./roles/shared/vm/vm-desktop').then((m) => m.VmDesktop) },
     ],
   },
 
