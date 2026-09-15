@@ -1,0 +1,10 @@
+interface_name: [eth0]
+xdp_attach_mode: generic
+api_address: :8080
+pfcp_address: 0.0.0.0:8805
+pfcp_node_id: upf.free5gc.org
+metrics_address: :9091
+n3_address: 0.0.0.0
+gtp_peer: []
+ueip_pool: 10.60.0.0/16
+logging_level: info

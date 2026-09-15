@@ -261,20 +261,15 @@ services:
         aliases:
           - amf.free5gc.org
 
-  # --- UPF (user plane; GTP-U — REQUIRES gtp5g kernel module) ------------------
-  #  ⚠️  Windows/Mac: always exits with "operation not supported" because gtp5g
-  #     is a custom Linux kernel module.  UPF is ONLY needed for PDU sessions
-  #     (data-plane internet through 5GC).  UE registration works without it.
-  #
-  #  This service is opt-in via the "upf" profile:
-  #    Linux:   docker compose --profile upf -f docker/docker-compose-5gc.yml up -d
-  #    Windows: docker compose         -f docker/docker-compose-5gc.yml up -d   ← skips UPF
+  # --- UPF — Option 1: free5GC native UPF (REQUIRES gtp5g on Linux host) ------
+  #  profile: upf-linux
+  #  Linux only: docker compose --profile upf-linux -f docker/docker-compose-5gc.yml up -d
   free5gc-upf:
     container_name: free5gc-upf
     image: free5gc/upf:${F5GC_TAG:-v3.4.4}
     command: ./upf -c ./config/upfcfg.yaml
     profiles:
-      - upf
+      - upf-linux
     cap_add:
       - NET_ADMIN
     privileged: true
@@ -292,6 +287,34 @@ services:
         fluentd-address: "host.docker.internal:24224"
         tag: "free5gc.upf"
         fluentd-async: "true"
+    networks:
+      shared-network: {}
+      privnet:
+        ipv4_address: 10.100.200.101
+        aliases:
+          - upf.free5gc.org
+
+  # --- UPF — Option 2: eUPF (eBPF/XDP — works on WSL2, no kernel module) -----
+  #  profile: upf-ebpf
+  #  Windows/WSL2: docker compose --profile upf-ebpf -f docker/docker-compose-5gc.yml up -d
+  free5gc-eupf:
+    container_name: free5gc-eupf
+    image: ghcr.io/edgecomllc/eupf:latest
+    command: /app/eupf --config /config/eupf.yaml
+    profiles:
+      - upf-ebpf
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - BPF
+    privileged: true
+    sysctls:
+      - net.ipv4.ip_forward=1
+    volumes:
+      - ./ueransim/eupf.yaml:/config/eupf.yaml
+      - /sys/fs/bpf:/sys/fs/bpf
+    depends_on:
+      - free5gc-smf
     networks:
       shared-network: {}
       privnet:
