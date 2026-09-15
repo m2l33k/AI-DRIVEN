@@ -29,6 +29,7 @@ export class SecurityLayout {
       ],
     },
     { label: '5G Core', path: '5gc', icon: 'M12 2L3 7v10l9 5 9-5V7l-9-5zm0 2.18L19 8v8l-7 3.89L5 16V8l7-3.82z' },
+    { label: '5GC Topology', path: '5gc-topology', icon: 'M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z' },
     { label: 'Detection Rules', path: 'detection-rules', icon: 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z' },
     { label: 'Rate Limiting', path: 'rate-limiting', icon: 'M12 2a10 10 0 100 20 10 10 0 000-20zm0 18a8 8 0 110-16 8 8 0 010 16zm1-13h-2v6l5 3 1-1.6-4-2.4V7z' },
   ];

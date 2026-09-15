@@ -98,14 +98,6 @@ export interface NavItem {
                 @if (notif.unread() > 0) { <span class="badge">{{ notif.unread() }}</span> }
               } @else if (notif.unread() > 0) { <i class="dot"></i> }
             </button>
-            <a class="nav-item" routerLink="messages" routerLinkActive="active" title="Messages"
-               (click)="mobileOpen.set(false)">
-              <svg class="li" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-              @if (!collapsed()) {
-                <span class="lbl">{{ i18n.t('Messages') }}</span>
-                @if (messages.unread() > 0) { <span class="badge alt">{{ messages.unread() }}</span> }
-              } @else if (messages.unread() > 0) { <i class="dot alt"></i> }
-            </a>
             <button class="nav-item" (click)="openChangePw()" title="Change password">
               <svg class="li" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
               @if (!collapsed()) { <span class="lbl">{{ i18n.t('Change password') }}</span> }
@@ -215,6 +207,18 @@ export interface NavItem {
         <main class="content">
           <router-outlet />
         </main>
+
+        <!-- Floating Messages Button -->
+        <a class="msg-fab" routerLink="messages" aria-label="Messages"
+           (click)="mobileOpen.set(false)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+          </svg>
+          @if (messages.unread() > 0) {
+            <span class="fab-badge">{{ messages.unread() > 9 ? '9+' : messages.unread() }}</span>
+          }
+        </a>
       </div>
     </div>
   `,
@@ -430,6 +434,36 @@ export interface NavItem {
     .note.err { background: rgba(245,63,63,.1); color: var(--hw-danger); }
     .note.ok { background: rgba(0,168,112,.1); color: var(--hw-success); }
     .pw-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+
+    /* ---- Floating Messages Button ---- */
+    .msg-fab {
+      position: fixed; bottom: 28px; right: 28px; z-index: 80;
+      width: 54px; height: 54px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, var(--crimson) 0%, var(--crimson-deep) 100%);
+      color: #fff; box-shadow: 0 4px 20px rgba(193,21,54,.45);
+      text-decoration: none; cursor: pointer;
+      transition: transform .2s, box-shadow .2s;
+    }
+    .msg-fab:hover {
+      transform: translateY(-3px) scale(1.06);
+      box-shadow: 0 8px 28px rgba(193,21,54,.65);
+    }
+    .msg-fab:active { transform: scale(.95); }
+    .msg-fab svg { width: 22px; height: 22px; stroke: #fff; flex: none; }
+    .fab-badge {
+      position: absolute; top: 2px; right: 2px;
+      min-width: 18px; height: 18px; padding: 0 4px;
+      background: #fff; color: var(--crimson);
+      font-size: 10px; font-weight: 700; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,.25);
+      animation: fab-pop .25s cubic-bezier(.35,1.6,.55,1);
+    }
+    @keyframes fab-pop {
+      from { transform: scale(0); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
   `],
 })
 export class RoleShell {
