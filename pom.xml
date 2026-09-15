@@ -29,5 +29,6 @@
         <module>microservices/distributed-tracing-service</module>
         <module>microservices/fault-injection-service</module>
         <module>microservices/messaging-service</module>
+        <module>microservices/fivegc-service</module>
     </modules>
 </project>

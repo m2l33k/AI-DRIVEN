@@ -37,13 +37,23 @@ spring:
             - id: roaming-analysis-service
               uri: lb://roaming-analysis-service
               predicates:
-                - Path=/api/roaming/**,/api/5gc/**
+                - Path=/api/roaming/**
             - id: roaming-analysis-service-docs
               uri: lb://roaming-analysis-service
               predicates:
                 - Path=/roaming-analysis-service/v3/api-docs
               filters:
                 - RewritePath=/roaming-analysis-service/(?<segment>.*), /$\{segment}
+            - id: fivegc-service
+              uri: lb://fivegc-service
+              predicates:
+                - Path=/api/5gc/**
+            - id: fivegc-service-docs
+              uri: lb://fivegc-service
+              predicates:
+                - Path=/fivegc-service/v3/api-docs
+              filters:
+                - RewritePath=/fivegc-service/(?<segment>.*), /$\{segment}
             - id: anomaly-detection-service
               uri: lb://anomaly-detection-service
               predicates:
@@ -167,6 +177,8 @@ springdoc:
         url: /auth-service/v3/api-docs
       - name: roaming-analysis-service
         url: /roaming-analysis-service/v3/api-docs
+      - name: fivegc-service
+        url: /fivegc-service/v3/api-docs
       - name: anomaly-detection-service
         url: /anomaly-detection-service/v3/api-docs
       - name: rate-limiting-service
@@ -202,13 +214,23 @@ spring:
             - id: roaming-analysis-service
               uri: lb://roaming-analysis-service
               predicates:
-                - Path=/api/roaming/**,/api/5gc/**
+                - Path=/api/roaming/**
             - id: roaming-analysis-service-docs
               uri: lb://roaming-analysis-service
               predicates:
                 - Path=/roaming-analysis-service/v3/api-docs
               filters:
                 - RewritePath=/roaming-analysis-service/(?<segment>.*), /$\{segment}
+            - id: fivegc-service
+              uri: lb://fivegc-service
+              predicates:
+                - Path=/api/5gc/**
+            - id: fivegc-service-docs
+              uri: lb://fivegc-service
+              predicates:
+                - Path=/fivegc-service/v3/api-docs
+              filters:
+                - RewritePath=/fivegc-service/(?<segment>.*), /$\{segment}
             - id: anomaly-detection-service
               uri: lb://anomaly-detection-service
               predicates:

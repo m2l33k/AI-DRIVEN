@@ -15,5 +15,7 @@ export class OperatorLayout {
     { label: 'Dashboard', path: 'dashboard', icon: 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z' },
     { label: 'Network Functions', path: 'network-functions', icon: 'M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm13 0a3 3 0 100 6 3 3 0 000-6z' },
     { label: 'Core Config', path: 'core-config', icon: 'M20 8h-3V4H3v16h14v-4h3V8zM7 9h6v2H7V9zm0 4h6v2H7v-2z' },
+    { label: '5G Core', path: '5gc', icon: 'M12 2L3 7v10l9 5 9-5V7l-9-5zm0 2.18L19 8v8l-7 3.89L5 16V8l7-3.82z' },
+    { label: 'Messages', path: 'messages', icon: 'M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z' },
   ];
 }

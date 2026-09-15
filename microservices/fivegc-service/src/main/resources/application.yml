@@ -1,28 +1,12 @@
 server:
-  port: 9002
+  port: 9008
   shutdown: graceful
 
 spring:
   application:
-    name: roaming-analysis-service
+    name: fivegc-service
   lifecycle:
     timeout-per-shutdown-phase: 15s
-  servlet:
-    multipart:
-      max-file-size: 25MB
-      max-request-size: 25MB
-  datasource:
-    url: ${ROAMING_DB_URL:jdbc:mysql://localhost:3307/roaming_db?createDatabaseIfNotExist=true&serverTimezone=UTC}
-    username: ${ROAMING_DB_USERNAME:roaming}
-    password: ${ROAMING_DB_PASSWORD:roaming}
-    driver-class-name: com.mysql.cj.jdbc.Driver
-  jpa:
-    hibernate:
-      ddl-auto: update
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQLDialect
-    open-in-view: false
   security:
     oauth2:
       resourceserver:
@@ -30,11 +14,17 @@ spring:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/auth-management}
           jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/auth-management/protocol/openid-connect/certs}
 
-roaming:
-  data-dir: ${ROAMING_DATA_DIR:E:/My-project/spring-boot-based-microservices/Data/Data}
-  home-operators: ${ROAMING_HOME_OPERATORS:OPRITWND,OPRGBEE,OPRESORE}
-  ml-service:
-    url: ${ML_SERVICE_URL:http://localhost:8000}
+free5gc:
+  webconsole:
+    url: ${FREE5GC_WEBCONSOLE_URL:http://localhost:5000}
+    username: ${FREE5GC_USERNAME:admin}
+    password: ${FREE5GC_PASSWORD:free5gc}
+
+# Docker daemon connection.
+# Windows dev: tcp://localhost:2375 (Docker Desktop → Settings → General → "Expose daemon on tcp")
+# Docker container / Linux: unix:///var/run/docker.sock
+docker:
+  host: ${DOCKER_HOST:tcp://localhost:2375}
 
 eureka:
   client:
@@ -71,20 +61,21 @@ spring:
   config:
     activate:
       on-profile: docker
-  datasource:
-    url: jdbc:mysql://roaming-mysql:3306/roaming_db?createDatabaseIfNotExist=true&serverTimezone=UTC
-    username: roaming
-    password: roaming
   security:
     oauth2:
       resourceserver:
         jwt:
           issuer-uri: http://keycloak:8080/realms/auth-management
           jwk-set-uri: http://keycloak:8080/realms/auth-management/protocol/openid-connect/certs
+
+free5gc:
+  webconsole:
+    url: http://free5gc-webui:5000
+
+docker:
+  host: unix:///var/run/docker.sock
+
 eureka:
   client:
     service-url:
       defaultZone: http://eureka-server:8761/eureka/
-roaming:
-  ml-service:
-    url: http://ml-service:8000

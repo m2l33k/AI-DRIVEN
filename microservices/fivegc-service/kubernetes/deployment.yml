@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fivegc-service
+  labels:
+    app: fivegc-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fivegc-service
+  template:
+    metadata:
+      labels:
+        app: fivegc-service
+    spec:
+      containers:
+        - name: fivegc-service
+          image: fivegc-service
+          imagePullPolicy: IfNotPresent
+          lifecycle:
+            preStop:
+              exec:
+                command: [ "sh", "-c", "sleep 5" ]
+          ports:
+            - containerPort: 9008
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: docker
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              value: http://eureka-server:8761/eureka/
+            - name: FREE5GC_WEBCONSOLE_URL
+              value: http://free5gc-webui:5000
+            - name: DOCKER_HOST
+              value: unix:///var/run/docker.sock
+          volumeMounts:
+            - name: docker-socket
+              mountPath: /var/run/docker.sock
+      volumes:
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket

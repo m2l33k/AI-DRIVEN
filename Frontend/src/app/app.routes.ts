@@ -35,6 +35,7 @@ export const routes: Routes = [
       { path: 'dashboard', loadComponent: () => import('./roles/network-operator/dashboard/operator-dashboard').then((m) => m.OperatorDashboard) },
       { path: 'network-functions', loadComponent: () => import('./roles/network-operator/network-functions/network-functions').then((m) => m.NetworkFunctions) },
       { path: 'core-config', loadComponent: () => import('./roles/network-operator/core-config/core-config').then((m) => m.CoreConfig) },
+      { path: '5gc', loadComponent: () => import('./roles/security-analyst/fivegc/fivegc-dashboard').then((m) => m.FiveGcDashboard) },
       { path: 'messages', loadComponent: () => import('./messaging/messages').then((m) => m.Messages) },
     ],
   },
