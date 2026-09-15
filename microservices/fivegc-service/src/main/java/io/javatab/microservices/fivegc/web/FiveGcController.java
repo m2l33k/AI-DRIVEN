@@ -170,6 +170,17 @@ public class FiveGcController {
 		return ResponseEntity.noContent().build();
 	}
 
+	// ── charging records ──────────────────────────────────────────────────────────
+
+	@Operation(summary = "Subscriber charging records",
+			description = "Charging configuration (Offline/Online) for all provisioned subscribers, extracted from UDR.",
+			security = @SecurityRequirement(name = "bearerAuth"))
+	@PreAuthorize("isAuthenticated()")
+	@GetMapping("/charging")
+	public List<Map<String, Object>> chargingRecords() {
+		return webconsole.getChargingRecords();
+	}
+
 	// ── UE contexts ──────────────────────────────────────────────────────────────
 
 	@Operation(summary = "Active UE contexts",

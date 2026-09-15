@@ -45,6 +45,18 @@ export interface Tenant {
   [key: string]: unknown;
 }
 
+export interface ChargingRecord {
+  _ueId?: string;
+  chargingMethod?: string;
+  quota?: string;
+  unitCost?: string;
+  snssai?: string;
+  dnn?: string;
+  filter?: string;
+  qosRef?: number | null;
+  [key: string]: unknown;
+}
+
 export interface SubscriberProfile {
   profileName?: string;
   AccessAndMobilitySubscriptionData?: unknown;
@@ -85,6 +97,11 @@ export class FiveGcService {
   // ── UE contexts ──────────────────────────────────────────────────────────────
   ueContexts(): Observable<UeContext[]> {
     return this.http.get<UeContext[]>(`${BASE}/ue-contexts`).pipe(catchError(() => of([])));
+  }
+
+  // ── charging records ──────────────────────────────────────────────────────────
+  chargingRecords(): Observable<ChargingRecord[]> {
+    return this.http.get<ChargingRecord[]>(`${BASE}/charging`).pipe(catchError(() => of([])));
   }
 
   // ── tenants ───────────────────────────────────────────────────────────────────

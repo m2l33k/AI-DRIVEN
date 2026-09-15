@@ -261,11 +261,20 @@ services:
         aliases:
           - amf.free5gc.org
 
-  # --- UPF (user plane; GTP-U — REQUIRES gtp5g on the host) ------------------
+  # --- UPF (user plane; GTP-U — REQUIRES gtp5g kernel module) ------------------
+  #  ⚠️  Windows/Mac: always exits with "operation not supported" because gtp5g
+  #     is a custom Linux kernel module.  UPF is ONLY needed for PDU sessions
+  #     (data-plane internet through 5GC).  UE registration works without it.
+  #
+  #  This service is opt-in via the "upf" profile:
+  #    Linux:   docker compose --profile upf -f docker/docker-compose-5gc.yml up -d
+  #    Windows: docker compose         -f docker/docker-compose-5gc.yml up -d   ← skips UPF
   free5gc-upf:
     container_name: free5gc-upf
     image: free5gc/upf:${F5GC_TAG:-v3.4.4}
     command: ./upf -c ./config/upfcfg.yaml
+    profiles:
+      - upf
     cap_add:
       - NET_ADMIN
     privileged: true
@@ -289,6 +298,43 @@ services:
         ipv4_address: 10.100.200.101
         aliases:
           - upf.free5gc.org
+
+  # --- UERANSIM gNB (simulated 5G base-station; connects to AMF via NGAP/SCTP) ---
+  #  Uses ./ueransim/gnbcfg.yaml (linkIp: 0.0.0.0 so the UE container can reach it)
+  free5gc-gnb:
+    container_name: free5gc-gnb
+    image: free5gc/ueransim:latest
+    command: ./nr-gnb -c ./config/gnbcfg.yaml
+    volumes:
+      - ./ueransim:/ueransim/config
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    depends_on:
+      - free5gc-amf
+    networks:
+      privnet:
+        ipv4_address: 10.100.200.50
+        aliases:
+          - gnb.free5gc.org
+
+  # --- UERANSIM UE (simulated subscriber; registers through the gNB) -----------
+  free5gc-ue:
+    container_name: free5gc-ue
+    image: free5gc/ueransim:latest
+    command: ./nr-ue -c ./config/uecfg.yaml
+    volumes:
+      - ./ueransim:/ueransim/config
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    depends_on:
+      - free5gc-gnb
+    networks:
+      privnet:
+        ipv4_address: 10.100.200.51
 
   # --- WebConsole (subscriber provisioning UI + REST) ------------------------
   free5gc-webui:

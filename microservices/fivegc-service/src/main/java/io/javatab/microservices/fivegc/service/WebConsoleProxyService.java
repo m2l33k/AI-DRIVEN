@@ -46,35 +46,93 @@ public class WebConsoleProxyService {
 
 	// ── public API ──────────────────────────────────────────────────────────────
 
+	@SuppressWarnings("unchecked")
 	public List<Map<String, Object>> getSubscribers() {
 		try {
-			@SuppressWarnings("unchecked")
-			ResponseEntity<List> resp = get("/api/subscriber", List.class);
-			return resp.getBody() != null ? resp.getBody() : List.of();
+			ResponseEntity<String> raw = rest.exchange(
+					baseUrl + "/api/subscriber", HttpMethod.GET, tokenHeaders(resolveToken()), String.class);
+			String body = raw.getBody();
+			log.info("GET /api/subscriber → status={} body={}", raw.getStatusCode(), body);
+			if (body == null || body.isBlank() || body.equals("null")) return List.of();
+			com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+			com.fasterxml.jackson.databind.JsonNode node = om.readTree(body);
+			if (!node.isArray()) return List.of();
+			List<Map<String, Object>> result = new java.util.ArrayList<>();
+			for (com.fasterxml.jackson.databind.JsonNode item : node) {
+				result.add(om.convertValue(item, Map.class));
+			}
+			return result;
 		} catch (Exception e) {
 			log.warn("Could not fetch subscribers from WebConsole: {}", e.getMessage());
 			return List.of();
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	public List<Map<String, Object>> getRegisteredUeContexts() {
 		try {
-			// free5GC returns "null" (4 bytes) when no UEs are registered
-			ResponseEntity<Object> resp = rest.exchange(
+			// free5GC returns the literal string "null" (4 bytes) when no UEs are registered
+			ResponseEntity<String> raw = rest.exchange(
 					baseUrl + "/api/registered-ue-context",
-					HttpMethod.GET, tokenHeaders(resolveToken()), Object.class);
-			Object body = resp.getBody();
-			if (body == null) return List.of();
-			if (body instanceof List<?> list) {
-				@SuppressWarnings("unchecked")
-				List<Map<String, Object>> result = (List<Map<String, Object>>) list;
-				return result;
+					HttpMethod.GET, tokenHeaders(resolveToken()), String.class);
+			String body = raw.getBody();
+			log.info("GET /api/registered-ue-context → status={} body={}", raw.getStatusCode(), body);
+			if (body == null || body.isBlank() || body.equals("null")) return List.of();
+			com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+			com.fasterxml.jackson.databind.JsonNode node = om.readTree(body);
+			if (!node.isArray()) return List.of();
+			List<Map<String, Object>> result = new java.util.ArrayList<>();
+			for (com.fasterxml.jackson.databind.JsonNode item : node) {
+				result.add(om.convertValue(item, Map.class));
 			}
-			return List.of();
+			return result;
 		} catch (Exception e) {
 			log.warn("Could not fetch UE contexts from WebConsole: {}", e.getMessage());
 			return List.of();
 		}
+	}
+
+	@SuppressWarnings("unchecked")
+	public Map<String, Object> getSubscriberDetails(String ueId, String plmnId) {
+		try {
+			ResponseEntity<String> raw = rest.exchange(
+					baseUrl + "/api/subscriber/" + ueId + "/" + plmnId,
+					HttpMethod.GET, tokenHeaders(resolveToken()), String.class);
+			String body = raw.getBody();
+			if (body == null || body.isBlank() || body.equals("null")) return Map.of();
+			com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+			return om.readValue(body, Map.class);
+		} catch (Exception e) {
+			log.warn("Could not fetch subscriber details for {} / {}: {}", ueId, plmnId, e.getMessage());
+			return Map.of();
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	public List<Map<String, Object>> getChargingRecords() {
+		List<Map<String, Object>> subs = getSubscribers();
+		List<Map<String, Object>> all = new java.util.ArrayList<>();
+		com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+		for (Map<String, Object> sub : subs) {
+			String ueId   = (String) sub.getOrDefault("ueId", "");
+			String plmnId = (String) sub.getOrDefault("plmnID", "20893");
+			if (ueId.isBlank()) continue;
+			Map<String, Object> details = getSubscriberDetails(ueId, plmnId);
+			Object raw = details.get("ChargingDatas");
+			if (raw == null) continue;
+			try {
+				com.fasterxml.jackson.databind.JsonNode node = om.valueToTree(raw);
+				if (!node.isArray()) continue;
+				for (com.fasterxml.jackson.databind.JsonNode item : node) {
+					Map<String, Object> rec = om.convertValue(item, Map.class);
+					rec.put("_ueId", ueId);
+					all.add(rec);
+				}
+			} catch (Exception ex) {
+				log.warn("Could not parse ChargingDatas for {}: {}", ueId, ex.getMessage());
+			}
+		}
+		return all;
 	}
 
 	// ── tenants ──────────────────────────────────────────────────────────────────

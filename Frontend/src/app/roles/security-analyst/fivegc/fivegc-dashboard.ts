@@ -4,10 +4,10 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { AuthService } from '../../../core/auth.service';
 import {
-  FiveGcService, NfStatus, Subscriber, UeContext, ContainerInfo, ContainerLogs, SubscriberProfile, Tenant,
+  FiveGcService, NfStatus, Subscriber, UeContext, ContainerInfo, ContainerLogs, SubscriberProfile, Tenant, ChargingRecord,
 } from '../../shared/fivegc/fivegc.service';
 
-type Tab = 'nf' | 'subscribers' | 'ue-contexts' | 'containers';
+type Tab = 'nf' | 'subscribers' | 'ue-contexts' | 'charging' | 'containers';
 
 interface SliceRow { sst: number; sd: string; dnn: string; sessionAmbrUl: string; sessionAmbrDl: string; qi5: number; isDefault: boolean; }
 interface FlowRuleRow { filter: string; precedence: number; snssai: string; dnn: string; qosRef: number; }
@@ -130,6 +130,7 @@ const DEFAULT_SUB_BODY = {
       <button class="tab" [class.active]="tab()==='nf'"          (click)="setTab('nf')">NF Health</button>
       <button class="tab" [class.active]="tab()==='subscribers'"  (click)="setTab('subscribers')">Subscribers</button>
       <button class="tab" [class.active]="tab()==='ue-contexts'"  (click)="setTab('ue-contexts')">UE Contexts</button>
+      <button class="tab" [class.active]="tab()==='charging'"     (click)="setTab('charging')">Charging</button>
       <button class="tab" [class.active]="tab()==='containers'"   (click)="setTab('containers')">Infrastructure</button>
     </div>
 
@@ -572,24 +573,86 @@ const DEFAULT_SUB_BODY = {
     @if (tab() === 'ue-contexts') {
       <div class="hw-card panel">
         <div class="panel-head">
-          <span class="panel-title">Active UE Contexts</span>
+          <span class="panel-title">Active UE Contexts (AMF)</span>
           <span class="tag">{{ ueContexts().length ? ueContexts().length + ' connected' : 'No active sessions' }}</span>
         </div>
         @if (loadingUe()) {
           <p class="empty">Loading…</p>
         } @else {
           <table class="tbl">
-            <thead><tr><th>SUPI / IMSI</th><th>Access Type</th><th>GUTI</th></tr></thead>
+            <thead>
+              <tr>
+                <th>SUPI / IMSI</th>
+                <th>Access Type</th>
+                <th>TAI (MCC/MNC/TAC)</th>
+                <th>AMF UE NGAP ID</th>
+                <th>RAN UE NGAP ID</th>
+                <th>GUTI</th>
+              </tr>
+            </thead>
             <tbody>
               @for (u of ueContexts(); track $index) {
                 <tr>
-                  <td class="mono">{{ u['supi'] || '—' }}</td>
-                  <td class="muted">{{ u['accessType'] || '3GPP' }}</td>
-                  <td class="mono muted small">{{ u['guti'] || '—' }}</td>
+                  <td class="mono">{{ u['Supi'] || u['supi'] || '—' }}</td>
+                  <td class="muted">{{ u['AccessType'] || u['accessType'] || '3GPP_ACCESS' }}</td>
+                  <td class="mono muted small">{{ formatTai(u['Tai'] || u['tai']) }}</td>
+                  <td class="mono muted small">{{ u['AmfUeNgapId'] ?? u['amfUeNgapId'] ?? '—' }}</td>
+                  <td class="mono muted small">{{ u['RanUeNgapId'] ?? u['ranUeNgapId'] ?? '—' }}</td>
+                  <td class="mono muted small">{{ u['Guti'] || u['guti'] || '—' }}</td>
                 </tr>
               } @empty {
-                <tr><td class="empty" colspan="3">
-                  No UEs registered. Connect UERANSIM or a physical gNB to generate sessions.
+                <tr><td class="empty" colspan="6">
+                  No UEs registered — no UERANSIM or physical gNB connected to free5GC.
+                </td></tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+    }
+
+    <!-- ═══ CHARGING ═══ -->
+    @if (tab() === 'charging') {
+      <div class="hw-card panel">
+        <div class="panel-head">
+          <span class="panel-title">Subscriber Charging Records (UDR)</span>
+          <span class="tag">{{ chargingRecs().length }} records</span>
+        </div>
+        @if (loadingCharging()) {
+          <p class="empty">Loading…</p>
+        } @else {
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>SUPI / IMSI</th>
+                <th>Method</th>
+                <th>SNSSAI</th>
+                <th>DNN</th>
+                <th>Filter</th>
+                <th>Quota</th>
+                <th>Unit Cost</th>
+                <th>QoS Ref</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of chargingRecs(); track $index) {
+                <tr>
+                  <td class="mono">{{ c['_ueId'] || '—' }}</td>
+                  <td>
+                    <span class="method-badge" [class.offline]="c['chargingMethod']==='Offline'" [class.online]="c['chargingMethod']==='Online'">
+                      {{ c['chargingMethod'] || '—' }}
+                    </span>
+                  </td>
+                  <td class="mono muted small">{{ c['snssai'] || '—' }}</td>
+                  <td class="muted">{{ c['dnn'] || '—' }}</td>
+                  <td class="mono muted small">{{ c['filter'] || '—' }}</td>
+                  <td class="mono">{{ c['quota'] || '—' }}</td>
+                  <td class="mono muted small">{{ c['unitCost'] || '—' }}</td>
+                  <td class="mono muted small">{{ c['qosRef'] ?? '—' }}</td>
+                </tr>
+              } @empty {
+                <tr><td class="empty" colspan="8">
+                  No charging records — subscribers have no ChargingDatas configured.
                 </td></tr>
               }
             </tbody>
@@ -731,6 +794,9 @@ const DEFAULT_SUB_BODY = {
     /* container state */
     .state-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: var(--hw-danger); }
     .state-dot.running { background: var(--hw-success); }
+    .method-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .method-badge.offline { background: rgba(250,140,22,.15); color: #fa8c16; }
+    .method-badge.online  { background: rgba(0,168,112,.15);  color: var(--hw-success); }
     .state-label { font-size: 12px; font-weight: 600; color: var(--hw-danger); }
     .state-label.running { color: var(--hw-success); }
 
@@ -888,6 +954,10 @@ export class FiveGcDashboard implements OnInit {
   ueContexts   = signal<UeContext[]>([]);
   loadingUe    = signal(false);
 
+  // Charging records
+  chargingRecs     = signal<ChargingRecord[]>([]);
+  loadingCharging  = signal(false);
+
   // Containers
   containers        = signal<ContainerInfo[]>([]);
   loadingContainers = signal(false);
@@ -909,6 +979,7 @@ export class FiveGcDashboard implements OnInit {
     if (t === 'nf')          this.loadNf();
     if (t === 'subscribers') { this.loadSubscribers(); this.loadProfiles(); this.loadTenants(); }
     if (t === 'ue-contexts') this.loadUeContexts();
+    if (t === 'charging')    this.loadCharging();
     if (t === 'containers')  this.loadContainers();
   }
 
@@ -1203,6 +1274,16 @@ export class FiveGcDashboard implements OnInit {
     });
   }
 
+  formatTai(tai: unknown): string {
+    if (!tai || typeof tai !== 'object') return '—';
+    const t = tai as Record<string, unknown>;
+    const plmn = (t['PlmnId'] || t['plmnId']) as Record<string, string> | undefined;
+    const mcc  = plmn?.['Mcc'] || plmn?.['mcc'] || '';
+    const mnc  = plmn?.['Mnc'] || plmn?.['mnc'] || '';
+    const tac  = (t['Tac'] || t['tac'] || '') as string;
+    return mcc && mnc ? `${mcc}/${mnc}/${tac}` : '—';
+  }
+
   // ── subscriber form row helpers ───────────────────────────────────────────────
   addSlice()    { this.subSlices.push({ sst: 1, sd: '', dnn: 'internet', sessionAmbrUl: '1000 Mbps', sessionAmbrDl: '1000 Mbps', qi5: 9, isDefault: false }); }
   removeSlice(i: number)    { this.subSlices.splice(i, 1); }
@@ -1230,6 +1311,16 @@ export class FiveGcDashboard implements OnInit {
     this.api.ueContexts().subscribe({
       next: (v) => { this.ueContexts.set(Array.isArray(v) ? v : []); this.loadingUe.set(false); },
       error: () => this.loadingUe.set(false),
+    });
+  }
+
+  // ── charging ──────────────────────────────────────────────────────────────────
+
+  private loadCharging() {
+    this.loadingCharging.set(true);
+    this.api.chargingRecords().subscribe({
+      next: (v) => { this.chargingRecs.set(Array.isArray(v) ? v : []); this.loadingCharging.set(false); },
+      error: () => this.loadingCharging.set(false),
     });
   }
 
