@@ -208,9 +208,41 @@ export interface NavItem {
           <router-outlet />
         </main>
 
+        <!-- Floating Messages Panel -->
+        @if (msgPanelOpen()) {
+          <div class="msg-panel">
+            <div class="mp-head">
+              <svg class="mp-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+              <span class="mp-title">Messages</span>
+              @if (messages.unread() > 0) {
+                <span class="mp-badge">{{ messages.unread() > 9 ? '9+' : messages.unread() }}</span>
+              }
+              <a class="mp-open" routerLink="messages" (click)="mobileOpen.set(false)" title="Open full messages">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              </a>
+              <button class="mp-x" (click)="msgPanelOpen.set(false)" aria-label="Close">
+                <svg viewBox="0 0 24 24" width="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div class="mp-list">
+              @for (n of notif.items(); track $index) {
+                <a class="mp-item" [class.mp-unread]="!n.read" routerLink="messages"
+                   (click)="mobileOpen.set(false)">
+                  <span class="mp-av">{{ (n.from || '?').charAt(0).toUpperCase() }}</span>
+                  <span class="mp-body">
+                    <span class="mp-top"><strong>{{ n.from }}</strong><span class="mp-time">{{ n.at | date:'HH:mm' }}</span></span>
+                    <span class="mp-preview">{{ n.preview }}</span>
+                  </span>
+                </a>
+              } @empty {
+                <p class="mp-empty">No messages yet.</p>
+              }
+            </div>
+          </div>
+        }
+
         <!-- Floating Messages Button -->
-        <a class="msg-fab" routerLink="messages" aria-label="Messages"
-           (click)="mobileOpen.set(false)">
+        <button class="msg-fab" (click)="msgPanelOpen.update(v=>!v)" aria-label="Messages">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
@@ -218,7 +250,7 @@ export interface NavItem {
           @if (messages.unread() > 0) {
             <span class="fab-badge">{{ messages.unread() > 9 ? '9+' : messages.unread() }}</span>
           }
-        </a>
+        </button>
       </div>
     </div>
   `,
@@ -464,6 +496,65 @@ export interface NavItem {
       from { transform: scale(0); opacity: 0; }
       to   { transform: scale(1); opacity: 1; }
     }
+
+    /* ---- Floating Messages Panel ---- */
+    .msg-panel {
+      position: fixed; bottom: 94px; right: 28px; z-index: 200;
+      width: 300px; max-height: 380px;
+      display: flex; flex-direction: column;
+      background: #fff;
+      border: 1px solid rgba(193,21,54,.14);
+      border-radius: 16px;
+      box-shadow: 0 16px 48px rgba(64,12,24,.20), 0 2px 8px rgba(193,21,54,.10);
+      overflow: hidden;
+      animation: panel-in .2s cubic-bezier(.22,.68,0,1.2);
+    }
+    @keyframes panel-in {
+      from { transform: scale(.92) translateY(12px); opacity: 0; }
+      to   { transform: scale(1) translateY(0);      opacity: 1; }
+    }
+    .mp-head {
+      display: flex; align-items: center; gap: 7px;
+      padding: 11px 12px; border-bottom: 1px solid #f0e8ea; flex: none;
+      background: linear-gradient(135deg, rgba(193,21,54,.05), transparent);
+    }
+    .mp-ico { width: 16px; height: 16px; flex: none; color: var(--crimson); }
+    .mp-title { font-size: 13px; font-weight: 700; color: #2a1a1e; flex: 1; }
+    .mp-badge {
+      min-width: 18px; height: 18px; padding: 0 5px;
+      background: var(--crimson); color: #fff;
+      font-size: 10px; font-weight: 700; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .mp-open {
+      width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center;
+      color: #9a7d83; text-decoration: none; transition: background .13s, color .13s;
+    }
+    .mp-open:hover { background: rgba(193,21,54,.08); color: var(--crimson); }
+    .mp-x {
+      width: 26px; height: 26px; border: 0; border-radius: 7px; background: transparent;
+      display: grid; place-items: center; color: #9a7d83; cursor: pointer; transition: background .13s, color .13s;
+    }
+    .mp-x:hover { background: rgba(193,21,54,.08); color: var(--crimson); }
+    .mp-list { overflow-y: auto; flex: 1; }
+    .mp-item {
+      display: flex; gap: 9px; padding: 9px 12px;
+      border-bottom: 1px solid #f5eeef; text-decoration: none;
+      transition: background .12s;
+    }
+    .mp-item:hover { background: #faf7f8; }
+    .mp-unread { background: rgba(193,21,54,.04); }
+    .mp-av {
+      width: 32px; height: 32px; border-radius: 50%; flex: none;
+      display: grid; place-items: center; font-weight: 700; font-size: 12px;
+      color: #fff; background: linear-gradient(135deg, var(--crimson), var(--crimson-deep));
+    }
+    .mp-body { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+    .mp-top { display: flex; justify-content: space-between; gap: 6px; }
+    .mp-top strong { font-size: 12px; color: #2a1a1e; }
+    .mp-time { font-size: 10px; color: #9a7d83; white-space: nowrap; }
+    .mp-preview { font-size: 11px; color: #6a565b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mp-empty { padding: 24px 16px; text-align: center; color: #9a7d83; font-size: 12px; margin: 0; }
   `],
 })
 export class RoleShell {
@@ -484,7 +575,8 @@ export class RoleShell {
   readonly i18n = inject(I18nService);
   readonly messages = inject(MessagesService);
   readonly notif = inject(NotificationsService);
-  notifOpen = signal(false);
+  notifOpen   = signal(false);
+  msgPanelOpen = signal(true);
 
   /** Poll the unread-messages count for the sidebar "Messages" badge (auto-stops on destroy). */
   private readonly unreadPoll = interval(20000).pipe(startWith(0), takeUntilDestroyed())
