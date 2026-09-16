@@ -16,7 +16,7 @@
 	<properties>
 		<java.version>17</java.version>
 		<spring-cloud.version>2025.1.1</spring-cloud.version>
-		<docker-java.version>3.4.1</docker-java.version>
+		<docker-java.version>3.7.1</docker-java.version>
 	</properties>
 	<dependencies>
 		<dependency>
