@@ -1,0 +1,186 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+'
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  JAVA_VERSION: '17'
+
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+
+# ── 1. Validate the tag format ────────────────────────────────────────────────
+  validate:
+    name: Validate Release Tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+      is_prerelease: ${{ steps.tag.outputs.is_prerelease }}
+    steps:
+      - name: Extract version from tag
+        id: tag
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "version=${TAG}" >> "$GITHUB_OUTPUT"
+          if [[ "$TAG" == *"-rc."* ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Releasing: $TAG"
+
+# ── 2. Full test suite must pass before release ───────────────────────────────
+  test:
+    name: Pre-release Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Run all tests
+        run: mvn -B clean verify --no-transfer-progress -T 4
+
+# ── 3. Build all Docker images with release tag ───────────────────────────────
+  release-images:
+    name: Release Images — ${{ matrix.service.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [validate, test]
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - { name: auth-service,                context: microservices/auth-service }
+          - { name: roaming-analysis-service,    context: microservices/roaming-analysis-service }
+          - { name: anomaly-detection-service,   context: microservices/anomaly-detection-service }
+          - { name: rate-limiting-service,       context: microservices/rate-limiting-service }
+          - { name: audit-service,               context: microservices/audit-service }
+          - { name: messaging-service,           context: microservices/messaging-service }
+          - { name: fivegc-service,              context: microservices/fivegc-service }
+          - { name: distributed-tracing-service, context: microservices/distributed-tracing-service }
+          - { name: fault-injection-service,     context: microservices/fault-injection-service }
+          - { name: gateway-service,             context: spring-cloud/gateway-service }
+          - { name: eureka-server,               context: spring-cloud/eureka-server }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Build JAR
+        run: |
+          mvn -B clean package -DskipTests --no-transfer-progress \
+            --projects ${{ matrix.service.context }} \
+            --also-make
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.service.name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.service.context }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.service.name }}:${{ needs.validate.outputs.version }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.service.name }}:latest
+          platforms: linux/amd64
+          cache-from: type=gha,scope=${{ matrix.service.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service.name }}
+
+# ── 4. Create GitHub Release with changelog ───────────────────────────────────
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate, release-images]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog since last tag
+        id: changelog
+        run: |
+          PREV_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sed -n '2p')
+          if [ -z "$PREV_TAG" ]; then
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+          echo "Previous tag: $PREV_TAG"
+
+          # Group commits by type
+          FEAT=$(git log ${PREV_TAG}..HEAD --oneline --no-merges | grep -i "^[a-f0-9]* feat" || true)
+          FIX=$(git log ${PREV_TAG}..HEAD --oneline --no-merges | grep -i "^[a-f0-9]* fix" || true)
+          DOCS=$(git log ${PREV_TAG}..HEAD --oneline --no-merges | grep -i "^[a-f0-9]* docs" || true)
+          CHORE=$(git log ${PREV_TAG}..HEAD --oneline --no-merges | grep -iv "^[a-f0-9]* feat\|^[a-f0-9]* fix\|^[a-f0-9]* docs" || true)
+
+          {
+            echo "## What's Changed"
+            echo ""
+            if [ -n "$FEAT" ]; then
+              echo "### Features"
+              echo "$FEAT" | while read line; do echo "- $line"; done
+              echo ""
+            fi
+            if [ -n "$FIX" ]; then
+              echo "### Bug Fixes"
+              echo "$FIX" | while read line; do echo "- $line"; done
+              echo ""
+            fi
+            if [ -n "$DOCS" ]; then
+              echo "### Documentation"
+              echo "$DOCS" | while read line; do echo "- $line"; done
+              echo ""
+            fi
+            if [ -n "$CHORE" ]; then
+              echo "### Other Changes"
+              echo "$CHORE" | while read line; do echo "- $line"; done
+              echo ""
+            fi
+            echo "---"
+            echo "**Docker images** published to \`ghcr.io/${{ github.repository_owner }}\` with tag \`${{ needs.validate.outputs.version }}\`"
+          } > CHANGELOG_BODY.md
+
+          cat CHANGELOG_BODY.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ needs.validate.outputs.version }}
+          body_path: CHANGELOG_BODY.md
+          prerelease: ${{ needs.validate.outputs.is_prerelease == 'true' }}
+          generate_release_notes: false
+          make_latest: ${{ needs.validate.outputs.is_prerelease == 'false' }}

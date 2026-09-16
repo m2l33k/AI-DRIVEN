@@ -1,5 +1,9 @@
 # 5G Core Telecom Management Platform
 
+[![CI](https://github.com/m2l33k/spring-boot-based-microservices/actions/workflows/ci.yml/badge.svg)](https://github.com/m2l33k/spring-boot-based-microservices/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/m2l33k/spring-boot-based-microservices/actions/workflows/codeql.yml/badge.svg)](https://github.com/m2l33k/spring-boot-based-microservices/actions/workflows/codeql.yml)
+[![Docker](https://github.com/m2l33k/spring-boot-based-microservices/actions/workflows/docker.yml/badge.svg)](https://github.com/m2l33k/spring-boot-based-microservices/actions/workflows/docker.yml)
+
 A **5G Core (5GC) telecom management platform**, built as Spring Boot / Spring Cloud
 microservices with a role-based Angular console on top. It provides:
 

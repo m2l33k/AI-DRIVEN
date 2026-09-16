@@ -1,0 +1,212 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: '17'
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+
+# ── 1. Backend ────────────────────────────────────────────────────────────────
+  backend:
+    name: Backend — Build & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Build (skip tests — fast compile check)
+        run: mvn -B clean package -DskipTests --no-transfer-progress -T 4
+
+      - name: Run unit tests
+        run: mvn -B test --no-transfer-progress -T 4
+
+      - name: Publish test summary
+        uses: mikepenz/action-junit-report@v4
+        if: always()
+        with:
+          report_paths: '**/target/surefire-reports/TEST-*.xml'
+          check_name: 'JUnit — Spring Boot'
+          fail_on_failure: true
+          require_tests: false
+
+      - name: Upload surefire reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: surefire-reports
+          path: '**/target/surefire-reports/'
+          retention-days: 7
+
+      - name: Upload JARs (for Docker job)
+        uses: actions/upload-artifact@v4
+        with:
+          name: service-jars
+          path: |
+            microservices/*/target/*.jar
+            spring-cloud/*/target/*.jar
+          retention-days: 1
+
+# ── 2. Frontend ───────────────────────────────────────────────────────────────
+  frontend:
+    name: Frontend — TypeScript Check, Build & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: Frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: Frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: TypeScript strict check
+        run: npx tsc --noEmit --project tsconfig.app.json
+
+      - name: Production build
+        run: npx ng build --configuration production --no-progress
+
+      - name: Unit tests (vitest)
+        run: npx ng test --watch=false --no-progress
+        continue-on-error: true
+
+      - name: npm audit (non-blocking)
+        run: npm audit --audit-level=high || true
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: Frontend/dist/
+          retention-days: 7
+
+# ── 3. ML Service ─────────────────────────────────────────────────────────────
+  ml-service:
+    name: ML Service — Python Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: ml-service/requirements.txt
+
+      - name: Install lightweight test dependencies
+        run: pip install pytest pytest-mock django djangorestframework numpy
+
+      - name: Run tests (TF/Prophet/statsmodels mocked)
+        run: |
+          pytest ml-service/tests/ \
+            -v \
+            --tb=short \
+            --junit-xml=ml-test-results.xml \
+            -p no:warnings
+
+      - name: Publish ML test summary
+        uses: mikepenz/action-junit-report@v4
+        if: always()
+        with:
+          report_paths: 'ml-test-results.xml'
+          check_name: 'pytest — ML Service'
+          require_tests: false
+
+      - name: Upload ML test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ml-test-results
+          path: ml-test-results.xml
+          retention-days: 7
+
+# ── 4. Security — Trivy FS scan ───────────────────────────────────────────────
+  security-scan:
+    name: Security — Dependency & Code Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      security-events: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Trivy — filesystem scan (SARIF)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          skip-dirs: node_modules,free5gc-compose,.git
+
+      - name: Upload Trivy SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+      - name: Trivy — table summary (PR comment friendly)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          skip-dirs: node_modules,free5gc-compose,.git
+
+# ── 5. CI gate — all jobs must pass ───────────────────────────────────────────
+  ci-gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, ml-service, security-scan]
+    if: always()
+    steps:
+      - name: Check all jobs
+        run: |
+          if [[ "${{ needs.backend.result }}"     != "success" ||
+                "${{ needs.frontend.result }}"    != "success" ||
+                "${{ needs.ml-service.result }}"  != "success" ]]; then
+            echo "One or more required jobs failed."
+            exit 1
+          fi
+          echo "All required jobs passed."

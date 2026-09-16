@@ -1,0 +1,77 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+labels: [bug, needs-triage]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please fill in as much detail as possible. Logs and reproduction steps are very helpful.
+
+  - type: dropdown
+    id: service
+    attributes:
+      label: Affected service
+      multiple: true
+      options:
+        - gateway-service
+        - auth-service
+        - roaming-analysis-service
+        - anomaly-detection-service
+        - rate-limiting-service
+        - audit-service
+        - messaging-service
+        - fivegc-service
+        - ml-service
+        - Frontend (Angular)
+        - Docker / infra
+        - CI/CD
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: A clear description of what the bug is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start the stack with `docker compose -f docker/docker-compose-infra.yml up -d`
+        2. Run the Java service locally on port ...
+        3. Call endpoint `POST /api/...` with body `{...}`
+        4. Observe error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste any relevant stack traces or log output.
+      render: text
+
+  - type: input
+    id: java-version
+    attributes:
+      label: Java version
+      placeholder: '17.0.x'
+
+  - type: input
+    id: spring-version
+    attributes:
+      label: Spring Boot version
+      placeholder: '4.0.3'

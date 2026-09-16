@@ -1,6 +1,7 @@
 version: 2
 updates:
-  # ---- Java / Maven dependencies (whole multi-module reactor) ------------
+
+  # ── Java / Maven (whole multi-module reactor) ──────────────────────────────
   - package-ecosystem: maven
     directory: "/"
     schedule:
@@ -14,23 +15,84 @@ updates:
         patterns:
           - "org.springframework*"
           - "io.micrometer*"
+          - "org.springframework.cloud*"
       test-and-tooling:
         patterns:
           - "*junit*"
           - "*mockito*"
+          - "org.assertj*"
           - "org.springframework.security:spring-security-test"
+      observability:
+        patterns:
+          - "com.github.loki4j*"
+          - "io.opentelemetry*"
 
-  # ---- GitHub Actions used by the workflows ------------------------------
+  # ── Frontend / npm ─────────────────────────────────────────────────────────
+  - package-ecosystem: npm
+    directory: "/Frontend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:30"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "frontend"]
+    groups:
+      angular:
+        patterns:
+          - "@angular/*"
+          - "@angular-devkit/*"
+          - "@schematics/*"
+      testing:
+        patterns:
+          - "vitest*"
+          - "@vitest/*"
+          - "jsdom*"
+
+  # ── Python / pip (ml-service) ──────────────────────────────────────────────
+  - package-ecosystem: pip
+    directory: "/ml-service"
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "06:00"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "ml"]
+
+  # ── GitHub Actions ─────────────────────────────────────────────────────────
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
       day: monday
     labels: ["dependencies", "ci"]
+    groups:
+      actions:
+        patterns:
+          - "actions/*"
+          - "github/*"
+          - "docker/*"
+          - "aquasecurity/*"
+          - "mikepenz/*"
+          - "softprops/*"
 
-  # ---- Base images in the service Dockerfiles ----------------------------
+  # ── Docker base images ─────────────────────────────────────────────────────
   - package-ecosystem: docker
     directory: "/microservices/auth-service"
+    schedule:
+      interval: weekly
+    labels: ["dependencies", "docker"]
+  - package-ecosystem: docker
+    directory: "/microservices/anomaly-detection-service"
+    schedule:
+      interval: weekly
+    labels: ["dependencies", "docker"]
+  - package-ecosystem: docker
+    directory: "/microservices/audit-service"
+    schedule:
+      interval: weekly
+    labels: ["dependencies", "docker"]
+  - package-ecosystem: docker
+    directory: "/microservices/rate-limiting-service"
     schedule:
       interval: weekly
     labels: ["dependencies", "docker"]
@@ -41,6 +103,11 @@ updates:
     labels: ["dependencies", "docker"]
   - package-ecosystem: docker
     directory: "/spring-cloud/gateway-service"
+    schedule:
+      interval: weekly
+    labels: ["dependencies", "docker"]
+  - package-ecosystem: docker
+    directory: "/ml-service"
     schedule:
       interval: weekly
     labels: ["dependencies", "docker"]
