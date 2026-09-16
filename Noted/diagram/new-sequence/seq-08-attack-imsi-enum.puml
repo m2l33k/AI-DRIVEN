@@ -1,0 +1,52 @@
+@startuml seq-08-attack-imsi-enum
+title ATK-02 — IMSI Enumeration + Detection (Sequential Probe, 100 ms rate)
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+skinparam noteBackgroundColor #FFEBEE
+autonumber
+
+participant "attack-imsi-enum.sh\n(ATK-02)" as Script
+participant "UERANSIM nr-gnb" as GNB
+participant "UERANSIM nr-ue\n(probe-and-go)" as UE
+participant "AMF\nfree5gc-amf" as AMF
+participant "AUSF\nfree5gc-ausf" as AUSF
+participant "UDM\nfree5gc-udm" as UDM
+participant "Anomaly Detection\nService :9003" as ADS
+participant "Security Alerts\n:4200" as Alerts
+
+Script -> GNB : nr-gnb -c free5gc-gnb.yaml &
+GNB -> AMF : N2 Setup
+
+Script -> Script : for i in 1..100 (100 ms between each):
+note over Script : Sequential SUPI: imsi-001010000000001,\nimsi-001010000000002, … imsi-001010000000100\n100 ms gap → ~10 probes/s (evades burst filter)
+
+loop Each probe (i = 1..100, 100ms sleep between)
+  Script -> Script : sed supi=imsi-00101000000000{i} → /tmp/probe-{i}.yaml
+  Script -> UE : timeout 3 nr-ue -c /tmp/probe-{i}.yaml &
+  UE -> GNB : NAS Registration Request (SUPI = imsi-…{i})
+  GNB -> AMF : NGAP Initial UE Message
+  AMF -> AUSF : POST /nausf-auth/v1/ue-authentications\n(SUPI = imsi-…{i})
+  AUSF -> UDM : POST /nudm-uecm/v1/{supi}/registrations/amf-3gpp-access
+  alt SUPI exists in UDR
+    UDM --> AUSF : subscriber found (authentication vector)
+    AUSF --> AMF : 201 + authCtxId
+  else SUPI not found
+    UDM --> AUSF : 404 Not Found
+    AUSF --> AMF : 403 (authentication rejected)
+    AMF --> GNB : Registration Reject (cause=5GMM_CAUSE_ILLEGAL_UE)
+    GNB --> UE : NAS Registration Reject
+  end
+  UE -> UE : deregister immediately (probe-and-go)
+  Script -> Script : sleep 0.1
+end
+
+ADS -> ADS : detectImsiEnumeration()\npattern: sequential SUPI attempts\ncount of (last-supi - first-supi) == probe-count - 1\n≥ 5 sequential probes with gap ≤ 2
+
+alt Enumeration pattern detected
+  ADS -> ADS : append IMSI_ENUMERATION\nCRITICAL severity
+  ADS ->> Alerts : events update (5s poll)
+  Alerts -> Alerts : tab CRITICAL highlights\nHIGH IMSI_ENUMERATION alert visible
+end
+
+@enduml

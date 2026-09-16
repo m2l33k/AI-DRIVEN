@@ -1,0 +1,48 @@
+@startuml seq-07-attack-reg-flood
+title ATK-01 — Registration Flood + Detection (DoS on AMF)
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+skinparam noteBackgroundColor #FFEBEE
+autonumber
+
+participant "attack-reg-flood.sh\n(ATK-01)" as Script
+participant "UERANSIM nr-gnb\n127.0.0.1:38412" as GNB
+participant "UERANSIM nr-ue ×15\n(parallel)" as UEs
+participant "AMF\nfree5gc-amf\n:38412" as AMF
+participant "Anomaly Detection\nService :9003" as ADS
+participant "Rate Limiting\nService :9004" as RL
+participant "Security\nDashboard :4200" as Dashboard
+
+Script -> GNB : nr-gnb -c free5gc-gnb.yaml &\n(MCC=001, MNC=01, AMF=127.0.0.1:38412)
+GNB -> AMF : N2 Setup Request (NGAP)
+AMF --> GNB : N2 Setup Response
+
+Script -> Script : for i in 1..15:\n  sed supi=imsi-00101000000000{i} → /tmp/ue-flood-{i}.yaml\n  nr-ue -c /tmp/ue-flood-{i}.yaml &
+
+loop 15 UEs simultaneously
+  UEs -> GNB : NAS Registration Request\n(SUPI: imsi-001010000000001..15)
+  GNB -> AMF : NGAP Initial UE Message\n(ULInformationTransfer → Registration Req)
+  AMF -> AMF : 5G-AKA authentication\ncreate UE context
+  AMF --> GNB : Initial Context Setup Request
+  GNB --> UEs : Registration Accept
+end
+
+note over AMF : Sudden spike:\n15 registrations/s over 60s
+AMF -> ADS : /actuator/prometheus\nfree5gc_amf_ue_registration_total counter ++
+
+ADS -> ADS : detectRegistrationFlood()\nrate = 15/s > DR-001 threshold (20/s)\nz-score vs 60s rolling window
+
+alt Attack exceeds detection threshold
+  ADS -> ADS : append REGISTRATION_FLOOD\nHIGH severity, rate=15/s, zscore=4.1
+  ADS ->> Dashboard : events signal updates (5s poll)
+  Dashboard -> Dashboard : threatLevel = CRITICAL\nred banner "Registration flood detected"
+  ADS -> RL : advisory — keyType:imsi blocks increment
+  note over RL : rate-limiting advisory:\nif policy enabled, subsequent\nchecks would return 429
+end
+
+Script -> UEs : sleep 60s then kill all UE PIDs
+Script -> GNB : kill gNB PID
+Script -> Script : echo "Done. Check /security/dashboard"
+
+@enduml

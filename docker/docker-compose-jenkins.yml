@@ -1,0 +1,25 @@
+services:
+  jenkins:
+    build:
+      context: ./jenkins
+      dockerfile: Dockerfile
+    container_name: jenkins
+    ports:
+      - "8090:8080"    # Jenkins UI → http://localhost:8090
+      - "50000:50000"  # Jenkins agent inbound port
+    environment:
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+    volumes:
+      - jenkins-home:/var/jenkins_home
+      - ../:/workspace:ro               # repo mounted read-only for pipelines
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker CLI inside Jenkins
+    networks:
+      - telecom-shared-network
+
+networks:
+  telecom-shared-network:
+    external: true
+    name: telecom-shared-network
+
+volumes:
+  jenkins-home:

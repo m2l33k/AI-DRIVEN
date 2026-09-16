@@ -1,0 +1,52 @@
+@startuml seq-15-websocket-notifications
+title WebSocket Notifications — Real-Time Push (native WS, JWT query param)
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+autonumber
+
+actor "Authenticated\nUser (Angular)" as User
+participant "Gateway\n:9000\n(lb:ws://)" as GW
+participant "Messaging\nService :9007\n(TextWebSocket\nHandler)" as MSG
+participant "WsSessions\nMap<user,sessions>" as Sessions
+participant "Other User\n(Sender)" as Sender
+
+note over User : EventSource cannot send Authorization header\nWebSocket uses ?token=JWT query param instead (ADR-14)
+
+== WebSocket connection establishment ==
+
+User -> GW : WS Upgrade GET /ws/notifications?token=<JWT>
+note right of GW : /ws/** is permitAll at gateway\nMessaging-service validates JWT itself
+GW -> MSG : proxy WS upgrade (lb:ws://messaging-service)
+MSG -> MSG : JwtDecoder.decode(token)\nextract username from JWT sub
+MSG -> Sessions : register session for username
+Sessions --> MSG : session stored
+MSG --> User : 101 Switching Protocols (WS established)
+
+== Sender sends a message ==
+
+Sender -> GW : POST /api/messages/send\nBearer JWT\n{ recipientId:"analyst-user", content:"Alert update" }
+GW -> MSG : lb://messaging-service
+MSG -> MSG : persist message to Postgres\n(messaging_db)
+MSG -> Sessions : get sessions for "analyst-user"
+Sessions --> MSG : WebSocketSession(s)
+
+MSG -> User : WS TEXT frame\n{ type:"NEW_MESSAGE", fromUser:"admin-user",\n  unreadCount:3, timestamp }
+User -> User : FAB badge updates to "3"\nrouter: navigate to /messages
+
+== Unread count on app load ==
+
+User -> GW : GET /api/messages/unread-count\nBearer JWT
+GW -> MSG : route
+MSG -> MSG : count unread in Postgres\nwhere recipient=username AND readAt IS NULL
+MSG --> User : 200 { count: 3 }
+
+== Mark thread as read ==
+
+User -> GW : POST /api/messages/mark-read/{peerId}\nBearer JWT
+GW -> MSG : route
+MSG -> MSG : UPDATE messages SET readAt=now\nWHERE recipient=username AND sender=peerId
+MSG --> User : 200 OK
+MSG -> Sessions : notify sender of read receipt (optional)
+
+@enduml

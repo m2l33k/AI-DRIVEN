@@ -1,0 +1,42 @@
+@startuml seq-03-zero-trust-sbi-tls
+title Phase 2 — SBI TLS (SEC-01): No Certificate → Handshake Rejection
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+skinparam noteBackgroundColor #FFF9C4
+autonumber
+
+participant "UERANSIM gNB\n127.0.0.1:38412" as GNB
+participant "AMF\nfree5gc-amf" as AMF
+participant "NRF\nfree5gc-nrf\n:19001" as NRF
+participant "SMF\nfree5gc-smf\n:19003" as SMF
+participant "Platform\nPrometheus\n:9090" as Prom
+participant "Grafana D5\n:3000" as Grafana
+
+note over AMF, SMF : SBI TLS enabled\n(scheme: https in amfcfg.yaml)\nEach NF has PEM cert from Platform PKI
+
+== Normal flow (cert present) ==
+
+GNB -> AMF : NGAP N2 Registration Request\n(SCTP :38412)
+AMF -> NRF : HTTPS POST /nnrf-nfm/v1/nf-instances/{amfId}\n(TLS — AMF presents amf.pem to NRF)
+NRF --> AMF : 201 NFProfile registered
+
+AMF -> SMF : HTTPS POST /nsmf-pdusession/v1/sm-contexts\n(TLS mTLS — AMF presents cert, verifies SMF cert)
+SMF --> AMF : 201 smContextRef
+
+== SEC-01 Demo: AMF starts WITHOUT certificate ==
+
+note over AMF : amfcfg.yaml: tls.pem missing\nor self-signed not in NRF trust store
+
+AMF -> NRF : HTTPS POST /nnrf-nfm/v1/nf-instances/{amfId}\n(TLS handshake — no client cert)
+NRF --> AMF : TLS alert: certificate_required (42)\nor handshake_failure
+
+AMF -> SMF : HTTPS POST /nsmf-pdusession/…\n(TLS handshake — AMF cert rejected)
+SMF --> AMF : TLS ALERT: bad_certificate (42)
+
+note over AMF : Registration fails\nPDU session cannot be established
+
+AMF -> Prom : scrape /metrics → sbi_tls_handshake_failures_total{nf="amf"} ++
+Prom -> Grafana : query → D5 panel "SBI TLS Failures" alerts
+
+@enduml

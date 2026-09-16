@@ -1,0 +1,56 @@
+@startuml seq-01-login-state-machine
+title Login — State-Aware Flow (SUCCESS / PWD_CHANGE / EMAIL_VERIFY)
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+skinparam sequenceGroupBorderColor #888888
+skinparam noteBorderColor #cccccc
+autonumber
+
+actor "Angular\nClient :4200" as Client
+participant "Gateway\n:9000" as GW
+participant "Auth Service\n:9001" as Auth
+participant "Keycloak\n:8081" as KC
+participant "Mail Service\n(Gmail SMTP)" as Mail
+
+Client -> GW : POST /api/auth/login\n{ username|email, password }
+note right of GW : permitAll — no JWT required
+GW -> Auth : lb://auth-service
+
+Auth -> KC : POST /realms/auth-management/…/token\ngrant_type=password\nclient_id=platform-client\nscope=openid profile email roles
+
+alt Credentials correct, account fully set up
+  KC --> Auth : 200 { access_token (JWT), refresh_token, expires_in }
+  note right of KC : JWT carries:\nrealm_access.roles → ROLE_*\nresource_access.platform-client.roles → PERM_*
+  Auth --> Client : 200 { status:"SUCCESS", accessToken, refreshToken, role }
+  Client -> Client : store token in localStorage\nredirect to role dashboard
+
+else Credentials correct, UPDATE_PASSWORD required
+  KC --> Auth : 401 invalid_grant\n"Account is not fully set up"
+  Auth -> KC : Admin API GET /users?username=…\n(admin-cli master-realm token)
+  KC --> Auth : user with requiredActions=[UPDATE_PASSWORD]
+  Auth -> Auth : issue single-use firstLoginToken\n(FirstLoginTokenService, 10 min)
+  Auth --> Client : 200 { status:"PASSWORD_CHANGE_REQUIRED",\nfirstLoginToken }
+  Client -> GW : POST /api/auth/first-login/change-password\n{ firstLoginToken, newPassword }
+  GW -> Auth : route
+  Auth -> KC : Admin API PUT /users/{id}/reset-password\n(permanent, no temp flag)
+  Auth --> Client : 200 OK — redirect to /login
+
+else Credentials correct, VERIFY_EMAIL required
+  KC --> Auth : 401 invalid_grant\n"Account is not fully set up"
+  Auth -> KC : Admin API GET /users?username=…
+  KC --> Auth : user emailVerified=false, requiredActions=[VERIFY_EMAIL]
+  Auth -> Mail : send verification email\n(EmailVerificationService, 24h token)
+  Auth --> Client : 200 { status:"EMAIL_VERIFICATION_REQUIRED" }
+  note over Client : User clicks link in email
+  Client -> GW : GET /api/auth/verify-email?token=…
+  GW -> Auth : route
+  Auth -> KC : Admin API PUT /users/{id} emailVerified=true\n+ remove VERIFY_EMAIL action
+  Auth --> Client : 200 HTML confirmation page
+
+else Wrong credentials
+  KC --> Auth : 401 invalid_grant "Invalid user credentials"
+  Auth --> Client : 401 { error:"Bad credentials" }
+end
+
+@enduml

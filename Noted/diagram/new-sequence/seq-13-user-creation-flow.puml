@@ -1,0 +1,65 @@
+@startuml seq-13-user-creation-flow
+title User Creation — Admin Creates User with Email Verification
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+autonumber
+
+actor "Platform Admin\n(Angular)" as Admin
+participant "Gateway\n:9000" as GW
+participant "Auth Service\n:9001" as Auth
+participant "KeycloakService\n(Admin REST API)" as KS
+participant "Keycloak\n:8081" as KC
+participant "Mail Service\n(Gmail SMTP)" as Mail
+participant "Email Verif.\nTokenService\n(24h)" as EVT
+
+== Admin creates a new analyst ==
+
+Admin -> GW : POST /api/users\nBearer JWT (PERM_users:write)\n{ username, email, role:"SECURITY_ANALYST" }
+GW -> Auth : lb://auth-service
+
+Auth -> KS : createUser(username, email, SECURITY_ANALYST)
+KS -> KC : Admin API POST /users\n{ username, email, enabled:true,\n  emailVerified:false }
+KC --> KS : 201 Location: /users/{userId}
+KS -> KC : Admin API PUT /users/{id}/role-mappings/realm\n[ SECURITY_ANALYST role ]
+KC --> KS : 204 role assigned
+
+KS -> KC : Admin API PUT /users/{id}/reset-password\n{ temporary:true, value:<random 12-char> }
+KC --> KS : 204 temp password set
+
+KS -> KC : Admin API PUT /users/{id}\n{ requiredActions:[VERIFY_EMAIL, UPDATE_PASSWORD] }
+KC --> KS : 204
+
+KS --> Auth : { userId, tempPassword }
+
+== Send account emails ==
+
+Auth -> Mail : sendTemporaryPassword(email, tempPassword)\n(Spring Mail — SUBJECT: "Your account is ready")
+Auth -> EVT : issue verificationToken (UUID, 24h)
+Auth -> Mail : sendVerificationEmail(email, verificationToken)\n(SUBJECT: "Verify your email")\nlink: http://localhost:9000/api/auth/verify-email?token=…
+Auth --> Admin : 201 { username, role, email }
+
+== New user logs in for first time ==
+
+note over Admin : New user opens email, clicks verify link
+
+"New User" -> GW : GET /api/auth/verify-email?token=<uuid> (Public)
+GW -> Auth : route
+Auth -> EVT : consume(token) → username
+Auth -> KS : markEmailVerified(username)
+KS -> KC : Admin API PUT /users/{id}\n{ emailVerified:true }\n+ remove VERIFY_EMAIL action
+KC --> KS : 204
+Auth --> "New User" : 200 HTML "Email verified — please login"
+
+"New User" -> GW : POST /api/auth/login { username, tempPassword }
+GW -> Auth : route
+Auth -> KC : token endpoint (password grant)
+KC --> Auth : 401 "Account is not fully set up" (UPDATE_PASSWORD remains)
+Auth --> "New User" : 200 { status:"PASSWORD_CHANGE_REQUIRED", firstLoginToken }
+
+"New User" -> GW : POST /api/auth/first-login/change-password\n{ firstLoginToken, newPassword }
+GW -> Auth : route
+Auth -> KC : Admin API reset-password (permanent)
+Auth --> "New User" : 200 OK
+
+@enduml

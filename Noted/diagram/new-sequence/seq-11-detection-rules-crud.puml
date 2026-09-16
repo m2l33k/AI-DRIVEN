@@ -1,0 +1,63 @@
+@startuml seq-11-detection-rules-crud
+title Detection Rules — Full CRUD Lifecycle
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+autonumber
+
+actor "Security Analyst\n(Angular)" as SA
+participant "Gateway\n:9000" as GW
+participant "Anomaly Detection\nService :9003" as ADS
+participant "RuleController" as RC
+participant "RuleStore\n(ConcurrentHashMap)" as RS
+
+== Load all rules on init ==
+
+SA -> GW : GET /api/rules\nBearer JWT (PERM_detection-rules:read)
+GW -> ADS : lb://anomaly-detection-service
+ADS -> RC : GET /api/rules
+RC -> RS : findAll() → sorted by id
+RS --> RC : [DR-001 … DR-005]
+RC --> SA : 200 [ { id, name, category, severity, enabled, thresholdValue, hitCount, … } ]
+note over SA : Angular detectionRules component:\nlive.set(true)\nsorted = computed by SEV_ORDER then id
+
+== Create a new rule ==
+
+SA -> GW : POST /api/rules\nBearer JWT (PERM_detection-rules:write)\n{ name:"Fake gNB Detection",\n  category:"Signalling", severity:"CRITICAL",\n  enabled:true, thresholdValue:0 }
+GW -> ADS : lb://anomaly-detection-service
+ADS -> RC : POST /api/rules
+RC -> RS : save(rule)\nid = "DR-006" (seq.incrementAndGet)
+RS --> RC : DetectionRule { id:"DR-006", createdAt:now }
+RC --> SA : 201 { id:"DR-006", … }
+SA -> SA : rules.update([…, new rule])
+
+== Toggle enable/disable ==
+
+SA -> GW : PATCH /api/rules/DR-001/toggle\nBearer JWT
+GW -> ADS : lb://anomaly-detection-service
+ADS -> RC : PATCH /api/rules/{id}/toggle
+RC -> RS : toggle("DR-001")\n→ rule.withEnabled(!rule.enabled())\nreplace in map
+RS --> RC : DetectionRule { enabled:false }
+RC --> SA : 200 { …, enabled:false }
+SA -> SA : rules.update(list.map x → x.id==id ? updated : x)
+
+== Edit rule (full update) ==
+
+SA -> GW : PUT /api/rules/DR-001\nBearer JWT\n{ name:"Registration Flood v2", thresholdValue:25 }
+GW -> ADS : route
+ADS -> RC : PUT /api/rules/{id}
+RC -> RS : save(updated rule)
+RS --> RC : DetectionRule { id:"DR-001", updatedAt:now }
+RC --> SA : 200 updated rule
+
+== Delete rule ==
+
+SA -> GW : DELETE /api/rules/DR-006\nBearer JWT
+GW -> ADS : route
+ADS -> RC : DELETE /api/rules/{id}
+RC -> RS : delete("DR-006")\nmap.remove(id)
+RS --> RC : removed
+RC --> SA : 204 No Content
+SA -> SA : rules.update(list.filter x → x.id != id)
+
+@enduml

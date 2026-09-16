@@ -1,0 +1,44 @@
+@startuml seq-18-audit-logs-query
+title Audit Logs — Query with Pagination (Auditor Dashboard)
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+autonumber
+
+actor "Auditor\n(Angular)" as Auditor
+participant "Gateway\n:9000" as GW
+participant "Audit Service\n:9009" as AuditSvc
+participant "AuditStore\n(ConcurrentLinked\nDeque)" as Store
+participant "AuditStats\ncompute" as Stats
+
+== Load stats (every 30s poll) ==
+
+Auditor -> GW : GET /api/audit/stats\nBearer JWT (PERM_audit:read)
+GW -> AuditSvc : lb://audit-service
+AuditSvc -> Store : stats()\n7-day rolling window filter
+Store -> Stats : compute:\n  total, writes, denied, active actors\n  perDay[7] (Mon…Sun counts)\n  outcome breakdown (allowed/denied/error)\n  top 6 actors by (reads + writes)
+Stats --> AuditSvc : AuditStats record
+AuditSvc --> Auditor : 200 { total, writeActions, deniedActions,\n  activeActors, perDay:[], dayLabels:[],\n  allowed, errored, topActors:[] }
+
+== Query logs with search + outcome filter ==
+
+Auditor -> GW : GET /api/audit/logs?q=detection-rules&outcome=Allowed&limit=200\nBearer JWT (PERM_audit:read)
+GW -> AuditSvc : route
+AuditSvc -> Store : query("detection-rules", "Allowed", "", 200)
+Store -> Store : stream entries (newest first)\nfilter by outcome=="Allowed"\nfilter where actor|action|resource|details contains "detection-rules"\nlimit(200)
+Store --> AuditSvc : List<AuditEntry> (max 200)
+AuditSvc --> Auditor : 200 [ { id, timestamp, actor, role,\n  action, resource, outcome, ip, details } ]
+
+note over Auditor : Angular audit-logs.ts:\n- client-side pagination (20 rows/page)\n- pagedLogs = computed slice\n- pageWindow computed with ellipsis\n- exportCsv() via URL.createObjectURL
+
+== Paginate result (client-side) ==
+
+Auditor -> Auditor : pageIndex = 0\ntotalPages = ceil(200 / 20) = 10\npagedLogs = logs.slice(0, 20)
+
+Auditor -> Auditor : click Next →\npageIndex = 1\npagedLogs = logs.slice(20, 40)
+
+== Export CSV ==
+
+Auditor -> Auditor : exportCsv()\nbuild CSV string from all 200 entries\nnew Blob([csv], {type:"text/csv"})\nURL.createObjectURL → download\naudit-logs-2026-09-16.csv
+
+@enduml

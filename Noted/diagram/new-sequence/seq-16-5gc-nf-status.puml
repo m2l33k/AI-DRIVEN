@@ -1,0 +1,58 @@
+@startuml seq-16-5gc-nf-status
+title 5GC NF Status — fivegc-service Proxies WebConsole
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+autonumber
+
+actor "Network Operator\n(Angular)" as NO
+participant "Gateway\n:9000" as GW
+participant "fivegc-service\n:9008" as FGC
+participant "WebConsole\nProxy Service" as WPS
+participant "free5GC\nWebConsole :5000" as WC
+participant "NRF\nfree5gc-nrf\n:19001" as NRF
+
+== NF Status (read) ==
+
+NO -> GW : GET /api/5gc/nf-status\nBearer JWT (Authenticated)
+GW -> FGC : lb://fivegc-service
+FGC -> WPS : getNfStatus()
+WPS -> WC : GET http://localhost:5000/api/v1/nf-instances\n(WebConsole REST API — no auth required on loopback)
+WC -> NRF : query registered NF instances
+NRF --> WC : NFProfile list (AMF, SMF, UDM, …)
+WC --> WPS : [ { nfType, nfStatus, ipv4Addresses } ]
+WPS --> FGC : List<NfStatusDto>
+FGC --> NO : 200 [ { id:"amf-1", type:"AMF", status:"REGISTERED",\n  ip:"172.18.0.12", heartbeat: } ]
+
+== Subscribers (read) ==
+
+NO -> GW : GET /api/5gc/subscribers\nBearer JWT
+GW -> FGC : route
+FGC -> WPS : getSubscribers()
+WPS -> WC : GET http://localhost:5000/api/v1/subscriber
+WC --> WPS : [ { ueId:"imsi-001010000000001", plmnId, gpsi } ]
+FGC --> NO : 200 [ subscriber list ]
+
+== Network Config (read) ==
+
+NO -> GW : GET /api/5gc/network-config\nBearer JWT
+GW -> FGC : route
+FGC -> WPS : getNetworkConfig()
+WPS -> WC : GET /api/v1/subscriber (all)
+WC --> WPS : subscriber UDR records
+WPS -> WPS : derive: S-NSSAI slices, 5QI profiles,\nAMBR values, PLMN/MCC/MNC
+FGC --> NO : 200 { slices:[{sst,sd}], qosProfiles:[{5qi,uplink,downlink}],\n  plmn:{mcc:"001",mnc:"01"} }
+
+== Network Config (write — NETWORK_OPERATOR only) ==
+
+NO -> GW : PUT /api/5gc/network-config\nBearer JWT (ROLE_NETWORK_OPERATOR)\n{ qosProfiles:[{5qi:9, uplinkAmbr:"100 Mbps"}] }
+GW -> FGC : route (ROLE_NETWORK_OPERATOR required)
+FGC -> WPS : applyNetworkConfig(config)
+loop for each subscriber
+  WPS -> WC : PUT /api/v1/subscriber/{imsi}/am-data\n{ sessionAmbr: { uplink, downlink } }
+  WC --> WPS : 200 | 404
+end
+WPS -> WPS : collect successes + failures
+FGC --> NO : 207 Multi-Status\n{ succeeded:[…], failed:[…] }
+
+@enduml

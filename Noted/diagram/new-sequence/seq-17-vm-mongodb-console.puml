@@ -1,0 +1,68 @@
+@startuml seq-17-vm-mongodb-console
+title VM MongoDB Console — Document Browser via fivegc-service
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+autonumber
+
+actor "Network Operator\n(Angular XP Desktop)" as NO
+participant "Gateway\n:9000" as GW
+participant "fivegc-service\n:9008" as FGC
+participant "VmMongo\nController" as VMC
+participant "MongoClient\nmongodb://localhost:27017" as Mongo
+
+== List databases ==
+
+NO -> GW : GET /api/vm/mongo/dbs\nBearer JWT (Authenticated)
+GW -> FGC : lb://fivegc-service
+FGC -> VMC : listDatabases()
+VMC -> Mongo : listDatabaseNames()\nexclude: ["local"]
+Mongo --> VMC : ["admin", "config", "free5gc", "testdb"]
+VMC --> NO : 200 ["admin", "config", "free5gc", "testdb"]
+
+== List collections in DB ==
+
+NO -> GW : GET /api/vm/mongo/testdb/collections\nBearer JWT
+GW -> FGC : route
+FGC -> VMC : listCollections("testdb")
+VMC -> Mongo : db("testdb").listCollectionNames()\n+ estimatedDocumentCount per collection
+Mongo --> VMC : [{ name:"users", count:12 },\n  { name:"devices", count:7 },\n  { name:"network_events", count:48 }]
+VMC --> NO : 200 collection list with counts
+
+== Query documents (with filter) ==
+
+NO -> GW : GET /api/vm/mongo/testdb/users/documents?filter={"role":"analyst"}&limit=20&skip=0\nBearer JWT
+GW -> FGC : route
+FGC -> VMC : getDocuments("testdb", "users", filter, 20, 0)
+VMC -> Mongo : db.users.find({"role":"analyst"}).limit(20).skip(0)
+Mongo --> VMC : List<Document>
+VMC --> NO : 200 [ { _id:"…", username:"analyst-user", role:"analyst" }, … ]
+
+== Insert document ==
+
+NO -> GW : POST /api/vm/mongo/testdb/users\nBearer JWT (ROLE_NETWORK_OPERATOR)\n{ username:"test-ue-01", type:"ue", imsi:"…" }
+GW -> FGC : route (role check in controller)
+FGC -> VMC : insertDocument("testdb", "users", doc)
+VMC -> Mongo : db.users.insertOne(doc)
+Mongo --> VMC : InsertOneResult (insertedId)
+VMC --> NO : 201 { insertedId:"64abc…" }
+
+== Delete document ==
+
+NO -> GW : DELETE /api/vm/mongo/testdb/users/64abc123\nBearer JWT (ROLE_NETWORK_OPERATOR)
+GW -> FGC : route
+FGC -> VMC : deleteDocument("testdb", "users", "64abc123")
+VMC -> Mongo : db.users.deleteOne({_id:ObjectId("64abc123")})
+Mongo --> VMC : DeleteResult (deletedCount:1)
+VMC --> NO : 204 No Content
+
+== MongoDB server stats ==
+
+NO -> GW : GET /api/vm/mongo/stats\nBearer JWT
+GW -> FGC : route
+FGC -> VMC : getStats()
+VMC -> Mongo : db.admin().serverStatus()\n{ version, connections, uptime }
+VMC -> Mongo : listDatabaseNames().size()
+VMC --> NO : 200 { version:"6.0.4", databaseCount:4, connections:{ current:5 } }
+
+@enduml

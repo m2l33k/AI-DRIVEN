@@ -30,5 +30,6 @@
         <module>microservices/fault-injection-service</module>
         <module>microservices/messaging-service</module>
         <module>microservices/fivegc-service</module>
+        <module>microservices/audit-service</module>
     </modules>
 </project>

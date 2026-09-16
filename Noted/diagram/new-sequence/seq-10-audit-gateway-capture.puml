@@ -1,0 +1,45 @@
+@startuml seq-10-audit-gateway-capture
+title Audit Gateway Filter — Real Write-Action Capture
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+autonumber
+
+actor "Any Authenticated\nUser" as User
+participant "Gateway\n:9000" as GW
+participant "AuditGateway\nFilter\n(GlobalFilter)" as AGF
+participant "Reactive Security\nContext" as SecCtx
+participant "Downstream\nService" as SVC
+participant "Audit Service\n:9009\n(WebClient)" as AuditSvc
+participant "AuditStore\n(ConcurrentLinked\nDeque, max 10k)" as Store
+
+User -> GW : PUT /api/rules/DR-001\nBearer JWT
+
+GW -> AGF : filter(exchange, chain)\n[Order: LOWEST_PRECEDENCE - 5]
+
+AGF -> AGF : shouldSkip(path, method)?
+note right of AGF : Skip list:\n/api/audit/** (loop prevention)\n/actuator, /swagger, /v3/api-docs\n/webjars, /ws\nOPTIONS, HEAD, GET
+
+AGF -> SecCtx : ReactiveSecurityContextHolder.getContext()
+SecCtx --> AGF : Mono<SecurityContext>
+
+AGF -> AGF : extractActor(JwtAuthenticationToken, exchange)\n→ preferred_username: "analyst-user"\n→ highest ROLE: SECURITY_ANALYST\n→ ip: "127.0.0.1"
+
+AGF -> GW : chain.filter(exchange)\n.doOnTerminate(() → fireAudit(…))
+
+GW -> SVC : forward to anomaly-detection-service
+SVC --> GW : 200 OK
+
+GW --> User : 200 OK
+
+note over AGF : doOnTerminate fires AFTER response
+
+AGF -> AGF : deriveAction("PUT", "/api/rules/DR-001")\n→ "detection-rules:write"\nnormalisePath → "/api/rules/{id}"
+
+AGF -> AuditSvc : POST /api/audit/logs (fire-and-forget)\n.subscribeOn(boundedElastic())\n{ id:"GW-00000042",\n  timestamp:"2026-09-16T…",\n  actor:"analyst-user",\n  role:"SECURITY_ANALYST",\n  action:"detection-rules:write",\n  resource:"/api/rules/{id}",\n  outcome:"Allowed",\n  ip:"127.0.0.1",\n  details:"PUT /api/rules/DR-001 → HTTP 200" }
+
+AuditSvc -> Store : append(entry)\nentries.addFirst(entry)\nwhile size > 10000: removeLast()
+
+note over AGF : Non-blocking — failure is logged\nat DEBUG, never propagated to user
+
+@enduml

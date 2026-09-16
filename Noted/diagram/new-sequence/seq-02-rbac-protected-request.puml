@@ -1,0 +1,45 @@
+@startuml seq-02-rbac-protected-request
+title RBAC Enforcement — Protected Request via Gateway
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+autonumber
+
+actor "Client\n(Angular/curl)" as Client
+participant "Gateway\n:9000\nSecurityConfig" as GW
+participant "Keycloak JWK\n:8081" as JWK
+participant "AuditGateway\nFilter" as Audit
+participant "Downstream\nService" as SVC
+participant "Audit Service\n:9009" as AuditSvc
+
+Client -> GW : POST /api/rules (Bearer JWT)
+
+group JWT Validation (Spring Security WebFlux)
+  GW -> JWK : GET /realms/auth-management/…/certs (cached 5 min)
+  JWK --> GW : JWK set (RS256)
+  GW -> GW : verify signature + expiry
+  GW -> GW : map realm_access.roles → ROLE_*\nmap platform-client.roles → PERM_*
+end
+
+group AuditGatewayFilter (pre-chain, LOWEST_PRECEDENCE - 5)
+  GW -> Audit : ReactiveSecurityContextHolder.getContext()
+  Audit -> Audit : extract preferred_username, highest ROLE_*\nfrom JwtAuthenticationToken
+end
+
+alt Has PERM_detection-rules:write
+  GW -> SVC : forward request + Bearer JWT
+  SVC -> SVC : @PreAuthorize("hasAuthority('PERM_detection-rules:write')")\nprocess business logic
+  SVC --> GW : 200 / 201
+  GW --> Client : 200 / 201
+
+  Audit ->> AuditSvc : POST /api/audit/logs (fire-and-forget)\n{ actor, role, action:"detection-rules:write",\n  resource:"/api/rules", outcome:"Allowed" }\nsubscribeOn(boundedElastic())
+
+else Missing permission
+  GW --> Client : 403 Forbidden
+  Audit ->> AuditSvc : POST /api/audit/logs\n{ outcome:"Denied", action:"detection-rules:write" }
+
+else Expired / invalid JWT
+  GW --> Client : 401 Unauthorized\nWWW-Authenticate: Bearer error="invalid_token"
+end
+
+@enduml

@@ -1,0 +1,47 @@
+@startuml seq-05-zero-trust-mtls-mesh
+title Phase 2 — mTLS + NetworkPolicy Between NF Containers
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+skinparam noteBackgroundColor #E8F5E9
+autonumber
+
+participant "Platform PKI\n(CFSSL/cert-manager)" as PKI
+participant "AMF sidecar\n(Istio/Linkerd proxy)" as AMF_proxy
+participant "SMF sidecar\n(Istio/Linkerd proxy)" as SMF_proxy
+participant "UDM sidecar" as UDM_proxy
+participant "Cilium eBPF\nNetworkPolicy" as Cilium
+
+note over PKI : Self-signed CA issues per-NF leaf certs\nCN=amf.free5gc.svc, CN=smf.free5gc.svc …
+
+== PKI bootstrap ==
+
+PKI -> AMF_proxy : issue amf.crt + amf.key (SAN: free5gc-amf)
+PKI -> SMF_proxy : issue smf.crt + smf.key
+PKI -> UDM_proxy : issue udm.crt + udm.key
+
+== mTLS handshake (AMF → SMF) ==
+
+AMF_proxy -> SMF_proxy : TLS ClientHello\n(presents amf.crt, requests smf.crt)
+SMF_proxy -> SMF_proxy : verify amf.crt against PKI CA\nCN must match expected AMF identity
+SMF_proxy -> AMF_proxy : TLS ServerHello\n(presents smf.crt)
+AMF_proxy -> AMF_proxy : verify smf.crt against PKI CA
+AMF_proxy <-> SMF_proxy : TLS session established (mutual)
+AMF_proxy -> SMF_proxy : HTTP/2 POST /nsmf-pdusession/…\n(encrypted + authenticated)
+
+== NetworkPolicy enforcement (Cilium eBPF) ==
+
+note over Cilium : Policy: AMF → SMF allowed\nPolicy: AMF → UPF direct DENIED\n(traffic must go AMF→SMF→UPF via PFCP)
+
+AMF_proxy -> Cilium : packet to UPF:GTP-U
+Cilium -> Cilium : evaluate L3/L4 policy\nAMF↛UPF direct = DROP
+Cilium --> AMF_proxy : DROP (policy denied)
+note over Cilium : Hubble metric: drop_count{src="amf",dst="upf"} ++
+
+AMF_proxy -> SMF_proxy : PFCP session request (via SMF)
+SMF_proxy -> UDM_proxy : allowed by policy
+SMF_proxy -> Cilium : packet to UPF
+Cilium -> Cilium : policy SMF→UPF = ALLOW
+Cilium --> SMF_proxy : FORWARD OK
+
+@enduml

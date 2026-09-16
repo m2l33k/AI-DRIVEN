@@ -1,0 +1,50 @@
+@startuml seq-06-anomaly-detection-pipeline
+title Anomaly Detection — Full Pipeline (Rule-Based + Z-Score)
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+autonumber
+
+actor "Security Analyst\n(Angular)" as SA
+participant "Gateway\n:9000" as GW
+participant "Anomaly Detection\nService :9003" as ADS
+participant "AnomalyEngine\n(z-score)" as Engine
+participant "AnomalyStore\n(in-memory)" as Store
+participant "AnomalyService\n(Angular)" as FE_SVC
+participant "Security\nDashboard" as Dashboard
+participant "Loki :3100" as Loki
+participant "Grafana\nD4 :3000" as Grafana
+
+== Simulate Attack (frontend button) ==
+
+SA -> GW : POST /api/anomaly/simulate/registration-flood\nBearer JWT (SECURITY_ANALYST)
+GW -> ADS : lb://anomaly-detection-service
+ADS -> Engine : detectRegistrationFlood()
+Engine -> Engine : compute rate (events/s)\ncompare vs DR-001 threshold (20/s)\ncompute z-score against rolling window
+
+alt Rate exceeds threshold
+  Engine -> Store : append AnomalyEvent {\n  type: REGISTRATION_FLOOD,\n  severity: HIGH,\n  zscore: 3.4,\n  rate: 28.2 }
+  ADS -> Loki : log "[ANOMALY] type=REGISTRATION_FLOOD sev=HIGH rate=28.2"
+  ADS --> GW : 200 { injected: 1 }
+else Below threshold
+  ADS --> GW : 200 { injected: 0 }
+end
+
+== Frontend Polling (5s interval) ==
+
+FE_SVC -> GW : GET /api/anomaly/events?limit=50\nBearer JWT
+note right of FE_SVC : EventSource not used — can't send Bearer header\nHTTP polling with interval(5000) + switchMap
+GW -> ADS : lb://anomaly-detection-service
+ADS -> Store : query(null, null, 50)
+Store --> ADS : List<AnomalyEvent> (newest first)
+ADS --> FE_SVC : 200 [ { id, timestamp, type, severity, zscore, rate, imsi } ]
+
+FE_SVC -> Dashboard : signal events.set(…)
+Dashboard -> Dashboard : recompute:\nthreatLevel (quiet/medium/high/critical)\nseveritySlices, typeCounts, rateHistory
+
+== Grafana observability ==
+
+Loki -> Grafana : stream {app="anomaly-detection-service"} |= "[ANOMALY]"
+Grafana -> Grafana : D4 panels:\n- CRITICAL/HIGH/MEDIUM count\n- events-per-minute timeseries\n- severity donut chart
+
+@enduml

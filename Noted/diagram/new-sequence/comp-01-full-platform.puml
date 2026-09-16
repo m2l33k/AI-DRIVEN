@@ -1,0 +1,142 @@
+@startuml comp-01-full-platform
+title Full Platform — Component Diagram (All Services)
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam packageBorderColor #888888
+skinparam ArrowColor #555555
+
+actor "Browser\nAngular :4200" as Browser
+
+package "Spring Cloud — Platform Harness" {
+  [Gateway Service\n:9000\nSpring Cloud Gateway\nOAuth2 RS + RBAC\nAuditGatewayFilter\nMetricsController] as GW
+  [Eureka Server\n:8761\nService Registry] as Eureka
+
+  package "Core Services" {
+    [Auth Service\n:9001\nKeycloak-backed auth\nUser management\nOTP reset + email verify] as Auth
+    [Roaming Analysis\n:9002\nCSV events + risk scoring\nZ-score anomaly\nML forecast proxy\nfree5GC NF facade] as Roaming
+  }
+
+  package "Security Layer" {
+    [Anomaly Detection\n:9003\nRule-based + Z-score\nAnomalyEngine\nRuleStore (CRUD)\nSimulate ATK-01/02] as Anomaly
+    [Rate Limiting\n:9004\nRedis token bucket\nPolicy CRUD\nStats (top offenders)] as RateLimit
+    [Audit Service\n:9009\nImmutable audit trail\nAuditStore (10k cap)\nNo seed data] as Audit
+  }
+
+  package "Platform Services" {
+    [fivegc-service\n:9008\nWebConsole proxy\nNF status/subscribers\nVM MongoDB console] as FGC
+    [Messaging Service\n:9007\nDM + WebSocket\nPush notifications] as Msg
+    [Distributed Tracing\n:9005\nPlaceholder] as Tracing
+    [Fault Injection\n:9006\nPlaceholder] as Fault
+  }
+}
+
+package "Identity" {
+  [Keycloak :8081\nrealm: auth-management\nclient: platform-client\n4 roles + PERM_*] as KC
+}
+
+package "5G Core (free5GC)" {
+  [NRF :19001\nNF Registry\nOAuth2 AS (planned)] as NRF
+  [AMF :19002\nAccess & Mobility] as AMF
+  [SMF :19003\nSession Mgmt] as SMF
+  [AUSF :19004\nAuthentication] as AUSF
+  [UDM/UDR :19005/06\nSubscriber Data] as UDM
+  [WebConsole :5000] as WC
+  database "MongoDB\n:27017\nfree5gc + testdb" as MDB
+}
+
+package "ML Service" {
+  [ml-service :8000\nDjango / Docker\nLSTM + Prophet\n+ ARIMA + Ensemble] as ML
+}
+
+package "Observability" {
+  [Prometheus :9090] as Prom
+  [Grafana :3000\nD1-D7 dashboards] as Grafana
+  [Loki :3100\nLog store] as Loki
+  [Tempo :4318\nTrace store] as Tempo
+  [Fluent Bit :24224] as Fluent
+}
+
+package "Data Stores" {
+  database "Keycloak PG :5437\nkeycloak_db" as KC_PG
+  database "Roaming MySQL :3307\nroaming_db" as Roaming_DB
+  database "RateLimit PG :5434\nratelimit_db" as RL_PG
+  database "Messaging PG :5438\nmessaging_db" as Msg_DB
+  database "Redis :6379\ntoken buckets" as Redis
+}
+
+' Browser → Gateway
+Browser --> GW : HTTPS + Bearer JWT\n(all /api/** paths)
+Browser --> Msg : WS /ws/notifications\n?token=JWT (direct :9007 in dev)
+
+' Gateway routing
+GW --> Auth : lb://auth-service /api/auth,/api/users
+GW --> Roaming : lb://roaming-analysis-service /api/roaming
+GW --> Anomaly : lb://anomaly-detection-service /api/anomaly, /api/rules
+GW --> RateLimit : lb://rate-limiting-service /api/protection
+GW --> Audit : lb://audit-service /api/audit
+GW --> FGC : lb://fivegc-service /api/5gc, /api/vm
+GW --> Msg : lb://messaging-service /api/messages, /ws
+GW --> Tracing : lb://distributed-tracing-service /api/tracing
+GW --> Fault : lb://fault-injection-service /api/fault
+
+' Service discovery
+GW ..> Eureka : register + discover
+Auth ..> Eureka : register
+Roaming ..> Eureka : register
+Anomaly ..> Eureka : register
+RateLimit ..> Eureka : register
+Audit ..> Eureka : register
+FGC ..> Eureka : register
+Msg ..> Eureka : register
+
+' Identity
+GW --> KC : JWK validation (cached)
+Auth --> KC : password grant + Admin REST
+
+' Audit filter
+GW -[#red]-> Audit : AuditGatewayFilter\nfire-and-forget POST /api/audit/logs
+
+' Data stores
+Auth ..> KC_PG : (via Keycloak)
+Roaming ..> Roaming_DB : roaming events
+RateLimit ..> RL_PG : policies
+RateLimit ..> Redis : token buckets + stats
+Msg ..> Msg_DB : messages + threads
+
+' 5GC integration
+FGC --> WC : proxy /api/5gc/* → WebConsole :5000
+FGC ..> MDB : MongoClient :27017 (VM console)
+WC ..> MDB : subscriber data
+Roaming --> WC : Free5gcService proxy
+
+' ML
+Roaming --> ML : RestTemplate POST /api/forecast/\n(Content-Type: application/json)
+
+' Observability
+Prom --> GW : scrape /actuator/prometheus
+Prom --> Auth : scrape
+Prom --> Roaming : scrape
+Prom --> Anomaly : scrape
+Prom --> RateLimit : scrape
+Prom --> Audit : scrape
+Prom --> FGC : scrape
+Prom --> NRF : scrape :19001
+Prom --> AMF : scrape :19002
+
+GW ..> Fluent : logs (fluentd driver)
+Fluent --> Loki : push logs
+GW --> Tempo : OTLP traces
+Grafana --> Prom : query
+Grafana --> Loki : query
+Grafana --> Tempo : query
+
+' 5GC NF SBI
+AMF --> NRF : NF register / heartbeat
+AMF --> SMF : PDU session (SBI)
+AMF --> AUSF : 5G-AKA
+AUSF --> UDM : auth vectors
+SMF --> UDM : subscriber policy
+
+@enduml

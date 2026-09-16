@@ -1,0 +1,45 @@
+@startuml seq-20-protection-stats-sparkline
+title Rate Limiting — Stats Poll + Allow/Block Sparkline
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+autonumber
+
+actor "Security Analyst\n(Angular)" as SA
+participant "Gateway\n:9000" as GW
+participant "Rate Limiting\nService :9004" as RL
+participant "TokenBucket\nService" as TBS
+participant "Redis :6379" as Redis
+
+== Initial load (startWith(0) + interval 5s) ==
+
+SA -> GW : GET /api/protection/stats?topN=10\nBearer JWT (PERM_roaming-events:read)
+GW -> RL : lb://rate-limiting-service
+
+RL -> TBS : allowedCount()
+TBS -> Redis : GET rl:stats:allowed
+Redis --> TBS : "1248"
+TBS -> Redis : GET rl:stats:blocked
+Redis --> TBS : "37"
+TBS -> Redis : ZREVRANGEBYSCORE rl:stats:blocked:keys +inf -inf WITHSCORES LIMIT 0 10
+Redis --> TBS : [("imsi:234-15-000123", 24.0), ("ip:10.0.0.5", 8.0), …]
+
+RL -> RL : rate = 37/(1248+37)*100 = 2.88%\npolicyCount = policies.count()
+RL --> SA : 200 { allowed:1248, blocked:37, blockRatePct:2.88,\n  policyCount:4,\n  topBlocked:[{key:"imsi:234-15-000123",blocks:24},…] }
+
+note over SA : Angular history.update:\n  push {ts:Date.now(), allowed:1248, blocked:37}\n  slice to last 20 points
+
+== 5 seconds later ==
+
+SA -> GW : GET /api/protection/stats?topN=10 (interval tick)
+GW -> RL : route
+RL -> TBS : allowedCount() → "1265"  blocked() → "38"
+RL --> SA : 200 { allowed:1265, blocked:38, … }
+
+note over SA : history now has 2 points\nsparkData.allowed = [1265-1248] = [17]\nsparkData.blocked = [38-37] = [1]\nsparkPath renders SVG polyline
+
+== policyBlocks computed (client-side aggregation) ==
+
+note over SA : policyBlocks = computed from topBlocked:\n  split "imsi:234-15-000123".split(":")[0] = "imsi"\n  map.set("imsi", 24)\n  split "ip:10.0.0.5" → "ip" → map.set("ip", 8)\n\nPolicies table "Blocks" column shows:\n  imsi → 24\n  ip → 8\n  default, operator → 0 (not in top-10)
+
+@enduml

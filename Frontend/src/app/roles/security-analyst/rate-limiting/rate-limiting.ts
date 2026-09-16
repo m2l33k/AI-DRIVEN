@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, computed, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
@@ -20,6 +20,7 @@ interface CheckResult {
   allowed: boolean; keyType: string; key: string; limit: number; remaining: number;
   retryAfterMs: number; action: Action;
 }
+interface HistPoint { ts: number; allowed: number; blocked: number; }
 
 const API = '/api/protection';
 const POLL_MS = 5000;
@@ -27,6 +28,8 @@ const EMPTY_POLICY: Policy = {
   keyType: '', capacity: 100, refillTokens: 10, refillIntervalMs: 1000,
   action: 'THROTTLE', enabled: true, description: '',
 };
+const SPARK_W = 240;
+const SPARK_H = 48;
 
 @Component({
   selector: 'app-rate-limiting',
@@ -52,7 +55,36 @@ const EMPTY_POLICY: Policy = {
       </div>
     }
 
+    <!-- allow / block sparkline -->
+    @if (sparkData().allowed.length > 1) {
+      <div class="hw-card spark-card">
+        <div class="spark-head">
+          <span class="spark-title">Allow / Block rate <small class="muted">(per {{ pollLabel }} interval)</small></span>
+          <span class="spark-legend">
+            <span class="leg-dot" style="background:#00a870"></span>Allowed
+            <span class="leg-dot" style="background:#f53f3f"></span>Blocked
+          </span>
+        </div>
+        <svg [attr.width]="SPARK_W" [attr.height]="SPARK_H" class="sparkline">
+          <!-- zero baseline -->
+          <line x1="0" [attr.y1]="SPARK_H" [attr.x2]="SPARK_W" [attr.y2]="SPARK_H"
+            stroke="var(--hw-border)" stroke-width="1"/>
+          <!-- allowed path -->
+          @if (sparkPath('allowed'); as p) {
+            <path [attr.d]="p" fill="none" stroke="#00a870" stroke-width="1.8"
+              stroke-linejoin="round" stroke-linecap="round"/>
+          }
+          <!-- blocked path -->
+          @if (sparkPath('blocked'); as p) {
+            <path [attr.d]="p" fill="none" stroke="#f53f3f" stroke-width="1.8"
+              stroke-linejoin="round" stroke-linecap="round"/>
+          }
+        </svg>
+      </div>
+    }
+
     <div class="grid">
+      <!-- policies table -->
       <div class="hw-card panel">
         <div class="panel-head">
           <h3>Rate-limit policies</h3>
@@ -65,7 +97,9 @@ const EMPTY_POLICY: Policy = {
         <table class="tbl">
           <thead>
             <tr>
-              <th>Key type</th><th>Capacity</th><th>Refill</th><th>Action</th><th>Status</th>
+              <th>Key type</th><th>Capacity</th><th>Refill</th><th>Action</th>
+              <th title="Known block count (sampled from top-10 offenders)">Blocks</th>
+              <th>Enabled</th>
               @if (canWrite) { <th class="right">Manage</th> }
             </tr>
           </thead>
@@ -76,7 +110,19 @@ const EMPTY_POLICY: Policy = {
                 <td>{{ p.capacity }}</td>
                 <td class="muted">{{ p.refillTokens }} / {{ p.refillIntervalMs }}ms</td>
                 <td><span class="act" [class.block]="p.action==='BLOCK'">{{ p.action }}</span></td>
-                <td><span class="dot" [class.on]="p.enabled">{{ p.enabled ? 'Enabled' : 'Disabled' }}</span></td>
+                <td class="mono hits">
+                  {{ policyBlocks().get(p.keyType) ?? 0 }}
+                </td>
+                <td>
+                  @if (canWrite) {
+                    <button class="switch" [class.on]="p.enabled"
+                      (click)="toggleEnabled(p); $event.stopPropagation()">
+                      <i></i>
+                    </button>
+                  } @else {
+                    <span class="dot" [class.on]="p.enabled">{{ p.enabled ? 'Enabled' : 'Disabled' }}</span>
+                  }
+                </td>
                 @if (canWrite) {
                   <td class="right nowrap">
                     <button class="mini" (click)="editPolicy(p)">Edit</button>
@@ -85,25 +131,40 @@ const EMPTY_POLICY: Policy = {
                 }
               </tr>
             } @empty {
-              <tr><td class="empty" [attr.colspan]="canWrite ? 6 : 5">No policies configured.</td></tr>
+              <tr><td class="empty" [attr.colspan]="canWrite ? 7 : 6">No policies configured.</td></tr>
             }
           </tbody>
         </table>
         @if (saveError() && !editing()) { <div class="banner-err">{{ saveError() }}</div> }
       </div>
 
+      <!-- top blocked offenders with bar chart -->
       <div class="hw-card panel">
-        <div class="panel-head"><h3>Top blocked offenders</h3><span class="tag">blocks</span></div>
-        <table class="tbl">
-          <tbody>
-            @for (t of stats()?.topBlocked ?? []; track t.key) {
-              <tr><td class="mono">{{ t.key }}</td><td class="num">{{ t.blocks }}</td></tr>
-            } @empty { <tr><td class="empty" colspan="2">No blocks recorded.</td></tr> }
-          </tbody>
-        </table>
+        <div class="panel-head">
+          <h3>Top blocked offenders</h3>
+          <span class="tag">block counts</span>
+        </div>
+        @if ((stats()?.topBlocked ?? []).length === 0) {
+          <div class="empty-panel">No blocks recorded.</div>
+        } @else {
+          <div class="offenders">
+            @for (t of stats()!.topBlocked; track t.key) {
+              <div class="offender-row">
+                <span class="off-key mono">{{ t.key }}</span>
+                <div class="bar-wrap">
+                  <div class="bar-fill"
+                    [style.width.%]="maxBlocks() > 0 ? (t.blocks / maxBlocks() * 100) : 0">
+                  </div>
+                  <span class="bar-num">{{ t.blocks }}</span>
+                </div>
+              </div>
+            }
+          </div>
+        }
       </div>
     </div>
 
+    <!-- policy editor -->
     @if (canWrite && editing(); as e) {
       <div class="hw-card panel">
         <div class="panel-head">
@@ -147,6 +208,7 @@ const EMPTY_POLICY: Policy = {
       </div>
     }
 
+    <!-- decision tester -->
     <div class="hw-card panel">
       <div class="panel-head">
         <h3>Test a rate-limit decision</h3>
@@ -203,23 +265,56 @@ const EMPTY_POLICY: Policy = {
     .tag { font-size: 12px; color: var(--hw-text-3); }
     .note { padding: 16px 20px; font-size: 13px; color: var(--hw-text-3); margin-bottom: 16px; }
     .note code { font-family: monospace; background: var(--hw-bg); padding: 1px 5px; border-radius: 4px; }
+    .muted { color: var(--hw-text-3); }
+
+    /* sparkline card */
+    .spark-card { padding: 14px 20px; margin-bottom: 16px; display: flex; align-items: center; gap: 24px; }
+    .spark-head { display: flex; flex-direction: column; gap: 6px; min-width: 200px; }
+    .spark-title { font-size: 13px; font-weight: 600; color: var(--hw-text); }
+    .spark-legend { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--hw-text-3); }
+    .leg-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 3px; }
+    .sparkline { display: block; }
+
+    /* table */
     .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
     .tbl th { text-align: left; color: var(--hw-text-3); font-weight: 500; padding: 10px 12px; border-bottom: 1px solid var(--hw-border); }
-    .tbl td { padding: 11px 12px; border-bottom: 1px solid var(--hw-border); color: var(--hw-text-2); }
+    .tbl td { padding: 11px 12px; border-bottom: 1px solid var(--hw-border); color: var(--hw-text-2); vertical-align: middle; }
     .tbl tr:last-child td { border-bottom: 0; }
     .right { text-align: right; }
     .nowrap { white-space: nowrap; }
     .mono { font-family: monospace; }
-    .muted { color: var(--hw-text-3); }
-    .num { text-align: right; font-weight: 600; color: var(--hw-text); }
+    .hits { color: var(--hw-text); font-weight: 600; }
     .empty { text-align: center; color: var(--hw-text-3); padding: 18px; }
+    .empty-panel { padding: 24px; text-align: center; color: var(--hw-text-3); font-size: 13px; }
     .act { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 6px; background: rgba(255,143,31,.14); color: var(--hw-warning); }
     .act.block { background: rgba(245,63,63,.12); color: var(--hw-danger); }
     .dot { font-size: 12px; color: var(--hw-text-3); }
     .dot.on { color: var(--hw-success); font-weight: 600; }
+
+    /* toggle switch */
+    .switch { width: 44px; height: 24px; border-radius: 20px; border: 0;
+      background: var(--hw-border-strong, #d1d5db); position: relative;
+      transition: background .15s; cursor: pointer; flex-shrink: 0; }
+    .switch i { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px;
+      border-radius: 50%; background: #fff; transition: left .15s; pointer-events: none;
+      box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+    .switch.on { background: var(--hw-success, #00a870); }
+    .switch.on i { left: 22px; }
+
+    /* offenders bar chart */
+    .offenders { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
+    .offender-row { display: flex; flex-direction: column; gap: 4px; }
+    .off-key { font-size: 12px; color: var(--hw-text); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; }
+    .bar-wrap { display: flex; align-items: center; gap: 8px; }
+    .bar-fill { height: 8px; border-radius: 4px; background: linear-gradient(90deg, #f53f3f, #ff6b6b);
+      transition: width .4s ease; min-width: 2px; }
+    .bar-num { font-size: 12px; font-weight: 600; color: var(--hw-text); white-space: nowrap; min-width: 32px; }
+
     .mini { font-size: 12px; padding: 4px 10px; margin-left: 6px; border: 1px solid var(--hw-border); background: var(--hw-card, #fff); border-radius: 6px; cursor: pointer; color: var(--hw-text-2); }
     .mini:hover { border-color: var(--hw-info); color: var(--hw-info); }
     .mini.danger:hover { border-color: var(--hw-danger); color: var(--hw-danger); }
+
     .editor { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
     .editor label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--hw-text-3); }
     .editor .wide { grid-column: span 2; }
@@ -231,6 +326,7 @@ const EMPTY_POLICY: Policy = {
     .hw-btn.ghost { background: transparent; border: 1px solid var(--hw-border); color: var(--hw-text-2); }
     .inline-err { color: var(--hw-danger); font-size: 12px; }
     .banner-err { margin-top: 12px; padding: 10px 14px; border-radius: 6px; background: rgba(245,63,63,.1); color: var(--hw-danger); font-size: 12px; }
+
     .check { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
     .check label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--hw-text-3); }
     .check input, .check select { padding: 8px 10px; border: 1px solid var(--hw-border); border-radius: 6px; font-size: 13px; min-width: 200px; }
@@ -255,34 +351,81 @@ export class RateLimiting implements OnInit, OnDestroy {
   private sub?: Subscription;
   pollLabel = `${POLL_MS / 1000}s`;
 
-  /** Only users with detection-rules:write may create/edit/delete policies (matches the backend guard). */
+  readonly SPARK_W = SPARK_W;
+  readonly SPARK_H = SPARK_H;
+
   canWrite = this.auth.hasPermission('detection-rules:write');
 
-  stats = signal<ProtectionStats | null>(null);
+  stats    = signal<ProtectionStats | null>(null);
   policies = signal<Policy[]>([]);
+  history  = signal<HistPoint[]>([]);
 
   // policy editor state
-  editing = signal<Policy | null>(null);
-  isNew = signal(false);
-  saving = signal(false);
+  editing   = signal<Policy | null>(null);
+  isNew     = signal(false);
+  saving    = signal(false);
   saveError = signal<string | null>(null);
 
   // decision tester state
   result = signal<CheckResult | null>(null);
-  error = signal<string | null>(null);
-  busy = signal(false);
-  log = signal<{ seq: number; allowed: boolean; remaining: number }[]>([]);
+  error  = signal<string | null>(null);
+  busy   = signal(false);
+  log    = signal<{ seq: number; allowed: boolean; remaining: number }[]>([]);
   private seq = 0;
   keyType = 'imsi';
   key = '234-15-000123';
   tokens = 1;
+
+  /** Aggregate block counts per keyType from the top-blocked list. */
+  policyBlocks = computed(() => {
+    const map = new Map<string, number>();
+    for (const t of this.stats()?.topBlocked ?? []) {
+      const kt = t.key.split(':')[0];
+      map.set(kt, (map.get(kt) ?? 0) + t.blocks);
+    }
+    return map;
+  });
+
+  maxBlocks = computed(() => {
+    const top = this.stats()?.topBlocked ?? [];
+    return top.length ? Math.max(...top.map(t => t.blocks)) : 1;
+  });
+
+  /** Per-interval deltas for the sparkline (so flat-line cumulative counters become a rate chart). */
+  sparkData = computed(() => {
+    const h = this.history();
+    if (h.length < 2) return { allowed: [] as number[], blocked: [] as number[] };
+    const allowed = h.slice(1).map((p, i) => Math.max(0, p.allowed - h[i].allowed));
+    const blocked = h.slice(1).map((p, i) => Math.max(0, p.blocked - h[i].blocked));
+    return { allowed, blocked };
+  });
+
+  sparkPath(series: 'allowed' | 'blocked'): string {
+    const vals = this.sparkData()[series];
+    if (vals.length < 2) return '';
+    const allVals = [...this.sparkData().allowed, ...this.sparkData().blocked];
+    const max = Math.max(...allVals, 1);
+    const n = vals.length;
+    const pts = vals.map((v, i) => {
+      const x = (i / (n - 1)) * SPARK_W;
+      const y = SPARK_H - (v / max) * (SPARK_H - 6);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    return 'M' + pts.join('L');
+  }
 
   ngOnInit() {
     this.sub = interval(POLL_MS).pipe(
       startWith(0),
       switchMap(() => this.http.get<ProtectionStats>(`${API}/stats`)),
     ).subscribe({
-      next: (data) => this.stats.set(data),
+      next: (data) => {
+        this.stats.set(data);
+        this.history.update(h => {
+          const next = [...h, { ts: Date.now(), allowed: data.allowed, blocked: data.blocked }];
+          return next.slice(-20);
+        });
+      },
       error: () => this.stats.set(null),
     });
     this.loadPolicies();
@@ -297,7 +440,7 @@ export class RateLimiting implements OnInit, OnDestroy {
     });
   }
 
-  // ---- policy CRUD (write; gated by canWrite in the template) ----
+  // ---- policy CRUD ----
 
   newPolicy() {
     this.saveError.set(null);
@@ -321,7 +464,6 @@ export class RateLimiting implements OnInit, OnDestroy {
     if (!p || !p.keyType) return;
     this.saving.set(true);
     this.saveError.set(null);
-    // Send the full, typed policy body the backend validates (all bucket params + action).
     const body: Policy = {
       keyType: p.keyType.trim(),
       capacity: Number(p.capacity),
@@ -340,7 +482,15 @@ export class RateLimiting implements OnInit, OnDestroy {
     });
   }
 
-  /** Builds a readable message from the backend's detailed error payload (validation fields, parse cause, 403). */
+  /** Quick inline toggle — flips enabled without opening the editor. */
+  toggleEnabled(p: Policy) {
+    const body: Policy = { ...p, enabled: !p.enabled };
+    this.http.put<Policy>(`${API}/policies/${encodeURIComponent(p.keyType)}`, body).subscribe({
+      next: (r) => this.policies.update(list => list.map(x => x.keyType === r.keyType ? r : x)),
+      error: (err: HttpErrorResponse) => this.saveError.set(this.describeError(err, 'Toggle')),
+    });
+  }
+
   private describeError(err: HttpErrorResponse, verb: string): string {
     if (err.status === 403) return 'Forbidden — your token lacks detection-rules:write.';
     const body = err.error;
@@ -365,7 +515,6 @@ export class RateLimiting implements OnInit, OnDestroy {
 
   runCheck() { void this.runBurst(1); }
 
-  /** Fire {@code n} checks in sequence (a bucket is stateful, so order matters) and log each verdict. */
   async runBurst(n: number) {
     if (!this.keyType || !this.key || this.busy()) return;
     this.busy.set(true);
@@ -373,15 +522,14 @@ export class RateLimiting implements OnInit, OnDestroy {
     this.log.set([]);
     for (let i = 0; i < n; i++) {
       const r = await this.sendOne();
-      if (!r) break; // hard error (e.g. 403/network) — stop the burst
+      if (!r) break;
       this.result.set(r);
       this.log.update((l) => [...l, { seq: ++this.seq, allowed: r.allowed, remaining: r.remaining }]);
     }
     this.busy.set(false);
-    this.refreshStats(); // reflect the new allowed/blocked counts immediately
+    this.refreshStats();
   }
 
-  /** One /check call; a 429 (blocked) carries a valid CheckResult body, so treat it as a result. */
   private async sendOne(): Promise<CheckResult | null> {
     try {
       return await firstValueFrom(this.http.post<CheckResult>(`${API}/check`, {
@@ -397,8 +545,14 @@ export class RateLimiting implements OnInit, OnDestroy {
 
   private refreshStats() {
     this.http.get<ProtectionStats>(`${API}/stats`).subscribe({
-      next: (data) => this.stats.set(data),
-      error: () => { /* keep last known stats */ },
+      next: (data) => {
+        this.stats.set(data);
+        this.history.update(h => {
+          const next = [...h, { ts: Date.now(), allowed: data.allowed, blocked: data.blocked }];
+          return next.slice(-20);
+        });
+      },
+      error: () => {},
     });
   }
 }

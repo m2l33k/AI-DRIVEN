@@ -1,0 +1,45 @@
+@startuml seq-19-gateway-metrics
+title Gateway Metrics — Prometheus-Backed Platform Overview
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+autonumber
+
+actor "Platform Admin\n(Angular)" as Admin
+participant "Gateway\n:9000\nMetricsController" as GW
+participant "Prometheus\n:9090" as Prom
+participant "gateway\n/actuator/prometheus" as GWMetrics
+participant "auth-service\n/actuator/prometheus" as AuthMetrics
+
+== Admin loads metrics dashboard ==
+
+Admin -> GW : GET /api/metrics/overview\nBearer JWT (PERM_platform-config:read)
+
+GW -> Prom : PromQL: sum(http_server_requests_seconds_count\n{application="gateway-service"}[5m])
+Prom -> GWMetrics : scrape (every 15s — already cached)
+GWMetrics --> Prom : metrics
+Prom --> GW : total_requests_5min
+
+GW -> Prom : PromQL: rate(http_server_requests_seconds_count[1m]) ×60
+Prom --> GW : requests_per_second
+
+GW -> Prom : PromQL: sum(rate(…{status=~"2.."}[5m]))\n/ sum(rate(…[5m])) × 100
+Prom --> GW : success_rate_pct
+
+GW -> Prom : PromQL: sum(rate(…{status=~"5.."}[5m]))\n/ sum(rate(…[5m])) × 100
+Prom --> GW : error_rate_pct
+
+GW -> Prom : PromQL: topk(5, sum by (uri)\n(rate(http_server_requests_seconds_count[5m])))
+Prom --> GW : top_endpoints [{uri, count, avg_duration_ms}]
+
+GW -> Prom : jvm_memory_used_bytes{area="heap"}\n/ jvm_memory_max_bytes{area="heap"} × 100
+Prom --> GW : heap_usage_pct
+
+GW -> Prom : jvm_threads_live_threads{application="gateway-service"}
+Prom --> GW : thread_count
+
+GW --> Admin : 200 { totalRequests, rps, successRatePct, errorRatePct,\n  exceptions, topEndpoints:[{uri,count,avgDurationMs}],\n  jvm:{heapPct, threads} }
+
+note over Admin : Angular admin-dashboard.ts renders:\n- 4 stat cards (total req, RPS, 2xx%, 5xx%)\n- Top endpoints bar chart\n- JVM health gauge
+
+@enduml

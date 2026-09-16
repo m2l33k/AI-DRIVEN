@@ -1,0 +1,47 @@
+@startuml seq-09-rate-limiting-check
+title Rate Limiting — Redis Token Bucket Check Flow
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+autonumber
+
+actor "Security Analyst\n(Angular)" as SA
+participant "Gateway\n:9000" as GW
+participant "Rate Limiting\nService :9004" as RL
+participant "TokenBucket\nService" as TBS
+participant "Redis :6379\n(token buckets)" as Redis
+participant "Postgres :5434\n(policies)" as PG
+
+== Check a rate-limit decision ==
+
+SA -> GW : POST /api/protection/check\n{ keyType:"imsi", key:"234-15-000123", tokens:1 }\nBearer JWT (PERM_roaming-events:read)
+GW -> RL : lb://rate-limiting-service
+
+RL -> TBS : check("imsi", "234-15-000123", 1)
+TBS -> PG : findById("imsi") → RateLimitPolicy\n{capacity:20, refillTokens:10,\n refillIntervalMs:1000, action:BLOCK, enabled:true}
+PG --> TBS : policy found
+
+TBS -> Redis : EVAL token_bucket.lua\nKEYS=[rl:imsi:234-15-000123]\nARGS=[capacity=20, refill=10, interval=1000,\n      now=<epoch_ms>, tokens=1]
+
+note over Redis : Lua script (atomic):\n1. GET current bucket (tokens, last_refill)\n2. compute elapsed since last_refill\n3. add refillTokens * (elapsed / interval)\n4. cap at capacity\n5. if tokens_available >= requested: consume + return allowed=1\n6. else return allowed=0 + retry_after\n7. PEXPIRE bucket (2 × interval)
+
+alt Tokens available
+  Redis --> TBS : [1, remaining=14, retryAfter=0]
+  TBS -> Redis : INCR rl:stats:allowed
+  TBS --> RL : RateLimitResult(allowed=true, remaining=14)
+  RL --> SA : 200 { allowed:true, remaining:14, limit:20 }\nX-RateLimit-Remaining: 14
+
+else Bucket empty
+  Redis --> TBS : [0, remaining=0, retryAfter=850]
+  TBS -> Redis : INCR rl:stats:blocked
+  TBS -> Redis : ZINCRBY rl:stats:blocked:keys "imsi:234-15-000123" 1
+  TBS --> RL : RateLimitResult(allowed=false, retryAfterMs=850)
+  RL --> SA : 429 Too Many Requests\n{ allowed:false, action:"BLOCK", retryAfterMs:850 }\nRetry-After: 1
+
+else Policy disabled / Redis down
+  note over TBS : Fail-open: return allowed=true\n(limiter never takes platform down)
+  TBS --> RL : RateLimitResult(allowed=true, remaining=-1)
+  RL --> SA : 200 { allowed:true, remaining:-1 }
+end
+
+@enduml

@@ -1,0 +1,40 @@
+@startuml comp-02-zero-trust-layers
+title Phase 2 — Zero-Trust Security Layers
+
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam packageBorderColor #888888
+
+package "Layer A — Platform RBAC (DONE ✅)" #E8F5E9 {
+  [Keycloak OIDC\nJWT issuer\nComposite RBAC] as KC
+  [Gateway SecurityConfig\nJWT validation\nPERM_* RBAC\nRoute-level authz] as GWSec
+  [AuditGatewayFilter\nEvery write captured\nfire-and-forget] as AGF
+  [Audit Service :9009\nImmutable trail\nNo seed / real data] as AuditSvc
+  [Rate Limiting :9004\nRedis token bucket\nFail-open design] as RL
+  [Anomaly Detection :9003\nRule-based + z-score\nATK-01 flood\nATK-02 IMSI enum] as AD
+}
+
+package "Layer B — 5G SBI Zero Trust (PLANNED 🔲)" #FFF9C4 {
+  [free5GC NRF\nNF registry\nOAuth2 AS\nScoped SBI tokens\n(TS 33.501 §13)] as NRF
+  [SBI TLS\nHTTPS on all NF\nSBI interfaces\nCert per NF] as SBI_TLS
+  [mTLS Mesh\n(Istio/Linkerd/Cilium)\nPeer cert per container\nAMF↛UPF denied] as MTLS
+  [PKI\nCFSSL or cert-manager\nSelf-signed CA\nLeaf certs per NF] as PKI
+  [Grafana D5\nHandshake failures\nToken scope rejects\nCert expiry alert] as D5
+}
+
+KC --> GWSec : JWK set\n(RS256 validation)
+GWSec --> AGF : SecurityContext\n(reactor)
+AGF --> AuditSvc : write actions
+GWSec --> RL : advisory check
+AD --> RL : anomaly signals
+
+NRF --> SBI_TLS : OAuth2 token\n+ TLS client cert
+PKI --> SBI_TLS : issue leaf certs
+PKI --> MTLS : issue workload certs
+SBI_TLS --> MTLS : mTLS on top of TLS
+MTLS --> D5 : metric: handshake failures
+NRF --> D5 : metric: token scope rejects
+
+note bottom of "Layer B — 5G SBI Zero Trust (PLANNED 🔲)" : Requires Linux host (Ubuntu 22.04 VM or WSL2)\nwith gtp5g kernel module for free5GC UPF.\nControl-plane NFs work on Windows (no UPF).
+
+@enduml

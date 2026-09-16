@@ -1,0 +1,55 @@
+@startuml seq-14-roaming-analysis
+title Roaming Analysis — CSV Upload → Analysis → ML Forecast
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+autonumber
+
+actor "Security Analyst\n(Angular)" as SA
+participant "Gateway\n:9000" as GW
+participant "Roaming Analysis\nService :9002" as RAS
+participant "MySQL :3307\nroaming_db" as DB
+participant "ML Service\n:8000\n(Django)" as ML
+participant "AnomalyDetector\n(z-score / IQR)" as AD
+
+== Upload CSV data ==
+
+SA -> GW : POST /api/roaming/upload\nBearer JWT (PERM_roaming-events:read)\nmultipart/form-data (CSV file)
+GW -> RAS : lb://roaming-analysis-service
+RAS -> RAS : parse CSV rows → RoamingEvent entities
+RAS -> DB : bulk insert RoamingEvent records\n(roaming_db.roaming_events)
+DB --> RAS : inserted N rows
+
+== Run analysis ==
+
+RAS -> DB : SELECT * FROM roaming_events ORDER BY timestamp
+DB --> RAS : List<RoamingEvent>
+
+RAS -> AD : detectAnomalies(events)\ncompute z-scores per IMSI/PLMN\nflag outliers (|z| > 2.5)
+AD --> RAS : List<AnomalyResult> { imsi, zScore, reasons }
+
+RAS -> ML : POST http://localhost:8000/api/forecast/\nContent-Type: application/json\n{ timestamps[], values[], horizon:24 }
+note right of ML : Django service (Docker only)\nLSTM + Prophet + ARIMA + Ensemble\nRestTemplate with jsonEntity() wrapper\n(Spring Boot 4 requires Content-Type)
+ML --> RAS : { lstm:[], prophet:[], arima:[], ensemble:[], metrics:{mae,rmse,aic} }
+
+RAS --> SA : 200 { events, anomalies, forecast }
+
+== Dashboard polling ==
+
+SA -> GW : GET /api/roaming/overview\nBearer JWT
+GW -> RAS : route
+RAS -> DB : aggregate stats\n(total events, risk dist, direction)
+RAS --> SA : 200 { totalEvents, highRisk, avgRisk, byDirection }
+
+SA -> GW : GET /api/roaming/anomalies
+GW -> RAS : route
+RAS -> AD : cached results
+RAS --> SA : 200 [{ imsi, zScore, severity, reasons }]
+
+SA -> GW : GET /api/roaming/forecast
+GW -> RAS : route
+RAS -> ML : GET http://localhost:8000/api/train/ (status)
+ML --> RAS : { status:"idle", metrics:{mae,rmse} }
+RAS --> SA : 200 { forecast data, model metrics }
+
+@enduml

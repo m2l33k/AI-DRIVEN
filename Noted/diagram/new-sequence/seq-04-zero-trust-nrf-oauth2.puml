@@ -1,0 +1,47 @@
+@startuml seq-04-zero-trust-nrf-oauth2
+title Phase 2 — NRF OAuth2 Scoped Tokens (SEC-02): Wrong Scope → 403
+
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+skinparam noteBackgroundColor #FFF9C4
+autonumber
+
+participant "AMF\nfree5gc-amf" as AMF
+participant "NRF\nfree5gc-nrf\n(OAuth2 AS)\n:19001" as NRF
+participant "SMF\nfree5gc-smf\n:19003" as SMF
+participant "UDM\nfree5gc-udm\n:19005" as UDM
+participant "Prometheus\n:9090" as Prom
+
+note over NRF : nrfcfg.yaml: oauth: true\nNRF acts as SBI OAuth2 AS (TS 33.501 §13)
+
+== Normal flow: correct scope ==
+
+AMF -> NRF : POST /oauth2/token\ngrant_type=client_credentials\nclient_id=amf\nscope=namf-comm
+note right of NRF : AMF is authorized for namf-comm scope
+NRF --> AMF : 200 { access_token, scope:"namf-comm", expires_in:3600 }
+
+AMF -> SMF : POST /nsmf-pdusession/v1/sm-contexts\nAuthorization: Bearer <access_token>
+SMF -> NRF : POST /oauth2/introspect { token }
+NRF --> SMF : 200 { active:true, scope:"namf-comm" }
+note right of SMF : scope namf-comm is valid for this endpoint
+SMF --> AMF : 201 smContextRef
+
+== SEC-02 Demo: wrong scope ==
+
+AMF -> NRF : POST /oauth2/token\ngrant_type=client_credentials\nclient_id=amf\nscope=nsmf-pdusession
+note right of NRF : AMF is NOT authorized for nsmf-pdusession\n(that scope is for SMF→UDM calls)
+NRF --> AMF : 403 Forbidden\n{ error:"insufficient_scope" }
+
+note over AMF : Cannot obtain correct token\nSMF call blocked before it starts
+
+AMF -> NRF : POST /oauth2/token\nscope=namf-comm  (correct scope)
+NRF --> AMF : 200 { access_token (namf-comm) }
+AMF -> SMF : POST /nsmf-pdusession/v1/sm-contexts\nBearer <namf-comm token>
+SMF -> NRF : introspect
+NRF --> SMF : 200 { active:true, scope:"namf-comm" }
+SMF --> AMF : 201 OK
+
+AMF -> Prom : sbi_nrf_token_rejections_total{scope="nsmf-pdusession",nf="amf"} ++
+Prom -> Prom : D5 alert: "SBI Token Scope Rejections > 0"
+
+@enduml

@@ -2,6 +2,8 @@ app:
   jwk-set-uri: ${APP_KEYCLOAK_JWK_SET_URI:http://localhost:8081/realms/auth-management/protocol/openid-connect/certs}
 prometheus:
   base-url: ${PROMETHEUS_BASE_URL:http://localhost:9090}
+audit:
+  service-url: ${AUDIT_SERVICE_URL:http://localhost:9009}
 server:
   port: 9000
   netty:
@@ -62,12 +64,26 @@ spring:
               uri: lb://anomaly-detection-service
               predicates:
                 - Path=/api/anomaly/**
+            - id: detection-rules-service
+              uri: lb://anomaly-detection-service
+              predicates:
+                - Path=/api/rules/**
             - id: anomaly-detection-service-docs
               uri: lb://anomaly-detection-service
               predicates:
                 - Path=/anomaly-detection-service/v3/api-docs
               filters:
                 - RewritePath=/anomaly-detection-service/(?<segment>.*), /$\{segment}
+            - id: audit-service
+              uri: lb://audit-service
+              predicates:
+                - Path=/api/audit/**
+            - id: audit-service-docs
+              uri: lb://audit-service
+              predicates:
+                - Path=/audit-service/v3/api-docs
+              filters:
+                - RewritePath=/audit-service/(?<segment>.*), /$\{segment}
             - id: rate-limiting-service
               uri: lb://rate-limiting-service
               predicates:
@@ -193,6 +209,8 @@ springdoc:
         url: /fault-injection-service/v3/api-docs
       - name: messaging-service
         url: /messaging-service/v3/api-docs
+      - name: audit-service
+        url: /audit-service/v3/api-docs
 ---
 app:
   jwk-set-uri: http://keycloak:8080/realms/auth-management/protocol/openid-connect/certs
@@ -243,12 +261,26 @@ spring:
               uri: lb://anomaly-detection-service
               predicates:
                 - Path=/api/anomaly/**
+            - id: detection-rules-service
+              uri: lb://anomaly-detection-service
+              predicates:
+                - Path=/api/rules/**
             - id: anomaly-detection-service-docs
               uri: lb://anomaly-detection-service
               predicates:
                 - Path=/anomaly-detection-service/v3/api-docs
               filters:
                 - RewritePath=/anomaly-detection-service/(?<segment>.*), /$\{segment}
+            - id: audit-service
+              uri: lb://audit-service
+              predicates:
+                - Path=/api/audit/**
+            - id: audit-service-docs
+              uri: lb://audit-service
+              predicates:
+                - Path=/audit-service/v3/api-docs
+              filters:
+                - RewritePath=/audit-service/(?<segment>.*), /$\{segment}
             - id: rate-limiting-service
               uri: lb://rate-limiting-service
               predicates:
