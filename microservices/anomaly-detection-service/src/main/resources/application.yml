@@ -7,22 +7,6 @@ spring:
     name: anomaly-detection-service
   lifecycle:
     timeout-per-shutdown-phase: 15s
-  datasource:
-    url: ${ANOMALY_DB_URL:jdbc:postgresql://localhost:5433/anomaly_db}
-    username: ${ANOMALY_DB_USERNAME:anomaly}
-    password: ${ANOMALY_DB_PASSWORD:anomaly}
-    driver-class-name: org.postgresql.Driver
-  jpa:
-    hibernate:
-      ddl-auto: update
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-    open-in-view: false
-  data:
-    redis:
-      host: ${ANOMALY_REDIS_HOST:localhost}
-      port: ${ANOMALY_REDIS_PORT:6380}
 
 eureka:
   client:
@@ -30,6 +14,13 @@ eureka:
       defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
   instance:
     prefer-ip-address: true
+
+anomaly:
+  prometheus-url: ${PROMETHEUS_URL:http://localhost:9090}
+  poll-interval-ms: 10000
+  reg-flood-threshold: 20.0
+  zscore-threshold: 3.0
+  window-size: 30
 
 management:
   metrics:
@@ -59,15 +50,9 @@ spring:
   config:
     activate:
       on-profile: docker
-  datasource:
-    url: jdbc:postgresql://anomaly-postgres:5432/anomaly_db
-    username: anomaly
-    password: anomaly
-  data:
-    redis:
-      host: anomaly-redis
-      port: 6379
 eureka:
   client:
     service-url:
       defaultZone: http://eureka-server:8761/eureka/
+anomaly:
+  prometheus-url: http://prometheus:9090

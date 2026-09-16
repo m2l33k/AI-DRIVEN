@@ -1,0 +1,437 @@
+{
+  "uid": "security-anomaly",
+  "title": "Security — Anomaly Detection",
+  "description": "Live threat monitoring: UERANSIM flood / IMSI enumeration detection via Loki logs + Prometheus metrics",
+  "tags": ["security", "anomaly", "5gc", "attack"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Threat Summary",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+
+    {
+      "id": 2,
+      "title": "CRITICAL Events",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": {
+        "reduceOptions": { "calcs": ["count"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "#c7000b", "mode": "fixed" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#c7000b", "value": null }] }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "count_over_time({app=\"anomaly-detection-service\"} |= \"[ANOMALY]\" |= \"CRITICAL\" [$__range])",
+          "legendFormat": "CRITICAL"
+        }
+      ]
+    },
+
+    {
+      "id": 3,
+      "title": "HIGH Events",
+      "type": "stat",
+      "gridPos": { "x": 4, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": {
+        "reduceOptions": { "calcs": ["count"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "#f59f00", "mode": "fixed" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#f59f00", "value": null }] }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "count_over_time({app=\"anomaly-detection-service\"} |= \"[ANOMALY]\" |= \"HIGH\" [$__range])",
+          "legendFormat": "HIGH"
+        }
+      ]
+    },
+
+    {
+      "id": 4,
+      "title": "MEDIUM Events",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": {
+        "reduceOptions": { "calcs": ["count"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "#3491fa", "mode": "fixed" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#3491fa", "value": null }] }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "count_over_time({app=\"anomaly-detection-service\"} |= \"[ANOMALY]\" |= \"MEDIUM\" [$__range])",
+          "legendFormat": "MEDIUM"
+        }
+      ]
+    },
+
+    {
+      "id": 5,
+      "title": "AMF Reg Rate (req/s)",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "auto",
+        "orientation": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green",  "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red",    "value": 20 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(amf_reg_requests_total[30s])",
+          "legendFormat": "reg rate"
+        }
+      ]
+    },
+
+    {
+      "id": 6,
+      "title": "AMF Auth Failure Rate (req/s)",
+      "type": "stat",
+      "gridPos": { "x": 16, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green",  "value": null },
+              { "color": "yellow", "value": 3 },
+              { "color": "red",    "value": 8 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(amf_auth_failure_total[30s])",
+          "legendFormat": "auth fail rate"
+        }
+      ]
+    },
+
+    {
+      "id": 7,
+      "title": "Anomaly Service Up",
+      "type": "stat",
+      "gridPos": { "x": 20, "y": 1, "w": 4, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "1": { "text": "UP",   "color": "green" } } },
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red"   } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "up{job=\"anomaly-detection-service\"}",
+          "legendFormat": "anomaly-svc"
+        }
+      ]
+    },
+
+    {
+      "id": 10,
+      "type": "row",
+      "title": "Metrics Timeline",
+      "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+
+    {
+      "id": 11,
+      "title": "AMF Registration Rate — flood threshold",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "transparent", "value": null },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "threshold" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } },
+              { "id": "custom.lineStyle", "value": { "dash": [6, 3], "fill": "dash" } },
+              { "id": "custom.lineWidth", "value": 1 },
+              { "id": "custom.fillOpacity", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(amf_reg_requests_total[30s])",
+          "legendFormat": "reg rate"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "vector(20)",
+          "legendFormat": "threshold"
+        }
+      ]
+    },
+
+    {
+      "id": 12,
+      "title": "AMF Auth Failure Rate — baseline + z-score",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 6, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(amf_auth_failure_total[30s])",
+          "legendFormat": "auth fail rate"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "avg_over_time(rate(amf_auth_failure_total[30s])[10m:30s])",
+          "legendFormat": "10m baseline"
+        }
+      ]
+    },
+
+    {
+      "id": 20,
+      "type": "row",
+      "title": "Live Anomaly Logs",
+      "gridPos": { "x": 0, "y": 14, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+
+    {
+      "id": 21,
+      "title": "ANOMALY events — live tail",
+      "type": "logs",
+      "gridPos": { "x": 0, "y": 15, "w": 24, "h": 10 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{app=\"anomaly-detection-service\"} |= \"[ANOMALY]\"",
+          "legendFormat": ""
+        }
+      ]
+    },
+
+    {
+      "id": 22,
+      "title": "All anomaly-detection-service logs",
+      "type": "logs",
+      "gridPos": { "x": 0, "y": 25, "w": 24, "h": 8 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{app=\"anomaly-detection-service\"}",
+          "legendFormat": ""
+        }
+      ]
+    },
+
+    {
+      "id": 30,
+      "type": "row",
+      "title": "Anomaly Event Rate",
+      "gridPos": { "x": 0, "y": 33, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+
+    {
+      "id": 31,
+      "title": "Anomaly events per minute",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 34, "w": 16, "h": 7 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 15, "spanNulls": false }
+        }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(rate({app=\"anomaly-detection-service\"} |= \"[ANOMALY]\" |= \"CRITICAL\" [1m])) * 60",
+          "legendFormat": "CRITICAL/min"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(rate({app=\"anomaly-detection-service\"} |= \"[ANOMALY]\" |= \"HIGH\" [1m])) * 60",
+          "legendFormat": "HIGH/min"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(rate({app=\"anomaly-detection-service\"} |= \"[ANOMALY]\" |= \"MEDIUM\" [1m])) * 60",
+          "legendFormat": "MEDIUM/min"
+        }
+      ]
+    },
+
+    {
+      "id": 32,
+      "title": "Events by severity (30 min)",
+      "type": "piechart",
+      "gridPos": { "x": 16, "y": 34, "w": 8, "h": 7 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "options": {
+        "pieType": "donut",
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "CRITICAL" }, "properties": [{ "id": "color", "value": { "fixedColor": "#c7000b", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "HIGH"     }, "properties": [{ "id": "color", "value": { "fixedColor": "#f59f00", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "MEDIUM"   }, "properties": [{ "id": "color", "value": { "fixedColor": "#3491fa", "mode": "fixed" } }] }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({app=\"anomaly-detection-service\"} |= \"[ANOMALY]\" |= \"CRITICAL\" [$__range]))",
+          "legendFormat": "CRITICAL"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({app=\"anomaly-detection-service\"} |= \"[ANOMALY]\" |= \"HIGH\" [$__range]))",
+          "legendFormat": "HIGH"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({app=\"anomaly-detection-service\"} |= \"[ANOMALY]\" |= \"MEDIUM\" [$__range]))",
+          "legendFormat": "MEDIUM"
+        }
+      ]
+    }
+
+  ]
+}

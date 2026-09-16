@@ -50,7 +50,7 @@ Full table → [[Ports-and-URLs]]. All endpoints → [[All-Endpoints]].
 ## Auth — Keycloak
 - Realm config: `keycloak/platform-realm.json`
 - Client: `platform-client` (confidential)
-- Real Keycloak + users is in the `nexus-docker` project (not the default `docker` project). See [[Two-docker-projects]] memory note.
+- Keycloak runs in the **`docker`** project (`docker/docker-compose-infra.yml`). The old `nexus-docker` reference was incorrect.
 - Full auth API → [[Auth-Service]]
 
 ## ML service (Django)
