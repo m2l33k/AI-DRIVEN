@@ -174,17 +174,28 @@ pipeline {
         stage('Security — OWASP Dependency-Check') {
             when { not { expression { params.SKIP_SECURITY } } }
             steps {
-                withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
-                    sh '''
+                script {
+                    // NVD API key is optional — without it the DB download is slower
+                    // but the scan still works. Add credential 'nvd-api-key' to speed it up.
+                    def nvdFlag = ''
+                    try {
+                        withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_TMP')]) {
+                            nvdFlag = "-DnvdApiKey=${env.NVD_TMP}"
+                        }
+                    } catch (ignored) {
+                        echo 'nvd-api-key credential not configured — running without API key (first run will be slow)'
+                    }
+                    sh """
+                        mkdir -p reports/owasp
                         mvn -B org.owasp:dependency-check-maven:12.1.1:aggregate \
-                            -DnvdApiKey=${NVD_API_KEY} \
+                            ${nvdFlag} \
                             -Dformat=ALL \
                             -DfailBuildOnCVSS=9 \
                             -DfailOnError=false \
                             -DsuppressionFiles=owasp-suppressions.xml \
-                            -DoutputDirectory=reports/owasp \
+                            -DoutputDirectory=\${WORKSPACE}/reports/owasp \
                             --no-transfer-progress
-                    '''
+                    """
                 }
             }
             post {
