@@ -16,7 +16,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
 # ── Python 3 + pip (ML service tests) ────────────────────────────────────────
 RUN apt-get install -y python3 python3-pip python3-venv && \
     pip3 install --no-cache-dir --break-system-packages \
-        pytest pytest-mock django djangorestframework numpy
+        pytest pytest-mock django djangorestframework \
+        numpy pandas scipy statsmodels \
+        unittest-mock requests
 
 # ── Docker CLI (build images via host socket) ─────────────────────────────────
 RUN apt-get install -y ca-certificates curl gnupg lsb-release && \
