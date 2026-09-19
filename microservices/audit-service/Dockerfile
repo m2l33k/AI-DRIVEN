@@ -1,11 +1,11 @@
-FROM mcr.microsoft.com/openjdk/jdk:17-ubuntu as builder
+FROM mcr.microsoft.com/openjdk/jdk:25-ubuntu as builder
 WORKDIR extracted
 
 ADD ./target/*.jar app.jar
 
 RUN java -Djarmode=layertools -jar app.jar extract
 
-FROM mcr.microsoft.com/openjdk/jdk:17-ubuntu
+FROM mcr.microsoft.com/openjdk/jdk:25-ubuntu
 WORKDIR application
 
 COPY --from=builder extracted/dependencies/ ./
