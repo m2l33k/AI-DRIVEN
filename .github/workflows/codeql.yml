@@ -25,6 +25,8 @@ jobs:
     name: CodeQL — ${{ matrix.language }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Dependabot PRs only bump dependency versions — no new code to scan.
+    if: github.actor != 'dependabot[bot]'
 
     strategy:
       fail-fast: false

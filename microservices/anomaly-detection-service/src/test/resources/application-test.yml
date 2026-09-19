@@ -1,0 +1,11 @@
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+spring:
+  cloud:
+    discovery:
+      enabled: false
+anomaly:
+  poll-interval-ms: 3600000  # 1 hour — prevents polling during the test run

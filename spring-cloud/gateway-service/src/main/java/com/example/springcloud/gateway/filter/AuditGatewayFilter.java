@@ -70,7 +70,7 @@ public class AuditGatewayFilter implements GlobalFilter, Ordered {
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
-    private boolean shouldSkip(String path, String method) {
+    boolean shouldSkip(String path, String method) {
         if (path.startsWith("/api/audit"))        return true; // avoid loop
         if (path.startsWith("/actuator"))         return true;
         if (path.startsWith("/swagger"))          return true;
@@ -108,7 +108,7 @@ public class AuditGatewayFilter implements GlobalFilter, Ordered {
         return new ActorInfo(username, role, ip);
     }
 
-    private String deriveAction(String method, String path) {
+    String deriveAction(String method, String path) {
         String res = "platform";
         if      (path.startsWith("/api/users"))           res = "users";
         else if (path.startsWith("/api/auth"))            res = "auth";
