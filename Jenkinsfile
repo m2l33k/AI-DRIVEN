@@ -44,7 +44,10 @@ pipeline {
                 checkout scm
                 script {
                     env.GIT_SHORT     = sh(script: 'git rev-parse --short HEAD 2>/dev/null || echo unknown', returnStdout: true).trim()
-                    def branch        = env.BRANCH_NAME ?: 'local'
+                    // BRANCH_NAME is only set in Multibranch pipelines; regular Pipeline jobs use GIT_BRANCH (e.g. "origin/main")
+                    def rawBranch     = env.BRANCH_NAME ?: env.GIT_BRANCH ?: 'main'
+                    def branch        = rawBranch.replaceAll('^origin/', '')
+                    env.BRANCH_CLEAN  = branch
                     env.BUILD_VERSION = "${branch.replaceAll('/', '-')}-${env.GIT_SHORT}-${env.BUILD_NUMBER}"
                     currentBuild.displayName = "#${env.BUILD_NUMBER} — ${env.BUILD_VERSION}"
                     currentBuild.description = "Branch: ${branch} | Commit: ${env.GIT_SHORT}"
@@ -208,7 +211,7 @@ pipeline {
             when {
                 allOf {
                     anyOf {
-                        branch 'main'
+                        expression { env.BRANCH_CLEAN == 'main' }
                         tag pattern: 'v\\d+\\.\\d+\\.\\d+.*', comparator: 'REGEXP'
                     }
                     not { expression { params.SKIP_DOCKER } }
@@ -326,7 +329,7 @@ pipeline {
   BUILD SUMMARY — ${currentBuild.displayName}
 =================================================
   Status  : ${currentBuild.currentResult}
-  Branch  : ${env.BRANCH_NAME ?: 'local'}
+  Branch  : ${env.BRANCH_CLEAN ?: 'main'}
   Commit  : ${env.GIT_SHORT ?: 'unknown'}
   Version : ${env.BUILD_VERSION ?: 'unknown'}
   Duration: ${currentBuild.durationString}
