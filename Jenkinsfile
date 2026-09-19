@@ -207,6 +207,7 @@ pipeline {
 
         // ── Stage 6: Docker (main / tags only) ───────────────────────────────
         stage('Docker') {
+
             when {
                 allOf {
                     anyOf {
