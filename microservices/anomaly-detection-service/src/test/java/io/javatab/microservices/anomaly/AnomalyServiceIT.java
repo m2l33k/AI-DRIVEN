@@ -2,35 +2,39 @@ package io.javatab.microservices.anomaly;
 
 import io.javatab.microservices.anomaly.model.AnomalyEvent;
 import io.javatab.microservices.anomaly.model.Severity;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.Map;
+import static org.hamcrest.Matchers.hasItem;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest
+@AutoConfigureMockMvc
 @ActiveProfiles("test")
 class AnomalyServiceIT {
 
     @Autowired
-    private TestRestTemplate rest;
+    private MockMvc mvc;
+
+    @Autowired
+    private ObjectMapper mapper;
 
     @Test
-    void healthEndpointIsUp() {
-        ResponseEntity<Map> resp = rest.getForEntity("/api/anomaly/health", Map.class);
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(resp.getBody()).containsEntry("status", "UP");
+    void healthEndpointIsUp() throws Exception {
+        mvc.perform(get("/api/anomaly/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
     }
 
     @Test
-    void injectEventAppearsInEventList() {
+    void injectEventAppearsInEventList() throws Exception {
         AnomalyEvent event = AnomalyEvent.builder()
                 .type("AUTH_FLOOD")
                 .severity(Severity.HIGH)
@@ -42,34 +46,33 @@ class AnomalyServiceIT {
                 .message("IT: auth flood detected")
                 .build();
 
-        ResponseEntity<AnomalyEvent> inject = rest.postForEntity(
-                "/api/anomaly/inject", event, AnomalyEvent.class);
-        assertThat(inject.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(inject.getBody()).isNotNull();
-        assertThat(inject.getBody().type()).isEqualTo("AUTH_FLOOD");
-        assertThat(inject.getBody().severity()).isEqualTo(Severity.HIGH);
+        String body = mvc.perform(post("/api/anomaly/inject")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(event)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.type").value("AUTH_FLOOD"))
+                .andReturn().getResponse().getContentAsString();
 
-        String injectedId = inject.getBody().id();
+        String id = mapper.readTree(body).get("id").asText();
 
-        ResponseEntity<AnomalyEvent[]> events = rest.getForEntity(
-                "/api/anomaly/events?limit=200", AnomalyEvent[].class);
-        assertThat(events.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(events.getBody()).extracting(AnomalyEvent::id).contains(injectedId);
+        mvc.perform(get("/api/anomaly/events?limit=200"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", hasItem(id)));
     }
 
     @Test
-    void clearEventsReturnsNoContent() {
-        rest.postForEntity("/api/anomaly/inject",
-                AnomalyEvent.builder().type("NOISE").message("clear-test").build(),
-                AnomalyEvent.class);
+    void clearEventsReturnsNoContent() throws Exception {
+        mvc.perform(post("/api/anomaly/inject")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(
+                                AnomalyEvent.builder().type("NOISE").message("clear-test").build())))
+                .andExpect(status().isOk());
 
-        ResponseEntity<Void> clear = rest.exchange(
-                "/api/anomaly/events", HttpMethod.DELETE, null, Void.class);
-        assertThat(clear.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        mvc.perform(delete("/api/anomaly/events"))
+                .andExpect(status().isNoContent());
 
-        ResponseEntity<AnomalyEvent[]> after = rest.getForEntity(
-                "/api/anomaly/events", AnomalyEvent[].class);
-        assertThat(after.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(after.getBody()).isEmpty();
+        mvc.perform(get("/api/anomaly/events"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 }
