@@ -178,6 +178,41 @@
         <packageUrl regex="true">^pkg:maven/[^/]*/mxparser@.*$</packageUrl>
         <cve>CVE-2022-41966</cve>
     </suppress>
+    <suppress>
+        <notes>FALSE POSITIVE: mxparser is an XML pull-parser, not XStream. OWASP DC CPE misidentification. CVE-2021-21350 is XStream RCE.</notes>
+        <packageUrl regex="true">^pkg:maven/[^/]*/mxparser@.*$</packageUrl>
+        <cve>CVE-2021-21350</cve>
+    </suppress>
+    <suppress>
+        <notes>FALSE POSITIVE: mxparser is an XML pull-parser, not XStream. OWASP DC CPE misidentification. CVE-2013-7285 is XStream RCE.</notes>
+        <packageUrl regex="true">^pkg:maven/[^/]*/mxparser@.*$</packageUrl>
+        <cve>CVE-2013-7285</cve>
+    </suppress>
+    <suppress>
+        <notes>FALSE POSITIVE: mxparser is an XML pull-parser, not XStream. OWASP DC CPE misidentification. CVE-2021-21347 is XStream RCE.</notes>
+        <packageUrl regex="true">^pkg:maven/[^/]*/mxparser@.*$</packageUrl>
+        <cve>CVE-2021-21347</cve>
+    </suppress>
+    <suppress>
+        <notes>FALSE POSITIVE: mxparser is an XML pull-parser, not XStream. OWASP DC CPE misidentification. CVE-2021-21346 is XStream RCE.</notes>
+        <packageUrl regex="true">^pkg:maven/[^/]*/mxparser@.*$</packageUrl>
+        <cve>CVE-2021-21346</cve>
+    </suppress>
+    <suppress>
+        <notes>FALSE POSITIVE: mxparser is an XML pull-parser, not XStream. OWASP DC CPE misidentification. CVE-2021-21345 is XStream RCE.</notes>
+        <packageUrl regex="true">^pkg:maven/[^/]*/mxparser@.*$</packageUrl>
+        <cve>CVE-2021-21345</cve>
+    </suppress>
+    <suppress>
+        <notes>FALSE POSITIVE: mxparser is an XML pull-parser, not XStream. OWASP DC CPE misidentification. CVE-2021-21344 is XStream RCE.</notes>
+        <packageUrl regex="true">^pkg:maven/[^/]*/mxparser@.*$</packageUrl>
+        <cve>CVE-2021-21344</cve>
+    </suppress>
+    <suppress>
+        <notes>FALSE POSITIVE: mxparser is an XML pull-parser, not XStream. OWASP DC CPE misidentification. CVE-2021-21342 is XStream SSRF.</notes>
+        <packageUrl regex="true">^pkg:maven/[^/]*/mxparser@.*$</packageUrl>
+        <cve>CVE-2021-21342</cve>
+    </suppress>
 
     <!-- Netty 4.2.10.Final — managed by Spring Boot 4.0.3 / Spring Cloud 2025.1.1 BOM -->
     <!-- Fixed in Netty 4.2.12+ / Spring Boot 4.0.6+ -->
@@ -205,6 +240,26 @@
         <notes>Netty 4.2.10.Final — version pinned by Spring Boot 4.0.3 BOM. Fixed in 4.2.12+. Risk accepted.</notes>
         <packageUrl regex="true">^pkg:maven/io\.netty/.*@4\.2\.10\.Final$</packageUrl>
         <cve>CVE-2026-59123</cve>
+    </suppress>
+    <suppress>
+        <notes>Netty 4.2.10.Final — version pinned by Spring Boot 4.0.3 BOM. Fixed in 4.2.12+. Risk accepted.</notes>
+        <packageUrl regex="true">^pkg:maven/io\.netty/.*@4\.2\.10\.Final$</packageUrl>
+        <cve>CVE-2026-56820</cve>
+    </suppress>
+    <suppress>
+        <notes>Netty 4.2.10.Final — version pinned by Spring Boot 4.0.3 BOM. Fixed in 4.2.12+. Risk accepted.</notes>
+        <packageUrl regex="true">^pkg:maven/io\.netty/.*@4\.2\.10\.Final$</packageUrl>
+        <cve>CVE-2026-42581</cve>
+    </suppress>
+    <suppress>
+        <notes>Netty 4.2.10.Final — version pinned by Spring Boot 4.0.3 BOM. Fixed in 4.2.12+. Risk accepted.</notes>
+        <packageUrl regex="true">^pkg:maven/io\.netty/.*@4\.2\.10\.Final$</packageUrl>
+        <cve>CVE-2026-42584</cve>
+    </suppress>
+    <suppress>
+        <notes>Netty 4.2.10.Final — version pinned by Spring Boot 4.0.3 BOM. Fixed in 4.2.12+. Risk accepted.</notes>
+        <packageUrl regex="true">^pkg:maven/io\.netty/.*@4\.2\.10\.Final$</packageUrl>
+        <cve>CVE-2026-42579</cve>
     </suppress>
 
     <!-- Spring Boot 4.0.3 JARs — managed by spring-boot-starter-parent BOM itself -->
