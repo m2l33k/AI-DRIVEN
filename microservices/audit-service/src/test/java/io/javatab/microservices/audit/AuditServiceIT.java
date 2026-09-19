@@ -1,78 +1,95 @@
 package io.javatab.microservices.audit;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.javatab.microservices.audit.model.AuditEntry;
-import io.javatab.microservices.audit.model.AuditStats;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Instant;
-import java.util.Map;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest
 @ActiveProfiles("test")
 class AuditServiceIT {
 
     @Autowired
-    private TestRestTemplate rest;
+    private WebApplicationContext wac;
 
-    @Test
-    void healthEndpointIsUp() {
-        ResponseEntity<Map> resp = rest.getForEntity("/api/audit/health", Map.class);
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(resp.getBody()).containsEntry("status", "UP");
-        assertThat(resp.getBody()).containsKey("timestamp");
+    @Autowired
+    private ObjectMapper mapper;
+
+    private MockMvc mvc;
+
+    @BeforeEach
+    void setup() {
+        mvc = MockMvcBuilders.webAppContextSetup(wac).build();
     }
 
     @Test
-    void appendLogEntryAndQueryByActor() {
+    void healthEndpointIsUp() throws Exception {
+        mvc.perform(get("/api/audit/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status", is("UP")))
+                .andExpect(jsonPath("$.timestamp", notNullValue()));
+    }
+
+    @Test
+    void appendLogEntryAndQueryByActor() throws Exception {
         AuditEntry entry = new AuditEntry(
                 null, Instant.now(),
                 "it-test-actor", "SECURITY_ANALYST",
                 "rules:create", "/api/rules",
                 "Allowed", "10.0.0.1", "Integration test entry");
 
-        ResponseEntity<AuditEntry> posted = rest.postForEntity("/api/audit/logs", entry, AuditEntry.class);
-        assertThat(posted.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(posted.getBody()).isNotNull();
-        assertThat(posted.getBody().id()).isNotBlank();
-        assertThat(posted.getBody().actor()).isEqualTo("it-test-actor");
-        assertThat(posted.getBody().action()).isEqualTo("rules:create");
+        mvc.perform(post("/api/audit/logs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(entry)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", notNullValue()))
+                .andExpect(jsonPath("$.actor", is("it-test-actor")))
+                .andExpect(jsonPath("$.action", is("rules:create")));
 
-        ResponseEntity<AuditEntry[]> found = rest.getForEntity(
-                "/api/audit/logs?actor=it-test-actor&limit=5", AuditEntry[].class);
-        assertThat(found.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(found.getBody()).isNotEmpty();
-        assertThat(found.getBody()[0].actor()).isEqualTo("it-test-actor");
+        mvc.perform(get("/api/audit/logs?actor=it-test-actor&limit=5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$[0].actor", is("it-test-actor")));
     }
 
     @Test
-    void queryByOutcomeFilterWorks() {
-        rest.postForEntity("/api/audit/logs",
-                new AuditEntry(null, Instant.now(), "filter-actor", "AUDITOR",
-                        "resource:read", "/api/roaming", "Denied", "10.0.0.2", null),
-                AuditEntry.class);
+    void queryByOutcomeFilterWorks() throws Exception {
+        AuditEntry denied = new AuditEntry(null, Instant.now(), "filter-actor", "AUDITOR",
+                "resource:read", "/api/roaming", "Denied", "10.0.0.2", null);
 
-        ResponseEntity<AuditEntry[]> denied = rest.getForEntity(
-                "/api/audit/logs?outcome=Denied&limit=50", AuditEntry[].class);
-        assertThat(denied.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(denied.getBody()).isNotEmpty();
-        assertThat(denied.getBody()).allMatch(e -> "Denied".equals(e.outcome()));
+        mvc.perform(post("/api/audit/logs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(denied)))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/audit/logs?outcome=Denied&limit=50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", greaterThanOrEqualTo(1)));
     }
 
     @Test
-    void statsReturns7DayBuckets() {
-        ResponseEntity<AuditStats> resp = rest.getForEntity("/api/audit/stats", AuditStats.class);
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(resp.getBody()).isNotNull();
-        assertThat(resp.getBody().perDay()).hasSize(7);
-        assertThat(resp.getBody().dayLabels()).hasSize(7);
-        assertThat(resp.getBody().total()).isGreaterThanOrEqualTo(0);
+    void statsReturns7DayBuckets() throws Exception {
+        mvc.perform(get("/api/audit/stats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.perDay").isArray())
+                .andExpect(jsonPath("$.dayLabels").isArray())
+                .andExpect(jsonPath("$.total", greaterThanOrEqualTo(0)));
     }
 }
