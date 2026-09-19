@@ -341,9 +341,62 @@ pipeline {
             }
         }
 
-        success  { echo 'Pipeline passed. All tests green, artifacts archived.' }
-        unstable { echo 'Pipeline UNSTABLE — some tests failed. Check the JUnit report.' }
-        failure  { echo 'Pipeline FAILED. Check the stage logs above for details.' }
+        success {
+            echo 'Pipeline passed. All tests green, artifacts archived.'
+            mail(
+                to:      'malekaziz.hassayoun@esprit.tn',
+                subject: "✅ BUILD PASSED — ${currentBuild.displayName}",
+                body:    """\
+Build passed successfully.
+
+Job     : ${env.JOB_NAME}
+Version : ${env.BUILD_VERSION ?: 'unknown'}
+Branch  : ${env.BRANCH_CLEAN ?: 'main'}
+Commit  : ${env.GIT_SHORT ?: 'unknown'}
+Duration: ${currentBuild.durationString}
+
+View build: ${env.BUILD_URL}
+"""
+            )
+        }
+
+        unstable {
+            echo 'Pipeline UNSTABLE — some tests failed. Check the JUnit report.'
+            mail(
+                to:      'malekaziz.hassayoun@esprit.tn',
+                subject: "⚠️ BUILD UNSTABLE — ${currentBuild.displayName}",
+                body:    """\
+Build completed with test failures.
+
+Job     : ${env.JOB_NAME}
+Version : ${env.BUILD_VERSION ?: 'unknown'}
+Branch  : ${env.BRANCH_CLEAN ?: 'main'}
+Commit  : ${env.GIT_SHORT ?: 'unknown'}
+Duration: ${currentBuild.durationString}
+
+Check the JUnit report: ${env.BUILD_URL}testReport/
+"""
+            )
+        }
+
+        failure {
+            echo 'Pipeline FAILED. Check the stage logs above for details.'
+            mail(
+                to:      'malekaziz.hassayoun@esprit.tn',
+                subject: "❌ BUILD FAILED — ${currentBuild.displayName}",
+                body:    """\
+Build failed. Immediate attention required.
+
+Job     : ${env.JOB_NAME}
+Version : ${env.BUILD_VERSION ?: 'unknown'}
+Branch  : ${env.BRANCH_CLEAN ?: 'main'}
+Commit  : ${env.GIT_SHORT ?: 'unknown'}
+Duration: ${currentBuild.durationString}
+
+Console log: ${env.BUILD_URL}console
+"""
+            )
+        }
 
         cleanup {
             // deleteDir() replaces cleanWs (Workspace Cleanup plugin not required)
