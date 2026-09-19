@@ -56,7 +56,7 @@ pipeline {
                     echo "Version : ${BUILD_VERSION}"
                     java    -version
                     mvn     -version
-                    node    -version
+                    node    --version
                     npm     -version
                     python3 --version
                 '''
