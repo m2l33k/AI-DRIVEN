@@ -99,7 +99,7 @@ class GatewayServiceApplicationTests {
         "POST,   /api/vm/mongo/test/docs,       vm:create",
         "DELETE, /api/vm/mongo/test/docs/abc,   vm:delete",
         "POST,   /api/messages,                 messaging:create",
-        "POST,   /api/fault/inject,             fault:create",
+        "POST,   /api/fault/inject,             fault:inject",
     })
     void deriveActionCoversAllResources(String method, String path, String expected) {
         assertThat(filter.deriveAction(method.trim(), path.trim())).isEqualTo(expected.trim());
