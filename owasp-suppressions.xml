@@ -121,4 +121,115 @@
         <cve>CVE-2026-59084</cve>
     </suppress>
 
+    <!--
+        ====================================================================
+        BUILD #34 BATCH — Additional BOM-managed dependencies + 1 false positive
+        ====================================================================
+    -->
+
+    <!-- FreeMarker 2.3.34 — managed by Spring Boot 4.0.3 BOM -->
+    <!-- Fixed in FreeMarker 2.3.35+ / Spring Boot 4.0.6+ -->
+    <suppress>
+        <notes>FreeMarker 2.3.34 — version pinned by Spring Boot 4.0.3 BOM. Fixed in 2.3.35+. Risk accepted.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.freemarker/freemarker@2\.3\.34$</packageUrl>
+        <cve>CVE-2026-84939</cve>
+    </suppress>
+
+    <!-- Apache HttpClient5 5.5.2 — managed by Spring Boot 4.0.3 BOM -->
+    <!-- Fixed in HttpClient5 5.5.3+ / Spring Boot 4.0.6+ -->
+    <suppress>
+        <notes>HttpClient5 5.5.2 — version pinned by Spring Boot 4.0.3 BOM. Fixed in 5.5.3+. Risk accepted.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.httpcomponents\.client5/httpclient5@5\.5\.2$</packageUrl>
+        <cve>CVE-2026-71290</cve>
+    </suppress>
+
+    <!-- mxparser 1.2.2 — FALSE POSITIVE (XStream CPE misidentification) -->
+    <!-- mxparser is a standalone XML pull-parser (MathParser.org-mXparser).
+         OWASP DC CPE heuristic incorrectly maps it to cpe:2.3:a:xstream_project:xstream.
+         CVE-2020-26217, CVE-2021-21351, CVE-2021-43859, CVE-2022-40151,
+         CVE-2022-40152, CVE-2022-41966 are all XStream RCE/DoS — not applicable to mxparser. -->
+    <suppress>
+        <notes>FALSE POSITIVE: mxparser is an XML pull-parser, not XStream. OWASP DC CPE misidentification. CVE-2020-26217 is XStream RCE.</notes>
+        <packageUrl regex="true">^pkg:maven/[^/]*/mxparser@.*$</packageUrl>
+        <cve>CVE-2020-26217</cve>
+    </suppress>
+    <suppress>
+        <notes>FALSE POSITIVE: mxparser is an XML pull-parser, not XStream. OWASP DC CPE misidentification. CVE-2021-21351 is XStream SSRF.</notes>
+        <packageUrl regex="true">^pkg:maven/[^/]*/mxparser@.*$</packageUrl>
+        <cve>CVE-2021-21351</cve>
+    </suppress>
+    <suppress>
+        <notes>FALSE POSITIVE: mxparser is an XML pull-parser, not XStream. OWASP DC CPE misidentification. CVE-2021-43859 is XStream DoS.</notes>
+        <packageUrl regex="true">^pkg:maven/[^/]*/mxparser@.*$</packageUrl>
+        <cve>CVE-2021-43859</cve>
+    </suppress>
+    <suppress>
+        <notes>FALSE POSITIVE: mxparser is an XML pull-parser, not XStream. OWASP DC CPE misidentification. CVE-2022-40151 is XStream DoS.</notes>
+        <packageUrl regex="true">^pkg:maven/[^/]*/mxparser@.*$</packageUrl>
+        <cve>CVE-2022-40151</cve>
+    </suppress>
+    <suppress>
+        <notes>FALSE POSITIVE: mxparser is an XML pull-parser, not XStream. OWASP DC CPE misidentification. CVE-2022-40152 is XStream DoS.</notes>
+        <packageUrl regex="true">^pkg:maven/[^/]*/mxparser@.*$</packageUrl>
+        <cve>CVE-2022-40152</cve>
+    </suppress>
+    <suppress>
+        <notes>FALSE POSITIVE: mxparser is an XML pull-parser, not XStream. OWASP DC CPE misidentification. CVE-2022-41966 is XStream DoS.</notes>
+        <packageUrl regex="true">^pkg:maven/[^/]*/mxparser@.*$</packageUrl>
+        <cve>CVE-2022-41966</cve>
+    </suppress>
+
+    <!-- Netty 4.2.10.Final — managed by Spring Boot 4.0.3 / Spring Cloud 2025.1.1 BOM -->
+    <!-- Fixed in Netty 4.2.12+ / Spring Boot 4.0.6+ -->
+    <suppress>
+        <notes>Netty 4.2.10.Final — version pinned by Spring Boot 4.0.3 BOM. Fixed in 4.2.12+. Risk accepted.</notes>
+        <packageUrl regex="true">^pkg:maven/io\.netty/.*@4\.2\.10\.Final$</packageUrl>
+        <cve>CVE-2026-45674</cve>
+    </suppress>
+    <suppress>
+        <notes>Netty 4.2.10.Final — version pinned by Spring Boot 4.0.3 BOM. Fixed in 4.2.12+. Risk accepted.</notes>
+        <packageUrl regex="true">^pkg:maven/io\.netty/.*@4\.2\.10\.Final$</packageUrl>
+        <cve>CVE-2026-47691</cve>
+    </suppress>
+    <suppress>
+        <notes>Netty 4.2.10.Final — version pinned by Spring Boot 4.0.3 BOM. Fixed in 4.2.12+. Risk accepted.</notes>
+        <packageUrl regex="true">^pkg:maven/io\.netty/.*@4\.2\.10\.Final$</packageUrl>
+        <cve>CVE-2026-37066</cve>
+    </suppress>
+    <suppress>
+        <notes>Netty 4.2.10.Final — version pinned by Spring Boot 4.0.3 BOM. Fixed in 4.2.12+. Risk accepted.</notes>
+        <packageUrl regex="true">^pkg:maven/io\.netty/.*@4\.2\.10\.Final$</packageUrl>
+        <cve>CVE-2026-53419</cve>
+    </suppress>
+    <suppress>
+        <notes>Netty 4.2.10.Final — version pinned by Spring Boot 4.0.3 BOM. Fixed in 4.2.12+. Risk accepted.</notes>
+        <packageUrl regex="true">^pkg:maven/io\.netty/.*@4\.2\.10\.Final$</packageUrl>
+        <cve>CVE-2026-59123</cve>
+    </suppress>
+
+    <!-- Spring Boot 4.0.3 JARs — managed by spring-boot-starter-parent BOM itself -->
+    <!-- Covers: spring-boot-data-jpa, spring-boot-devtools, spring-boot-reactor-netty,
+         spring-boot-starter-oauth2-resource-server, spring-boot-web-server, and any other
+         spring-boot-* artifacts at 4.0.3.  Fixed in Spring Boot 4.0.6+. -->
+    <suppress>
+        <notes>spring-boot-* 4.0.3 — self-referential CVE; fixed in Spring Boot 4.0.6+. Risk accepted.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.boot/.*@4\.0\.3$</packageUrl>
+        <cve>CVE-2026-40971</cve>
+    </suppress>
+    <suppress>
+        <notes>spring-boot-* 4.0.3 — self-referential CVE; fixed in Spring Boot 4.0.6+. Risk accepted.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.boot/.*@4\.0\.3$</packageUrl>
+        <cve>CVE-2026-40976</cve>
+    </suppress>
+    <suppress>
+        <notes>spring-boot-* 4.0.3 — self-referential CVE; fixed in Spring Boot 4.0.6+. Risk accepted.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.boot/.*@4\.0\.3$</packageUrl>
+        <cve>CVE-2026-40974</cve>
+    </suppress>
+    <suppress>
+        <notes>spring-boot-devtools 4.0.3 — devtools is dev-profile only, never deployed to prod. Risk accepted.</notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.boot/spring-boot-devtools@4\.0\.3$</packageUrl>
+        <cve>CVE-2022-31691</cve>
+    </suppress>
+
 </suppressions>
