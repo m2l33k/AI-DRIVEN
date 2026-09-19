@@ -220,23 +220,33 @@ pipeline {
         // Only *IT.java classes run here — unit tests are not repeated.
         stage('Backend — Integration Tests') {
             steps {
-                withEnv([
-                    'TESTCONTAINERS_RYUK_DISABLED=true',
-                    // Jenkins runs in a docker-compose network; 172.17.0.1 is unreachable from there.
-                    // host.docker.internal is injected into every container by Docker Desktop.
-                    'TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal'
-                ]) {
-                    // Pre-pull via ECR Public (Docker Hub is blocked on the university network).
-                    // Retag to the plain name so Testcontainers finds them in the local cache.
-                    sh '''
-                        docker pull public.ecr.aws/docker/library/postgres:16-alpine \
-                            && docker tag public.ecr.aws/docker/library/postgres:16-alpine postgres:16-alpine \
-                            || true
-                        docker pull public.ecr.aws/docker/library/redis:7-alpine \
-                            && docker tag public.ecr.aws/docker/library/redis:7-alpine redis:7-alpine \
-                            || true
-                    '''
-                    sh 'mvn -B failsafe:integration-test failsafe:verify --no-transfer-progress'
+                script {
+                    // Detect the Docker host IP reachable from inside this container.
+                    // 'host.docker.internal' only works on Docker Desktop (Win/Mac).
+                    // On Linux, we read the default-route gateway which IS the Docker host.
+                    def tcHost = sh(
+                        script: "ip route show default 2>/dev/null | awk '/default/{print \$3; exit}'",
+                        returnStdout: true
+                    ).trim()
+                    if (!tcHost) tcHost = 'localhost'
+                    echo "Testcontainers host override: ${tcHost}"
+
+                    withEnv([
+                        'TESTCONTAINERS_RYUK_DISABLED=true',
+                        "TESTCONTAINERS_HOST_OVERRIDE=${tcHost}"
+                    ]) {
+                        // Pre-pull via ECR Public (Docker Hub is blocked on the university network).
+                        // Retag to the plain name so Testcontainers finds them in the local cache.
+                        sh '''
+                            docker pull public.ecr.aws/docker/library/postgres:16-alpine \
+                                && docker tag public.ecr.aws/docker/library/postgres:16-alpine postgres:16-alpine \
+                                || true
+                            docker pull public.ecr.aws/docker/library/redis:7-alpine \
+                                && docker tag public.ecr.aws/docker/library/redis:7-alpine redis:7-alpine \
+                                || true
+                        '''
+                        sh 'mvn -B failsafe:integration-test failsafe:verify --no-transfer-progress'
+                    }
                 }
             }
             post {
