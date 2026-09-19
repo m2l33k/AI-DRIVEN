@@ -1,11 +1,11 @@
-FROM eclipse-temurin:17.0.5_8-jre-focal as builder
+FROM mcr.microsoft.com/openjdk/jdk:17-ubuntu as builder
 WORKDIR extracted
 
 ADD ./target/*.jar app.jar
 
 RUN java -Djarmode=layertools -jar app.jar extract
 
-FROM eclipse-temurin:17.0.5_8-jre-focal
+FROM mcr.microsoft.com/openjdk/jdk:17-ubuntu
 WORKDIR application
 
 COPY --from=builder extracted/dependencies/ ./

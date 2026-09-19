@@ -221,6 +221,7 @@ pipeline {
 
                 stage('Docker — Spring Boot Services') {
                     steps {
+                        withEnv(['DOCKER_BUILDKIT=0']) {
                         script {
                             def services = [
                                 [name: 'auth-service',                ctx: 'microservices/auth-service'],
@@ -253,11 +254,13 @@ pipeline {
                             }
                             parallel buildSteps
                         }
+                        } // withEnv DOCKER_BUILDKIT=0
                     }
                 }
 
                 stage('Docker — ML Service') {
                     steps {
+                        withEnv(['DOCKER_BUILDKIT=0']) {
                         sh """
                             docker build \
                                 -t ${env.IMAGE_PREFIX}/ml-service:${env.BUILD_VERSION} \
@@ -265,6 +268,7 @@ pipeline {
                                 --label git.commit=${env.GIT_SHORT} \
                                 ml-service
                         """
+                        } // withEnv
                     }
                 }
 
