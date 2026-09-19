@@ -177,6 +177,16 @@ pipeline {
         stage('Backend — Integration Tests') {
             steps {
                 withEnv(['TESTCONTAINERS_RYUK_DISABLED=true']) {
+                    // Pre-pull via ECR Public (Docker Hub is blocked on the university network).
+                    // Retag to the plain name so Testcontainers finds them in the local cache.
+                    sh '''
+                        docker pull public.ecr.aws/docker/library/postgres:16-alpine \
+                            && docker tag public.ecr.aws/docker/library/postgres:16-alpine postgres:16-alpine \
+                            || true
+                        docker pull public.ecr.aws/docker/library/redis:7-alpine \
+                            && docker tag public.ecr.aws/docker/library/redis:7-alpine redis:7-alpine \
+                            || true
+                    '''
                     sh 'mvn -B failsafe:integration-test failsafe:verify --no-transfer-progress'
                 }
             }
