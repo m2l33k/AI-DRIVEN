@@ -23,9 +23,7 @@ pipeline {
     options {
         timeout(time: 45, unit: 'MINUTES')
         disableConcurrentBuilds(abortPrevious: true)
-        timestamps()
-        ansiColor('xterm')
-        buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
+buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
     }
 
     // ── Parameters (manual trigger) ───────────────────────────────────────────
@@ -200,7 +198,31 @@ pipeline {
             }
         }
 
-        // ── Stage 4: Archive artifacts ────────────────────────────────────────
+        // ── Stage 4: Integration Tests ────────────────────────────────────────
+        // Testcontainers uses the Docker socket (mounted at /var/run/docker.sock)
+        // to spin up PostgreSQL + Redis for the rate-limiting integration tests.
+        // Unit tests are NOT re-run here — only *IT.java classes via Failsafe.
+        stage('Backend — Integration Tests') {
+            steps {
+                withEnv(['TESTCONTAINERS_RYUK_DISABLED=true']) {
+                    sh 'mvn -B failsafe:integration-test failsafe:verify --no-transfer-progress'
+                }
+            }
+            post {
+                always {
+                    junit(
+                        testResults:       '**/target/failsafe-reports/TEST-*.xml',
+                        allowEmptyResults: true,
+                        skipMarkingBuildUnstable: false
+                    )
+                }
+                failure {
+                    echo 'Integration tests failed — check Testcontainers container startup logs above.'
+                }
+            }
+        }
+
+        // ── Stage 5: Archive artifacts ─────────────────────────────────────────
         stage('Archive') {
             steps {
                 archiveArtifacts(
