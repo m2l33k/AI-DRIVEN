@@ -136,6 +136,39 @@ This needs to be re-applied after a Docker Desktop restart.
 
 ---
 
+## GHCR Credentials Setup
+
+The Docker — Push stage requires a Jenkins credential to authenticate with GitHub Container Registry.
+
+### 1. Create a GitHub Personal Access Token (PAT)
+1. Go to `https://github.com/settings/tokens/new`
+2. Note: `jenkins-ghcr-push`
+3. Expiration: 90 days (or no expiration)
+4. Scope: check **`write:packages`** (auto-checks `read:packages`)
+5. Click **Generate token** — copy the `ghp_...` value immediately (shown only once)
+
+### 2. Add the credential to Jenkins
+Navigate to: `http://localhost:8090/manage/credentials/store/system/domain/_/newCredentials`
+
+| Field | Value |
+|---|---|
+| Kind | `Username with password` |
+| Username | `m2l33k` |
+| Password | the `ghp_...` token |
+| ID | `ghcr-credentials` ← must match exactly |
+
+> **Not SSH.** GHCR uses token-based HTTP authentication. The PAT acts as the password for `docker login ghcr.io`.
+
+### 3. What gets pushed
+After a successful build on `main`, all 12 images are pushed:
+```
+docker push ghcr.io/m2l33k/<service>:<branch>-<commit>-<build#>
+docker push ghcr.io/m2l33k/<service>:latest
+```
+Images are visible at `https://github.com/m2l33k?tab=packages`.
+
+---
+
 ## Integration Test Classes
 
 | Class | Service | Containers Used |
