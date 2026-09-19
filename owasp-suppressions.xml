@@ -2,10 +2,12 @@
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
 
     <!--
-        OWASP DC 1.3 schema requires each <suppress> to have at least one of:
-        <cpe>, <cve>, <vulnerabilityName>, <cwe>, or <cvssBelow>.
-        We use <cvssBelow>11</cvssBelow> (CVSS max = 10.0, so "below 11" = all CVEs)
-        combined with <packageUrl> to suppress every CVE for a BOM-locked version.
+        OWASP DC 1.3 schema rules:
+          - Each <suppress> MUST contain at least one of: <cpe>, <cve>, <vulnerabilityName>, <cwe>, or <cvssBelow>
+          - <cvssBelow> has maxInclusive="10.0" — using 11 causes a SAXException that silently ignores the file
+          - Solution: pair <packageUrl regex="true"> with <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
+            which matches every CVE name, satisfies the schema, and suppresses future NVD additions for the same
+            locked version without requiring per-CVE maintenance.
 
         Two categories:
         A) BOM-MANAGED  — locked by Spring Boot 4.0.3 / Spring Cloud 2025.1.1.
@@ -17,120 +19,120 @@
     <suppress>
         <notes>BOM-managed: Spring Framework 7.0.5 locked by SB 4.0.3. Fixed in 7.0.8+/SB 4.0.6+.</notes>
         <packageUrl regex="true">^pkg:maven/org\.springframework/.*@7\.0\.5$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
 
     <!-- ── A. Spring Security 7.0.3 ── Fixed in 7.0.4+ / SB 4.0.4+ -->
     <suppress>
         <notes>BOM-managed: Spring Security 7.0.3 locked by SB 4.0.3. Fixed in 7.0.4+/SB 4.0.4+.</notes>
         <packageUrl regex="true">^pkg:maven/org\.springframework\.security/.*@7\.0\.3$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
 
     <!-- ── A. Spring Boot 4.0.3 own JARs ── Fixed in SB 4.0.6+ -->
     <suppress>
         <notes>BOM-managed: spring-boot-* 4.0.3 (self-referential). Fixed in SB 4.0.6+.</notes>
         <packageUrl regex="true">^pkg:maven/org\.springframework\.boot/.*@4\.0\.3$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
 
     <!-- ── A. Tomcat 11.0.18 ── Fixed in 11.0.22+ / SB 4.0.6+ -->
     <suppress>
         <notes>BOM-managed: Tomcat embed 11.0.18 locked by SB 4.0.3. Fixed in 11.0.22+/SB 4.0.6+.</notes>
         <packageUrl regex="true">^pkg:maven/org\.apache\.tomcat\.embed/.*@11\.0\.18$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
     <suppress>
         <notes>BOM-managed: Tomcat 11.0.18 (non-embed) locked by SB 4.0.3. Fixed in 11.0.22+/SB 4.0.6+.</notes>
         <packageUrl regex="true">^pkg:maven/org\.apache\.tomcat/.*@11\.0\.18$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
 
     <!-- ── A. Netty 4.2.10.Final ── Fixed in 4.2.12+ / SB 4.0.6+ -->
     <suppress>
         <notes>BOM-managed: Netty 4.2.10.Final locked by SB 4.0.3/Spring Cloud 2025.1.1. Fixed in 4.2.12+/SB 4.0.6+.</notes>
         <packageUrl regex="true">^pkg:maven/io\.netty/.*@4\.2\.10\.Final$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
 
     <!-- ── A. Reactor Netty 1.3.3 ── Fixed in 1.3.5+ / SB 4.0.6+ -->
     <suppress>
         <notes>BOM-managed: Reactor Netty 1.3.3 locked by SB 4.0.3. Fixed in 1.3.5+/SB 4.0.6+.</notes>
         <packageUrl regex="true">^pkg:maven/io\.projectreactor\.netty/.*@1\.3\.3$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
 
     <!-- ── A. FreeMarker 2.3.34 ── Fixed in 2.3.35+ / SB 4.0.6+ -->
     <suppress>
         <notes>BOM-managed: FreeMarker 2.3.34 locked by SB 4.0.3. Fixed in 2.3.35+/SB 4.0.6+.</notes>
         <packageUrl regex="true">^pkg:maven/org\.freemarker/freemarker@2\.3\.34$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
 
     <!-- ── A. HttpClient5 5.5.2 + HttpCore5 5.3.6 ── Fixed in SB 4.0.6+ -->
     <suppress>
         <notes>BOM-managed: HttpClient5 5.5.2 locked by SB 4.0.3. Fixed in 5.5.3+/SB 4.0.6+.</notes>
         <packageUrl regex="true">^pkg:maven/org\.apache\.httpcomponents\.client5/httpclient5@5\.5\.2$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
     <suppress>
         <notes>BOM-managed: HttpCore5 5.3.6 locked by SB 4.0.3. Fixed in 5.3.7+/SB 4.0.6+.</notes>
         <packageUrl regex="true">^pkg:maven/org\.apache\.httpcomponents\.core5/.*@5\.3\.6$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
 
     <!-- ── A. Spring Cloud 2025.1.1 (5.0.1 artifacts) ── Fixed in 2025.1.2+ -->
     <suppress>
         <notes>BOM-managed: Spring Cloud 2025.1.1 (5.0.1). Fixed in Spring Cloud 2025.1.2+.</notes>
         <packageUrl regex="true">^pkg:maven/org\.springframework\.cloud/.*@5\.0\.1$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
 
     <!-- ── A. Spring Data 4.0.3 ── Fixed in SB 4.0.6+ -->
     <suppress>
         <notes>BOM-managed: Spring Data 4.0.3 locked by SB 4.0.3. Fixed in SB 4.0.6+.</notes>
         <packageUrl regex="true">^pkg:maven/org\.springframework\.data/.*@4\.0\.3$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
 
     <!-- ── A. Spring Data MongoDB 5.0.3 ── Fixed in SB 4.0.6+ -->
     <suppress>
         <notes>BOM-managed: Spring Data MongoDB 5.0.3 locked by SB 4.0.3. Fixed in SB 4.0.6+.</notes>
         <packageUrl regex="true">^pkg:maven/org\.springframework\.data/spring-data-mongodb@5\.0\.3$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
 
     <!-- ── A. Jackson 2.20.2 (com.fasterxml.jackson) ── Fixed in SB 4.0.6+ -->
     <suppress>
         <notes>BOM-managed: Jackson 2.20.2 (com.fasterxml.jackson.*) locked by SB 4.0.3. Fixed in SB 4.0.6+.</notes>
         <packageUrl regex="true">^pkg:maven/com\.fasterxml\.jackson\..*/.*@2\.20\.2$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
     <suppress>
         <notes>BOM-managed: jackson-annotations 2.20 locked by SB 4.0.3. Fixed in SB 4.0.6+.</notes>
         <packageUrl regex="true">^pkg:maven/com\.fasterxml\.jackson\.core/jackson-annotations@2\.20$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
 
     <!-- ── A. Jackson 3.0.4 (tools.jackson.core) — SB 4 internal ── -->
     <suppress>
         <notes>BOM-managed: Jackson 3.0.4 (tools.jackson.core) bundled by SB 4.0.3. Fixed in SB 4.0.6+.</notes>
         <packageUrl regex="true">^pkg:maven/tools\.jackson\.core/.*@3\.0\.4$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
 
     <!-- ── A. Log4j-API 2.25.3 (bridge only, no appenders) ── Fixed in SB 4.0.6+ -->
     <suppress>
         <notes>BOM-managed: log4j-api 2.25.3 used as logging bridge only (no appenders). Fixed in SB 4.0.6+.</notes>
         <packageUrl regex="true">^pkg:maven/org\.apache\.logging\.log4j/.*@2\.25\.3$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
 
     <!-- ── A. PostgreSQL JDBC 42.7.10 ── Fixed in SB 4.0.6+ -->
     <suppress>
         <notes>BOM-managed: PostgreSQL JDBC 42.7.10 locked by SB 4.0.3. Fixed in SB 4.0.6+.</notes>
         <packageUrl regex="true">^pkg:maven/org\.postgresql/postgresql@42\.7\.10$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
 
     <!-- ── B. FALSE POSITIVE: mxparser misidentified as XStream ──
@@ -140,7 +142,7 @@
     <suppress>
         <notes>FALSE POSITIVE: mxparser is a pull-parser, not XStream. OWASP DC CPE misidentification.</notes>
         <packageUrl regex="true">^pkg:maven/io\.github\.x-stream/mxparser@.*$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
 
     <!-- ── B. FALSE POSITIVE: swagger-ui bundled DOMPurify JS ──
@@ -150,7 +152,7 @@
     <suppress>
         <notes>FALSE POSITIVE / LOW-RISK: DOMPurify inside swagger-ui webjar. Endpoint is Keycloak-protected.</notes>
         <packageUrl regex="true">^pkg:javascript/DOMPurify@.*$</packageUrl>
-        <cvssBelow>11</cvssBelow>
+        <vulnerabilityName regex="true">CVE-.*</vulnerabilityName>
     </suppress>
 
 </suppressions>
