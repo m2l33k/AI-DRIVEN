@@ -33,6 +33,27 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <!-- OWASP Dependency-Check: scans all module JARs against NVD CVE database -->
+            <plugin>
+                <groupId>org.owasp</groupId>
+                <artifactId>dependency-check-maven</artifactId>
+                <version>12.1.1</version>
+                <configuration>
+                    <!-- NVD API key speeds up the DB download from hours to minutes.
+                         Set as Jenkins secret: nvd-api-key -->
+                    <nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
+                    <format>ALL</format>
+                    <!-- fail build only on CRITICAL (CVSS >= 9); reports are still
+                         generated for HIGH so Jenkins can display them -->
+                    <failBuildOnCVSS>9</failBuildOnCVSS>
+                    <failOnError>false</failOnError>
+                    <suppressionFiles>
+                        <suppressionFile>owasp-suppressions.xml</suppressionFile>
+                    </suppressionFiles>
+                    <outputDirectory>${project.build.directory}/dependency-check</outputDirectory>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 

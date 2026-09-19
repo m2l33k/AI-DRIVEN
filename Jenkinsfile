@@ -170,7 +170,40 @@ pipeline {
             }
         }
 
-        // ── Stage 4: Integration Tests ────────────────────────────────────────
+        // ── Stage 4: OWASP Dependency-Check ──────────────────────────────────
+        stage('Security — OWASP Dependency-Check') {
+            when { not { expression { params.SKIP_SECURITY } } }
+            steps {
+                withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
+                    sh '''
+                        mvn -B org.owasp:dependency-check-maven:12.1.1:aggregate \
+                            -DnvdApiKey=${NVD_API_KEY} \
+                            -Dformat=ALL \
+                            -DfailBuildOnCVSS=9 \
+                            -DfailOnError=false \
+                            -DsuppressionFiles=owasp-suppressions.xml \
+                            -DoutputDirectory=reports/owasp \
+                            --no-transfer-progress
+                    '''
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts(
+                        artifacts:        'reports/owasp/dependency-check-report.*',
+                        allowEmptyArchive: true
+                    )
+                    // Requires "OWASP Dependency-Check" Jenkins plugin for trend graphs
+                    dependencyCheckPublisher(
+                        pattern:           'reports/owasp/dependency-check-report.xml',
+                        failedTotalCritical: 1,
+                        unstableTotalHigh:   10
+                    )
+                }
+            }
+        }
+
+        // ── Stage 5: Integration Tests ────────────────────────────────────────
         // Testcontainers spins up PostgreSQL + Redis via the Docker socket
         // (/var/run/docker.sock mounted in the Jenkins container).
         // Only *IT.java classes run here — unit tests are not repeated.
