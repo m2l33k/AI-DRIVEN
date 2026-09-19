@@ -1,56 +1,41 @@
 /**
  * 5G Telecom Platform — Main CI Pipeline
  *
- * Stages (parallel where independent):
+ * Stages:
  *   1. Checkout & Metadata
- *   2. Parallel: Backend Build | Frontend Install | ML Lint
- *   3. Parallel: Backend Tests | Frontend Build + Test | ML Tests | Security Scan
- *   4. Stash / Archive Artifacts
- *   5. Docker Build (main branch only)
- *   6. Summary
+ *   2. Parallel: Backend Build | Frontend Install
+ *   3. Parallel: Backend Unit Tests | Frontend Build+Test | ML Tests | Trivy
+ *   4. Backend Integration Tests  (Testcontainers via Docker socket)
+ *   5. Archive artifacts
+ *   6. Docker Build & Push        (main branch / tags only)
  *
- * Plugins required:
- *   Pipeline, Pipeline: Stage View, JUnit, HTML Publisher,
- *   Workspace Cleanup, Warnings Next Generation (optional),
- *   Docker Pipeline (for Docker stages)
+ * Required plugins: Pipeline, Pipeline Stage View, JUnit, Docker Pipeline
  */
 
 pipeline {
 
     agent any
 
-    // ── Global options ────────────────────────────────────────────────────────
     options {
         timeout(time: 45, unit: 'MINUTES')
         disableConcurrentBuilds(abortPrevious: true)
-buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
+        buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
     }
 
-    // ── Parameters (manual trigger) ───────────────────────────────────────────
     parameters {
-        booleanParam(
-            name: 'SKIP_DOCKER',
-            defaultValue: false,
-            description: 'Skip Docker image build even on main branch'
-        )
-        booleanParam(
-            name: 'SKIP_SECURITY',
-            defaultValue: false,
-            description: 'Skip Trivy security scan (speeds up local testing)'
-        )
+        booleanParam(name: 'SKIP_DOCKER',   defaultValue: false, description: 'Skip Docker build even on main')
+        booleanParam(name: 'SKIP_SECURITY', defaultValue: false, description: 'Skip Trivy scan')
     }
 
-    // ── Environment ───────────────────────────────────────────────────────────
+    // Only static values here — computed vars (GIT_SHORT, BUILD_VERSION) are set
+    // in the Checkout script block where a workspace is available.
     environment {
         MAVEN_OPTS   = '-Xmx768m -XX:+TieredCompilation -XX:TieredStopAtLevel=1'
         NODE_OPTIONS = '--max-old-space-size=1024'
-        GIT_SHORT    = sh(script: 'git rev-parse --short HEAD 2>/dev/null || echo unknown', returnStdout: true).trim()
-        BUILD_VERSION = "${env.BRANCH_NAME?.replaceAll('/', '-') ?: 'local'}-${GIT_SHORT}-${env.BUILD_NUMBER}"
-        REGISTRY      = 'ghcr.io'
-        IMAGE_PREFIX  = "${REGISTRY}/m2l33k"
+        REGISTRY     = 'ghcr.io'
+        IMAGE_PREFIX = 'ghcr.io/m2l33k'
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
     stages {
 
         // ── Stage 1: Checkout ─────────────────────────────────────────────────
@@ -58,24 +43,27 @@ buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
             steps {
                 checkout scm
                 script {
-                    currentBuild.displayName = "#${env.BUILD_NUMBER} — ${BUILD_VERSION}"
-                    currentBuild.description = "Branch: ${env.BRANCH_NAME ?: 'local'} | Commit: ${GIT_SHORT}"
+                    env.GIT_SHORT     = sh(script: 'git rev-parse --short HEAD 2>/dev/null || echo unknown', returnStdout: true).trim()
+                    def branch        = env.BRANCH_NAME ?: 'local'
+                    env.BUILD_VERSION = "${branch.replaceAll('/', '-')}-${env.GIT_SHORT}-${env.BUILD_NUMBER}"
+                    currentBuild.displayName = "#${env.BUILD_NUMBER} — ${env.BUILD_VERSION}"
+                    currentBuild.description = "Branch: ${branch} | Commit: ${env.GIT_SHORT}"
                 }
                 sh '''
                     echo "=== Build Info ==="
                     echo "Branch  : ${BRANCH_NAME:-local}"
                     echo "Commit  : ${GIT_SHORT}"
                     echo "Version : ${BUILD_VERSION}"
-                    java  -version
-                    mvn   -version
-                    node  -version
-                    npm   -version
+                    java    -version
+                    mvn     -version
+                    node    -version
+                    npm     -version
                     python3 --version
                 '''
             }
         }
 
-        // ── Stage 2: Compile + Install (parallel) ─────────────────────────────
+        // ── Stage 2: Compile (parallel) ───────────────────────────────────────
         stage('Compile') {
             parallel {
 
@@ -84,7 +72,7 @@ buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
                         sh 'mvn -B clean package -DskipTests --no-transfer-progress -T 4'
                     }
                     post {
-                        failure { echo 'Maven compile failed — check build logs above.' }
+                        failure { echo 'Maven compile failed — check logs above.' }
                     }
                 }
 
@@ -103,11 +91,10 @@ buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
             }
         }
 
-        // ── Stage 3: Test + Build (parallel) ──────────────────────────────────
+        // ── Stage 3: Verify (parallel) ────────────────────────────────────────
         stage('Verify') {
             parallel {
 
-                // ── 3a. Spring Boot unit tests ─────────────────────────────────
                 stage('Backend — Unit Tests') {
                     steps {
                         sh 'mvn -B test --no-transfer-progress -T 4'
@@ -115,18 +102,15 @@ buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
                     post {
                         always {
                             junit(
-                                testResults:        '**/target/surefire-reports/TEST-*.xml',
-                                allowEmptyResults:  true,
+                                testResults:              '**/target/surefire-reports/TEST-*.xml',
+                                allowEmptyResults:        true,
                                 skipMarkingBuildUnstable: false
                             )
                         }
-                        failure {
-                            echo 'Unit tests failed — see JUnit report above.'
-                        }
+                        failure { echo 'Unit tests failed — see JUnit report above.' }
                     }
                 }
 
-                // ── 3b. Angular production build + tests ───────────────────────
                 stage('Frontend — Build & Test') {
                     steps {
                         dir('Frontend') {
@@ -136,41 +120,30 @@ buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
                     }
                     post {
                         always {
-                            junit(
-                                testResults:       'Frontend/test-results/*.xml',
-                                allowEmptyResults: true
-                            )
+                            junit(testResults: 'Frontend/test-results/*.xml', allowEmptyResults: true)
                         }
                     }
                 }
 
-                // ── 3c. ML service tests (mocked TF/Prophet) ───────────────────
                 stage('ML — Tests') {
                     steps {
                         sh '''
                             mkdir -p ml-service/test-results
                             python3 -m pytest ml-service/tests/ \
-                                -v \
-                                --tb=short \
+                                -v --tb=short \
                                 --junit-xml=ml-service/test-results/pytest.xml \
                                 -p no:warnings
                         '''
                     }
                     post {
                         always {
-                            junit(
-                                testResults:       'ml-service/test-results/pytest.xml',
-                                allowEmptyResults: true
-                            )
+                            junit(testResults: 'ml-service/test-results/pytest.xml', allowEmptyResults: true)
                         }
                     }
                 }
 
-                // ── 3d. Trivy security scan ────────────────────────────────────
                 stage('Security — Trivy') {
-                    when {
-                        not { expression { params.SKIP_SECURITY } }
-                    }
+                    when { not { expression { params.SKIP_SECURITY } } }
                     steps {
                         sh '''
                             mkdir -p reports
@@ -181,16 +154,12 @@ buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
                                 --format table \
                                 --output reports/trivy-fs.txt \
                                 --exit-code 0
-                            echo "=== Trivy scan complete ==="
                             cat reports/trivy-fs.txt
                         '''
                     }
                     post {
                         always {
-                            archiveArtifacts(
-                                artifacts:     'reports/trivy-fs.txt',
-                                allowEmptyArchive: true
-                            )
+                            archiveArtifacts(artifacts: 'reports/trivy-fs.txt', allowEmptyArchive: true)
                         }
                     }
                 }
@@ -199,9 +168,9 @@ buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
         }
 
         // ── Stage 4: Integration Tests ────────────────────────────────────────
-        // Testcontainers uses the Docker socket (mounted at /var/run/docker.sock)
-        // to spin up PostgreSQL + Redis for the rate-limiting integration tests.
-        // Unit tests are NOT re-run here — only *IT.java classes via Failsafe.
+        // Testcontainers spins up PostgreSQL + Redis via the Docker socket
+        // (/var/run/docker.sock mounted in the Jenkins container).
+        // Only *IT.java classes run here — unit tests are not repeated.
         stage('Backend — Integration Tests') {
             steps {
                 withEnv(['TESTCONTAINERS_RYUK_DISABLED=true']) {
@@ -211,34 +180,29 @@ buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
             post {
                 always {
                     junit(
-                        testResults:       '**/target/failsafe-reports/TEST-*.xml',
-                        allowEmptyResults: true,
+                        testResults:              '**/target/failsafe-reports/TEST-*.xml',
+                        allowEmptyResults:        true,
                         skipMarkingBuildUnstable: false
                     )
                 }
-                failure {
-                    echo 'Integration tests failed — check Testcontainers container startup logs above.'
-                }
+                failure { echo 'Integration tests failed — check Testcontainers logs above.' }
             }
         }
 
-        // ── Stage 5: Archive artifacts ─────────────────────────────────────────
+        // ── Stage 5: Archive ──────────────────────────────────────────────────
         stage('Archive') {
             steps {
                 archiveArtifacts(
-                    artifacts:            'microservices/*/target/*.jar, spring-cloud/*/target/*.jar',
-                    allowEmptyArchive:    true,
-                    fingerprint:          true,
-                    onlyIfSuccessful:     true
+                    artifacts:         'microservices/*/target/*.jar, spring-cloud/*/target/*.jar',
+                    allowEmptyArchive: true,
+                    fingerprint:       true,
+                    onlyIfSuccessful:  true
                 )
-                stash(
-                    name:     'jars',
-                    includes: 'microservices/*/target/*.jar,spring-cloud/*/target/*.jar'
-                )
+                stash(name: 'jars', includes: 'microservices/*/target/*.jar,spring-cloud/*/target/*.jar')
             }
         }
 
-        // ── Stage 5: Docker build & push (main branch only) ───────────────────
+        // ── Stage 6: Docker (main / tags only) ───────────────────────────────
         stage('Docker') {
             when {
                 allOf {
@@ -267,19 +231,17 @@ buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
                                 [name: 'gateway-service',             ctx: 'spring-cloud/gateway-service'],
                                 [name: 'eureka-server',               ctx: 'spring-cloud/eureka-server'],
                             ]
-
-                            // Build all images in parallel
                             def buildSteps = [:]
                             services.each { svc ->
-                                def s = svc   // capture for closure
+                                def s = svc
                                 buildSteps["docker-${s.name}"] = {
                                     stage("  ${s.name}") {
                                         sh """
                                             docker build \
-                                                -t ${IMAGE_PREFIX}/${s.name}:${BUILD_VERSION} \
-                                                -t ${IMAGE_PREFIX}/${s.name}:latest \
-                                                --label "git.commit=${GIT_SHORT}" \
-                                                --label "build.number=${env.BUILD_NUMBER}" \
+                                                -t ${env.IMAGE_PREFIX}/${s.name}:${env.BUILD_VERSION} \
+                                                -t ${env.IMAGE_PREFIX}/${s.name}:latest \
+                                                --label git.commit=${env.GIT_SHORT} \
+                                                --label build.number=${env.BUILD_NUMBER} \
                                                 ${s.ctx}
                                         """
                                     }
@@ -294,54 +256,39 @@ buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
                     steps {
                         sh """
                             docker build \
-                                -t ${IMAGE_PREFIX}/ml-service:${BUILD_VERSION} \
-                                -t ${IMAGE_PREFIX}/ml-service:latest \
-                                --label "git.commit=${GIT_SHORT}" \
+                                -t ${env.IMAGE_PREFIX}/ml-service:${env.BUILD_VERSION} \
+                                -t ${env.IMAGE_PREFIX}/ml-service:latest \
+                                --label git.commit=${env.GIT_SHORT} \
                                 ml-service
                         """
                     }
                 }
 
                 stage('Docker — Trivy Image Scan') {
-                    when {
-                        not { expression { params.SKIP_SECURITY } }
-                    }
+                    when { not { expression { params.SKIP_SECURITY } } }
                     steps {
                         script {
-                            def images = [
-                                'auth-service',
-                                'anomaly-detection-service',
-                                'gateway-service',
-                                'audit-service',
-                            ]
-                            images.each { img ->
+                            ['auth-service', 'anomaly-detection-service', 'gateway-service', 'audit-service'].each { img ->
                                 sh """
                                     trivy image \
-                                        --severity CRITICAL \
-                                        --ignore-unfixed \
-                                        --exit-code 0 \
-                                        --format table \
-                                        ${IMAGE_PREFIX}/${img}:latest 2>&1 \
+                                        --severity CRITICAL --ignore-unfixed \
+                                        --exit-code 0 --format table \
+                                        ${env.IMAGE_PREFIX}/${img}:latest 2>&1 \
                                     | tee reports/trivy-image-${img}.txt || true
                                 """
                             }
                         }
-                        archiveArtifacts(
-                            artifacts:         'reports/trivy-image-*.txt',
-                            allowEmptyArchive: true
-                        )
+                        archiveArtifacts(artifacts: 'reports/trivy-image-*.txt', allowEmptyArchive: true)
                     }
                 }
 
-                stage('Docker — Push to Registry') {
+                stage('Docker — Push') {
                     steps {
-                        withCredentials([
-                            usernamePassword(
-                                credentialsId: 'ghcr-credentials',
-                                usernameVariable: 'GHCR_USER',
-                                passwordVariable: 'GHCR_TOKEN'
-                            )
-                        ]) {
+                        withCredentials([usernamePassword(
+                            credentialsId: 'ghcr-credentials',
+                            usernameVariable: 'GHCR_USER',
+                            passwordVariable: 'GHCR_TOKEN'
+                        )]) {
                             sh 'echo "${GHCR_TOKEN}" | docker login ${REGISTRY} -u ${GHCR_USER} --password-stdin'
                             script {
                                 def allImages = [
@@ -352,16 +299,14 @@ buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
                                     'gateway-service', 'eureka-server', 'ml-service',
                                 ]
                                 allImages.each { img ->
-                                    sh "docker push ${IMAGE_PREFIX}/${img}:${BUILD_VERSION}"
-                                    sh "docker push ${IMAGE_PREFIX}/${img}:latest"
+                                    sh "docker push ${env.IMAGE_PREFIX}/${img}:${env.BUILD_VERSION}"
+                                    sh "docker push ${env.IMAGE_PREFIX}/${img}:latest"
                                 }
                             }
                         }
                     }
                     post {
-                        always {
-                            sh 'docker logout ${REGISTRY} || true'
-                        }
+                        always { sh 'docker logout ${REGISTRY} || true' }
                     }
                 }
 
@@ -375,44 +320,26 @@ buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '5'))
 
         always {
             script {
-                def summary = """
+                echo """
 =================================================
   BUILD SUMMARY — ${currentBuild.displayName}
 =================================================
   Status  : ${currentBuild.currentResult}
   Branch  : ${env.BRANCH_NAME ?: 'local'}
-  Commit  : ${GIT_SHORT}
-  Version : ${BUILD_VERSION}
+  Commit  : ${env.GIT_SHORT ?: 'unknown'}
+  Version : ${env.BUILD_VERSION ?: 'unknown'}
   Duration: ${currentBuild.durationString}
-=================================================
-"""
-                echo summary
+================================================="""
             }
         }
 
-        success {
-            echo "Pipeline passed. All tests green, artifacts archived."
-        }
-
-        unstable {
-            echo "Pipeline is UNSTABLE — some tests failed. Check the JUnit report."
-        }
-
-        failure {
-            echo "Pipeline FAILED. Check the stage logs above for details."
-        }
+        success  { echo 'Pipeline passed. All tests green, artifacts archived.' }
+        unstable { echo 'Pipeline UNSTABLE — some tests failed. Check the JUnit report.' }
+        failure  { echo 'Pipeline FAILED. Check the stage logs above for details.' }
 
         cleanup {
-            cleanWs(
-                cleanWhenSuccess:    true,
-                cleanWhenFailure:    false,
-                cleanWhenUnstable:   false,
-                cleanWhenNotBuilt:   true,
-                deleteDirs:          true,
-                notFailBuild:        true,
-                patterns: [[pattern: '**/target/**', type: 'INCLUDE'],
-                           [pattern: 'Frontend/dist/**', type: 'INCLUDE']]
-            )
+            // deleteDir() replaces cleanWs (Workspace Cleanup plugin not required)
+            deleteDir()
         }
     }
 }
