@@ -1,0 +1,275 @@
+@startuml use-case
+!theme plain
+left to right direction
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam backgroundColor #FAFAFA
+skinparam wrapWidth 170
+
+skinparam actor {
+  BackgroundColor #DDEEFF
+  BorderColor #336699
+  FontStyle bold
+  FontSize 11
+}
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #4A6FA5
+  FontSize 10
+  ArrowColor #336699
+}
+skinparam package {
+  BackgroundColor #F0F4FF
+  BorderColor #336699
+  FontStyle bold
+  FontSize 12
+}
+skinparam rectangle {
+  BackgroundColor #EEF6FF
+  BorderColor #1A56DB
+  FontStyle bold
+  FontSize 13
+}
+skinparam arrow {
+  Color #445566
+  FontSize 9
+  FontStyle italic
+}
+
+title Use Case Diagram — 5G Telecom Security Platform\n
+
+' ══════════════════════════════════════════════════════════════
+' HUMAN ACTORS
+' ══════════════════════════════════════════════════════════════
+actor "Security\nAnalyst" as SA
+actor "Network\nOperator" as NO
+actor "Auditor" as AUD
+actor "Platform\nAdmin" as ADMIN
+
+' ══════════════════════════════════════════════════════════════
+' SYSTEM / EXTERNAL ACTORS
+' ══════════════════════════════════════════════════════════════
+actor "Scheduler\n<<system>>" as SCHED
+actor "free5GC Core\n<<external>>" as F5GC
+actor "UERANSIM\n<<external>>" as UER
+
+' ══════════════════════════════════════════════════════════════
+' SYSTEM BOUNDARY
+' ══════════════════════════════════════════════════════════════
+rectangle "5G Telecom Security Platform" {
+
+  ' ── 1. Authentication & Identity ─────────────────────────
+  package "Authentication & Identity" as PKG_AUTH {
+    usecase "UC-01\nAuthenticate\n(Login · OTP · Password Reset\n· Verify Email)" as UC01
+    usecase "UC-02\nManage Users\n& Assign Roles" as UC02
+    usecase "UC-03\nConfigure Platform\nSettings" as UC03
+  }
+
+  ' ── 2. Messaging ─────────────────────────────────────────
+  package "Messaging" as PKG_MSG {
+    usecase "UC-04\nSend & Receive\nDirect Messages" as UC04
+  }
+
+  ' ── 3. Roaming Analytics & Risk ──────────────────────────
+  package "Roaming Analytics & Risk" as PKG_ROAM {
+    usecase "UC-05\nView Roaming\nEvents" as UC05
+    usecase "UC-06\nAnalyze Roaming\nRisk Score" as UC06
+    usecase "UC-07\nMonitor Partner\nAnalytics" as UC07
+    usecase "UC-08\nView QoS &\nKPI Dashboard" as UC08
+    usecase "UC-09\nView Revenue\nOverview" as UC09
+    usecase "UC-10\nUpload & Analyze\nCDR File" as UC10
+    usecase "UC-11\nSimulate Roaming\nTraffic" as UC11
+    usecase "UC-12\nRun IREG\nSynthetic Tests" as UC12
+    usecase "UC-13\nEvaluate SLA\n& Agreements" as UC13
+    usecase "UC-14\nExport CDR\nReport (CSV)" as UC14
+  }
+
+  ' ── 4. Anomaly & Threat Detection ────────────────────────
+  package "Anomaly & Threat Detection" as PKG_ANOM {
+    usecase "UC-15\nMonitor Security\nDashboard" as UC15
+    usecase "UC-16\nView & Filter\nAnomaly Events" as UC16
+    usecase "UC-17\nInject Attack\nScenario" as UC17
+    usecase "UC-18\nManage Detection\nRules (CRUD)" as UC18
+    usecase "UC-19\nClear Alert\nStore" as UC19
+  }
+
+  ' ── 5. 5G Core Management ────────────────────────────────
+  package "5G Core Management" as PKG_5GC {
+    usecase "UC-20\nMonitor 5G NF\nStatus" as UC20
+    usecase "UC-21\nView UE Contexts\n& Subscribers" as UC21
+    usecase "UC-22\nProvision Subscribers,\nProfiles & Tenants" as UC22
+    usecase "UC-23\nApply Network\nConfiguration" as UC23
+    usecase "UC-24\nManage 5GC\nContainers" as UC24
+    usecase "UC-25\nView 5GC Topology\n& Charging Records" as UC25
+  }
+
+  ' ── 6. ML Traffic Forecasting ────────────────────────────
+  package "ML Traffic Forecasting" as PKG_ML {
+    usecase "UC-26\nView Traffic\nForecast Charts" as UC26
+    usecase "UC-27\nTrigger Model\nTraining" as UC27
+    usecase "UC-28\nView Forecast\nAccuracy Metrics" as UC28
+  }
+
+  ' ── 7. Network Traffic Control ───────────────────────────
+  package "Network Traffic Control" as PKG_NET {
+    usecase "UC-29\nConfigure Rate\nLimiting Policies" as UC29
+    usecase "UC-30\nView Offender\nStatistics" as UC30
+    usecase "UC-31\nToggle Policy\nActive / Inactive" as UC31
+    usecase "UC-32\nInject Fault\nScenario" as UC32
+  }
+
+  ' ── 8. VM MongoDB Browser ────────────────────────────────
+  package "VM MongoDB Browser" as PKG_VM {
+    usecase "UC-33\nBrowse & Query\nCollections" as UC33
+    usecase "UC-34\nInsert & Delete\nDocuments" as UC34
+  }
+
+  ' ── 9. Audit & Compliance ────────────────────────────────
+  package "Audit & Compliance" as PKG_AUD {
+    usecase "UC-35\nView Audit\nDashboard" as UC35
+    usecase "UC-36\nSearch & Filter\nAudit Logs" as UC36
+    usecase "UC-37\nView Actor\nActivity Timeline" as UC37
+    usecase "UC-38\nExport Audit\nReport (CSV)" as UC38
+  }
+
+  ' ── 10. Observability ────────────────────────────────────
+  package "Observability" as PKG_OBS {
+    usecase "UC-39\nView Grafana\nDashboards" as UC39
+    usecase "UC-40\nMonitor Service\nHealth & Traces" as UC40
+  }
+
+  ' ── 11. Automated Background Processes ───────────────────
+  package "Automated Background Processes" as PKG_SYS {
+    usecase "UC-41\nIngest CDR Data\n(startup loader)" as UC41
+    usecase "UC-42\nRun Anomaly\nDetection Engine" as UC42
+    usecase "UC-43\nPublish Metrics\nto Prometheus" as UC43
+    usecase "UC-44\nForward Logs\nto Loki" as UC44
+  }
+}
+
+' ══════════════════════════════════════════════════════════════
+' INCLUDE / EXTEND RELATIONSHIPS
+' ══════════════════════════════════════════════════════════════
+UC06 .> UC05 : <<include>>
+UC14 .> UC05 : <<extend>>
+UC17 .> UC16 : <<extend>>
+UC27 .> UC26 : <<extend>>
+UC31 .> UC29 : <<extend>>
+UC38 .> UC36 : <<extend>>
+
+' ══════════════════════════════════════════════════════════════
+' ACTOR → USE CASE ASSOCIATIONS
+' ══════════════════════════════════════════════════════════════
+
+' All human actors authenticate
+SA    --> UC01
+NO    --> UC01
+AUD   --> UC01
+ADMIN --> UC01
+
+' All human actors message
+SA    --> UC04
+NO    --> UC04
+AUD   --> UC04
+ADMIN --> UC04
+
+' ── Platform Admin ───────────────────────────────────────────
+ADMIN --> UC02
+ADMIN --> UC03
+ADMIN --> UC35
+ADMIN --> UC36
+ADMIN --> UC39
+ADMIN --> UC40
+
+' ── Security Analyst ─────────────────────────────────────────
+' Roaming
+SA --> UC05
+SA --> UC06
+SA --> UC07
+SA --> UC08
+SA --> UC09
+SA --> UC10
+SA --> UC11
+SA --> UC12
+SA --> UC13
+SA --> UC14
+' Anomaly
+SA --> UC15
+SA --> UC16
+SA --> UC17
+SA --> UC18
+SA --> UC19
+' 5GC
+SA --> UC20
+SA --> UC21
+SA --> UC25
+' ML
+SA --> UC26
+SA --> UC27
+SA --> UC28
+' Network control
+SA --> UC29
+SA --> UC30
+SA --> UC31
+' VM
+SA --> UC33
+' Observability
+SA --> UC39
+SA --> UC40
+
+' ── Network Operator ─────────────────────────────────────────
+' 5GC management
+NO --> UC20
+NO --> UC21
+NO --> UC22
+NO --> UC23
+NO --> UC24
+NO --> UC25
+' ML
+NO --> UC26
+NO --> UC27
+NO --> UC28
+' Network control
+NO --> UC29
+NO --> UC30
+NO --> UC31
+NO --> UC32
+' VM
+NO --> UC33
+NO --> UC34
+' Observability
+NO --> UC39
+NO --> UC40
+
+' ── Auditor ──────────────────────────────────────────────────
+' Read-only roaming (PERM_roaming-events:read)
+AUD --> UC05
+AUD --> UC07
+AUD --> UC08
+AUD --> UC13
+' Read-only security alerts (PERM_security-alerts:read)
+AUD --> UC15
+AUD --> UC16
+' Read-only NF status (PERM_nf:read)
+AUD --> UC20
+' Audit (PERM_audit:read)
+AUD --> UC35
+AUD --> UC36
+AUD --> UC37
+AUD --> UC38
+' Observability
+AUD --> UC39
+
+' ── Scheduler (system) ───────────────────────────────────────
+SCHED --> UC41
+SCHED --> UC42
+SCHED --> UC43
+SCHED --> UC44
+
+' ── External systems ─────────────────────────────────────────
+F5GC --> UC20
+F5GC --> UC21
+UER  --> UC20
+
+@enduml

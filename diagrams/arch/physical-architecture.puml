@@ -1,0 +1,219 @@
+@startuml physical-architecture
+!theme plain
+skinparam linetype ortho
+skinparam nodesep 50
+skinparam ranksep 65
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam backgroundColor #F7F9FC
+
+' ── Huawei Cloud outer boundary ──────────────────────────────
+skinparam cloud {
+  BackgroundColor #E8F0FE
+  BorderColor #1A56DB
+  FontStyle bold
+  FontSize 13
+}
+' ── VPC / subnet rectangles ──────────────────────────────────
+skinparam rectangle {
+  BackgroundColor #F0F4FF
+  BorderColor #4A6FA5
+  FontStyle bold
+  FontSize 12
+}
+' ── ECS / node boxes ─────────────────────────────────────────
+skinparam node {
+  BackgroundColor #DDEEFF
+  BorderColor #336699
+  FontStyle bold
+  FontSize 11
+}
+' ── Components ───────────────────────────────────────────────
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #556677
+  FontSize 10
+}
+' ── Databases ────────────────────────────────────────────────
+skinparam database {
+  BackgroundColor #FFF8E1
+  BorderColor #CC8800
+  FontSize 10
+}
+
+title Physical Architecture — 5G Telecom Security Platform\nDeployed on Huawei Cloud
+
+' ══════════════════════════════════════════════════════════════════
+' USERS (outside cloud)
+' ══════════════════════════════════════════════════════════════════
+actor "Security Analyst\n/ Network Operator\n/ Auditor" as User
+node "Client Browser\n(Angular SPA)" as Browser
+
+' ══════════════════════════════════════════════════════════════════
+' HUAWEI CLOUD REGION
+' ══════════════════════════════════════════════════════════════════
+cloud "Huawei Cloud  ─  ap-southeast / cn-north Region\n[VPC: telecom-vpc  /  CIDR: 192.168.0.0/16]" as HWCloud {
+
+  ' ── DMZ / Public Subnet ──────────────────────────────────────
+  rectangle "Public Subnet  192.168.0.0/24\n[Security Group: sg-dmz]" as DMZ {
+    component "ELB — Elastic Load Balancer\n(EIP: public-ip)\nHTTPS :443 / HTTP :80" as ELB
+    component "NAT Gateway\n(outbound traffic)" as NAT
+  }
+
+  ' ── Application Tier ─────────────────────────────────────────
+  rectangle "Private Subnet — Application Tier  192.168.1.0/24\n[Security Group: sg-app]" as AppSubnet {
+
+    node "ECS — App Server\n(4 vCPU / 8 GB RAM)" as AppECS {
+      component "Nginx\n(Angular SPA  :80/:443)" as Nginx
+      component "Eureka Server\n:8761" as Eureka
+      component "Gateway Service\n:9000" as Gateway
+      component "Auth Service\n:8081" as AuthSvc
+      component "Roaming Analysis\n:8082" as Roaming
+      component "Anomaly Detection\n:8087" as Anomaly
+      component "Rate Limiting\n:8085" as RateLimit
+      component "Audit Service\n:9009" as Audit
+      component "Messaging Service\n:9007" as Messaging
+      component "Free5GC Service\n:8086" as Free5GCSvc
+      component "Fault Injection\n:8089" as FaultInj
+      component "Distributed Tracing\n:8088" as DistTrace
+    }
+  }
+
+  ' ── Container / Services Tier ────────────────────────────────
+  rectangle "Private Subnet — Container Tier  192.168.2.0/24\n[Security Group: sg-svc  /  CCE Node Pool]" as SvcSubnet {
+
+    node "ECS — Container Host\n(CCE / Docker Compose)" as ContainerECS {
+      component "Keycloak\n:8080\n(IAM / OAuth2 / OIDC)" as Keycloak
+      component "ml-service\nDjango + TensorFlow\n:8000\n(LSTM · ARIMA · Prophet)" as MLSvc
+      component "Jenkins CI/CD\n:8090" as Jenkins
+    }
+  }
+
+  ' ── Observability Tier ───────────────────────────────────────
+  rectangle "Private Subnet — Observability  192.168.3.0/24\n[Security Group: sg-obs]" as ObsSubnet {
+
+    node "ECS — Observability Host\n(Docker Compose)" as ObsECS {
+      component "Prometheus\n:9090" as Prometheus
+      component "Grafana\n:3000" as Grafana
+      component "Loki\n:3100" as Loki
+      component "Tempo\n:3200" as Tempo
+      component "Fluent Bit\n(container log collector)" as FluentBit
+    }
+  }
+
+  ' ── Data Tier (Managed Services) ─────────────────────────────
+  rectangle "Private Subnet — Data Tier  192.168.4.0/24\n[Security Group: sg-data  /  Managed Services]" as DataSubnet {
+
+    database "RDS for MySQL\n(roaming-db)\n:3307" as MySQL
+    database "RDS for PostgreSQL\n(keycloak-db · rate-limit-db)\n:5432 / :5434" as PG
+    database "DCS — Redis\n(token buckets · counters)\n:6379" as Redis
+    database "DDS — MongoDB\n(audit entries)\n:27017" as Mongo
+  }
+
+  ' ── 5G Core Simulation Tier ──────────────────────────────────
+  rectangle "Private Subnet — 5G Core Simulation  192.168.5.0/24\n[Security Group: sg-5gc]" as FiveGSubnet {
+
+    node "ECS — 5G Core Host\n(free5gc-compose / Linux)" as Free5GCECS {
+      component "NRF   :19001" as NRF
+      component "AMF   :19002" as AMF
+      component "SMF   :19003" as SMF
+      component "UDM   :19004" as UDM
+      component "UDR   :19005" as UDR
+      component "PCF   :19006" as PCF
+      component "AUSF  :19007" as AUSF
+      component "NSSF  :19008" as NSSF
+      component "WebConsole  :5000" as WebConsole
+    }
+
+    node "ECS — RAN Simulator\n(UERANSIM)" as UERANSIM {
+      component "gNB\n(simulated base station)" as gNB
+      component "UE\n(simulated user device)" as UE
+    }
+  }
+
+  ' ── Object Storage ───────────────────────────────────────────
+  database "OBS — Object Storage\n(Jenkins artifacts\nML model checkpoints)" as OBS
+  database "SWR — Container Registry\n(Docker images)" as SWR
+
+}
+
+' ══════════════════════════════════════════════════════════════════
+' CONNECTIONS
+' ══════════════════════════════════════════════════════════════════
+
+' External users → ELB
+User --> Browser
+Browser --> ELB : HTTPS :443
+
+' ELB → App
+ELB --> Nginx : HTTP :80
+ELB --> Gateway : REST :9000
+
+' Angular → Gateway (internal)
+Nginx --> Gateway : /api/**
+
+' Gateway → Eureka discovery
+Gateway ..> Eureka : lb:// resolve
+
+' Gateway → microservices
+Gateway --> AuthSvc
+Gateway --> Roaming
+Gateway --> Anomaly
+Gateway --> RateLimit
+Gateway --> Audit
+Gateway --> Messaging
+Gateway --> Free5GCSvc
+Gateway --> FaultInj
+
+' Identity
+Gateway --> Keycloak : JWKS / token introspect
+AuthSvc --> Keycloak : OAuth2 OIDC
+Keycloak --> PG : keycloak-db
+
+' Persistence
+Roaming --> MySQL
+RateLimit --> PG : rate-limit-db
+RateLimit --> Redis
+Audit --> Mongo
+
+' ML
+Roaming --> MLSvc : REST  /api/forecast
+Anomaly --> MLSvc : REST  /api/forecast
+
+' 5GC proxy
+Free5GCSvc --> WebConsole : HTTP  Token-auth
+
+' RAN simulation
+gNB --> AMF : N1/N2 (NAS/NGAP)
+UE --> gNB : radio
+
+' Observability — metrics
+AppECS ..> Prometheus : Actuator scrape  /actuator/prometheus
+ContainerECS ..> Prometheus : Actuator scrape
+
+' Observability — logs
+AppECS ..> Loki : Loki4j push  :3100
+FluentBit --> Loki : Docker container logs
+
+' Observability — traces
+AppECS ..> Tempo : OTLP spans  :4318
+
+' Observability — 5GC NF metrics
+Prometheus ..> Free5GCECS : scrape  :19001–:19008
+
+' Grafana reads
+Grafana --> Prometheus
+Grafana --> Loki
+Grafana --> Tempo
+
+' CI/CD
+Jenkins --> AppECS : deploy JARs  (SSH / Ansible)
+Jenkins --> SWR : push Docker images
+Jenkins --> OBS : store build artifacts
+MLSvc --> OBS : read/write model checkpoints
+
+' NAT outbound
+NAT ..> ContainerECS : outbound internet
+NAT ..> AppECS : outbound internet
+
+@enduml

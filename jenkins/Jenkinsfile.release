@@ -1,0 +1,279 @@
+/**
+ * 5G Telecom Platform — Release Pipeline
+ *
+ * Triggered manually with a version parameter (e.g. "1.2.0").
+ * Flow:
+ *   1. Validate version format
+ *   2. Run full test suite
+ *   3. Build + push versioned Docker images
+ *   4. Create Git tag v<version>
+ *   5. Generate and archive release notes
+ *
+ * Required Jenkins credentials:
+ *   ghcr-credentials  — Username/Password (GHCR token)
+ *   github-pat        — Username/Password (GitHub PAT for tagging)
+ */
+
+pipeline {
+
+    agent any
+
+    options {
+        timeout(time: 60, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        timestamps()
+        ansiColor('xterm')
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
+    parameters {
+        string(
+            name: 'RELEASE_VERSION',
+            defaultValue: '',
+            description: 'Release version without the "v" prefix, e.g. 1.2.0'
+        )
+        booleanParam(
+            name: 'DRY_RUN',
+            defaultValue: true,
+            description: 'Dry run — build and test but do NOT push images or create git tag'
+        )
+    }
+
+    environment {
+        REGISTRY     = 'ghcr.io'
+        IMAGE_PREFIX = "${REGISTRY}/m2l33k"
+        VERSION      = "${params.RELEASE_VERSION?.trim()}"
+        GIT_SHORT    = sh(script: 'git rev-parse --short HEAD 2>/dev/null || echo unknown', returnStdout: true).trim()
+    }
+
+    stages {
+
+        // ── 1. Validate ───────────────────────────────────────────────────────
+        stage('Validate') {
+            steps {
+                script {
+                    if (!VERSION) {
+                        error("RELEASE_VERSION parameter is required. Example: 1.2.0")
+                    }
+                    if (!(VERSION ==~ /^\d+\.\d+\.\d+(-rc\.\d+)?$/)) {
+                        error("Invalid version format '${VERSION}'. Expected: MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-rc.N")
+                    }
+                    currentBuild.displayName = "#${env.BUILD_NUMBER} — v${VERSION}"
+                    currentBuild.description = "Release v${VERSION} | Dry run: ${params.DRY_RUN}"
+                    echo "Releasing version: v${VERSION} (dry run: ${params.DRY_RUN})"
+                }
+            }
+        }
+
+        // ── 2. Checkout ───────────────────────────────────────────────────────
+        stage('Checkout') {
+            steps {
+                checkout scm
+                sh 'git log -1 --oneline'
+            }
+        }
+
+        // ── 3. Full test suite ────────────────────────────────────────────────
+        stage('Tests') {
+            parallel {
+
+                stage('Backend Tests') {
+                    steps {
+                        sh 'mvn -B clean verify --no-transfer-progress -T 4'
+                    }
+                    post {
+                        always {
+                            junit(
+                                testResults: '**/target/surefire-reports/TEST-*.xml',
+                                allowEmptyResults: true
+                            )
+                        }
+                    }
+                }
+
+                stage('ML Tests') {
+                    steps {
+                        sh '''
+                            mkdir -p ml-service/test-results
+                            python3 -m pytest ml-service/tests/ \
+                                -v --tb=short \
+                                --junit-xml=ml-service/test-results/pytest.xml \
+                                -p no:warnings
+                        '''
+                    }
+                    post {
+                        always {
+                            junit(
+                                testResults: 'ml-service/test-results/pytest.xml',
+                                allowEmptyResults: true
+                            )
+                        }
+                    }
+                }
+
+                stage('Frontend TypeScript Check') {
+                    steps {
+                        dir('Frontend') {
+                            sh 'npm ci --prefer-offline'
+                            sh 'npx tsc --noEmit --project tsconfig.app.json'
+                            sh 'npx ng build --configuration production --no-progress'
+                        }
+                    }
+                }
+
+            }
+        }
+
+        // ── 4. Build release images ───────────────────────────────────────────
+        stage('Build Release Images') {
+            steps {
+                script {
+                    def services = [
+                        [name: 'auth-service',                ctx: 'microservices/auth-service'],
+                        [name: 'roaming-analysis-service',    ctx: 'microservices/roaming-analysis-service'],
+                        [name: 'anomaly-detection-service',   ctx: 'microservices/anomaly-detection-service'],
+                        [name: 'rate-limiting-service',       ctx: 'microservices/rate-limiting-service'],
+                        [name: 'audit-service',               ctx: 'microservices/audit-service'],
+                        [name: 'messaging-service',           ctx: 'microservices/messaging-service'],
+                        [name: 'fivegc-service',              ctx: 'microservices/fivegc-service'],
+                        [name: 'distributed-tracing-service', ctx: 'microservices/distributed-tracing-service'],
+                        [name: 'fault-injection-service',     ctx: 'microservices/fault-injection-service'],
+                        [name: 'gateway-service',             ctx: 'spring-cloud/gateway-service'],
+                        [name: 'eureka-server',               ctx: 'spring-cloud/eureka-server'],
+                    ]
+                    def buildSteps = [:]
+                    services.each { svc ->
+                        def s = svc
+                        buildSteps[s.name] = {
+                            sh """
+                                docker build \
+                                    -t ${IMAGE_PREFIX}/${s.name}:v${VERSION} \
+                                    -t ${IMAGE_PREFIX}/${s.name}:latest \
+                                    --label "org.opencontainers.image.version=v${VERSION}" \
+                                    --label "org.opencontainers.image.revision=${GIT_SHORT}" \
+                                    ${s.ctx}
+                            """
+                        }
+                    }
+                    parallel buildSteps
+
+                    sh """
+                        docker build \
+                            -t ${IMAGE_PREFIX}/ml-service:v${VERSION} \
+                            -t ${IMAGE_PREFIX}/ml-service:latest \
+                            --label "org.opencontainers.image.version=v${VERSION}" \
+                            ml-service
+                    """
+                }
+            }
+        }
+
+        // ── 5. Push release images ────────────────────────────────────────────
+        stage('Push Release Images') {
+            when { expression { !params.DRY_RUN } }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'ghcr-credentials',
+                        usernameVariable: 'GHCR_USER',
+                        passwordVariable: 'GHCR_TOKEN'
+                    )
+                ]) {
+                    sh 'echo "${GHCR_TOKEN}" | docker login ${REGISTRY} -u ${GHCR_USER} --password-stdin'
+                    script {
+                        def allImages = [
+                            'auth-service', 'roaming-analysis-service',
+                            'anomaly-detection-service', 'rate-limiting-service',
+                            'audit-service', 'messaging-service', 'fivegc-service',
+                            'distributed-tracing-service', 'fault-injection-service',
+                            'gateway-service', 'eureka-server', 'ml-service',
+                        ]
+                        def pushSteps = [:]
+                        allImages.each { img ->
+                            def i = img
+                            pushSteps[i] = {
+                                sh "docker push ${IMAGE_PREFIX}/${i}:v${VERSION}"
+                                sh "docker push ${IMAGE_PREFIX}/${i}:latest"
+                            }
+                        }
+                        parallel pushSteps
+                    }
+                }
+            }
+            post {
+                always { sh 'docker logout ${REGISTRY} || true' }
+            }
+        }
+
+        // ── 6. Tag git commit ─────────────────────────────────────────────────
+        stage('Git Tag') {
+            when { expression { !params.DRY_RUN } }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'github-pat',
+                        usernameVariable: 'GH_USER',
+                        passwordVariable: 'GH_TOKEN'
+                    )
+                ]) {
+                    sh """
+                        git config user.email "jenkins@ci.local"
+                        git config user.name  "Jenkins CI"
+                        git tag -a "v${VERSION}" -m "Release v${VERSION}"
+                        git push https://${GH_USER}:${GH_TOKEN}@github.com/m2l33k/spring-boot-based-microservices.git "v${VERSION}"
+                    """
+                }
+            }
+        }
+
+        // ── 7. Release notes ──────────────────────────────────────────────────
+        stage('Release Notes') {
+            steps {
+                script {
+                    def prevTag = sh(
+                        script: "git tag --sort=-version:refname | grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+\$' | sed -n '2p' || echo ''",
+                        returnStdout: true
+                    ).trim()
+                    def base = prevTag ?: sh(script: 'git rev-list --max-parents=0 HEAD', returnStdout: true).trim()
+
+                    sh """
+                        echo "# Release v${VERSION}" > RELEASE_NOTES.md
+                        echo "" >> RELEASE_NOTES.md
+                        echo "**Date:** \$(date -u '+%Y-%m-%d')" >> RELEASE_NOTES.md
+                        echo "**Commit:** ${GIT_SHORT}" >> RELEASE_NOTES.md
+                        echo "" >> RELEASE_NOTES.md
+                        echo "## Changes since ${base}" >> RELEASE_NOTES.md
+                        echo "" >> RELEASE_NOTES.md
+                        git log ${base}..HEAD --oneline --no-merges \
+                            --format='- %s (%h)' >> RELEASE_NOTES.md || true
+                        echo "" >> RELEASE_NOTES.md
+                        echo "## Docker Images" >> RELEASE_NOTES.md
+                        echo "" >> RELEASE_NOTES.md
+                        echo "All images published to \`ghcr.io/m2l33k\` with tag \`v${VERSION}\`" >> RELEASE_NOTES.md
+                        cat RELEASE_NOTES.md
+                    """
+                    archiveArtifacts(artifacts: 'RELEASE_NOTES.md', allowEmptyArchive: false)
+                }
+            }
+        }
+
+    }
+
+    post {
+        success {
+            script {
+                if (params.DRY_RUN) {
+                    echo "Dry run complete — all checks passed for v${VERSION}. Re-run with DRY_RUN=false to publish."
+                } else {
+                    echo "Release v${VERSION} complete. Images pushed, git tag created."
+                }
+            }
+        }
+        failure {
+            echo "Release pipeline FAILED for v${VERSION}. No images pushed, no tag created."
+        }
+        cleanup {
+            cleanWs(cleanWhenSuccess: true, cleanWhenFailure: false)
+        }
+    }
+}

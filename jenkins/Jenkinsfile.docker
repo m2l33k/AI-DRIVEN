@@ -1,0 +1,237 @@
+/**
+ * 5G Telecom Platform — Docker Build & Push Pipeline
+ *
+ * Triggered manually or from the main CI pipeline on main branch.
+ * Builds all 12 service images, scans with Trivy, and pushes to GHCR.
+ *
+ * Required Jenkins credentials:
+ *   ghcr-credentials  — Username/Password (GitHub token with packages:write)
+ */
+
+pipeline {
+
+    agent any
+
+    options {
+        timeout(time: 60, unit: 'MINUTES')
+        disableConcurrentBuilds(abortPrevious: true)
+        timestamps()
+        ansiColor('xterm')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+
+    parameters {
+        string(
+            name: 'IMAGE_TAG',
+            defaultValue: '',
+            description: 'Image tag to apply (leave empty to use git short SHA)'
+        )
+        booleanParam(
+            name: 'PUSH',
+            defaultValue: true,
+            description: 'Push images to GHCR after build'
+        )
+        booleanParam(
+            name: 'SCAN',
+            defaultValue: true,
+            description: 'Run Trivy vulnerability scan on built images'
+        )
+    }
+
+    environment {
+        REGISTRY     = 'ghcr.io'
+        IMAGE_PREFIX = "${REGISTRY}/m2l33k"
+        GIT_SHORT    = sh(script: 'git rev-parse --short HEAD 2>/dev/null || echo unknown', returnStdout: true).trim()
+        TAG          = "${params.IMAGE_TAG?.trim() ?: GIT_SHORT}"
+        JAVA_VERSION = '17'
+    }
+
+    // ── Service matrix defined once, reused across stages ────────────────────
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script {
+                    currentBuild.displayName = "#${env.BUILD_NUMBER} — docker:${TAG}"
+                    currentBuild.description = "Tag: ${TAG} | Push: ${params.PUSH}"
+                }
+                echo "Building images with tag: ${TAG}"
+            }
+        }
+
+        // ── 1. Build all Spring Boot JARs first ───────────────────────────────
+        stage('Build JARs') {
+            steps {
+                sh 'mvn -B clean package -DskipTests --no-transfer-progress -T 4'
+            }
+        }
+
+        // ── 2. Build service images in parallel ───────────────────────────────
+        stage('Build Images') {
+            steps {
+                script {
+                    def services = [
+                        [name: 'auth-service',                ctx: 'microservices/auth-service'],
+                        [name: 'roaming-analysis-service',    ctx: 'microservices/roaming-analysis-service'],
+                        [name: 'anomaly-detection-service',   ctx: 'microservices/anomaly-detection-service'],
+                        [name: 'rate-limiting-service',       ctx: 'microservices/rate-limiting-service'],
+                        [name: 'audit-service',               ctx: 'microservices/audit-service'],
+                        [name: 'messaging-service',           ctx: 'microservices/messaging-service'],
+                        [name: 'fivegc-service',              ctx: 'microservices/fivegc-service'],
+                        [name: 'distributed-tracing-service', ctx: 'microservices/distributed-tracing-service'],
+                        [name: 'fault-injection-service',     ctx: 'microservices/fault-injection-service'],
+                        [name: 'gateway-service',             ctx: 'spring-cloud/gateway-service'],
+                        [name: 'eureka-server',               ctx: 'spring-cloud/eureka-server'],
+                    ]
+
+                    def buildSteps = [:]
+                    services.each { svc ->
+                        def s = svc
+                        buildSteps["${s.name}"] = {
+                            sh """
+                                docker build \
+                                    -t ${IMAGE_PREFIX}/${s.name}:${TAG} \
+                                    -t ${IMAGE_PREFIX}/${s.name}:latest \
+                                    --label "org.opencontainers.image.revision=${GIT_SHORT}" \
+                                    --label "org.opencontainers.image.created=\$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                                    --label "org.opencontainers.image.source=https://github.com/m2l33k/spring-boot-based-microservices" \
+                                    ${s.ctx}
+                            """
+                        }
+                    }
+                    parallel buildSteps
+                }
+            }
+        }
+
+        stage('Build ML Image') {
+            steps {
+                sh """
+                    docker build \
+                        -t ${IMAGE_PREFIX}/ml-service:${TAG} \
+                        -t ${IMAGE_PREFIX}/ml-service:latest \
+                        --label "org.opencontainers.image.revision=${GIT_SHORT}" \
+                        ml-service
+                """
+            }
+        }
+
+        // ── 3. Trivy scan — key images ────────────────────────────────────────
+        stage('Security Scan') {
+            when { expression { params.SCAN } }
+            steps {
+                script {
+                    def criticalImages = [
+                        'auth-service',
+                        'gateway-service',
+                        'anomaly-detection-service',
+                        'rate-limiting-service',
+                        'audit-service',
+                    ]
+                    def scanSteps = [:]
+                    criticalImages.each { img ->
+                        def i = img
+                        scanSteps["scan-${i}"] = {
+                            sh """
+                                mkdir -p reports
+                                trivy image \
+                                    --severity CRITICAL,HIGH \
+                                    --ignore-unfixed \
+                                    --exit-code 0 \
+                                    --format table \
+                                    ${IMAGE_PREFIX}/${i}:${TAG} \
+                                > reports/trivy-${i}.txt 2>&1
+                            """
+                        }
+                    }
+                    parallel scanSteps
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts(
+                        artifacts: 'reports/trivy-*.txt',
+                        allowEmptyArchive: true
+                    )
+                    script {
+                        // Print scan summaries to console
+                        sh 'for f in reports/trivy-*.txt; do echo "\\n--- $f ---"; cat $f; done || true'
+                    }
+                }
+            }
+        }
+
+        // ── 4. Push to GHCR ───────────────────────────────────────────────────
+        stage('Push Images') {
+            when { expression { params.PUSH } }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'ghcr-credentials',
+                        usernameVariable: 'GHCR_USER',
+                        passwordVariable: 'GHCR_TOKEN'
+                    )
+                ]) {
+                    sh 'echo "${GHCR_TOKEN}" | docker login ${REGISTRY} -u ${GHCR_USER} --password-stdin'
+                    script {
+                        def allImages = [
+                            'auth-service', 'roaming-analysis-service',
+                            'anomaly-detection-service', 'rate-limiting-service',
+                            'audit-service', 'messaging-service', 'fivegc-service',
+                            'distributed-tracing-service', 'fault-injection-service',
+                            'gateway-service', 'eureka-server', 'ml-service',
+                        ]
+                        def pushSteps = [:]
+                        allImages.each { img ->
+                            def i = img
+                            pushSteps["push-${i}"] = {
+                                sh "docker push ${IMAGE_PREFIX}/${i}:${TAG}"
+                                sh "docker push ${IMAGE_PREFIX}/${i}:latest"
+                            }
+                        }
+                        parallel pushSteps
+                    }
+                }
+            }
+            post {
+                always {
+                    sh 'docker logout ${REGISTRY} || true'
+                }
+            }
+        }
+
+        // ── 5. Print image digest summary ─────────────────────────────────────
+        stage('Summary') {
+            steps {
+                script {
+                    def images = [
+                        'auth-service', 'gateway-service', 'anomaly-detection-service',
+                        'audit-service', 'ml-service'
+                    ]
+                    echo "=== Published Images ==="
+                    images.each { img ->
+                        def digest = sh(
+                            script: "docker inspect --format='{{index .RepoDigests 0}}' ${IMAGE_PREFIX}/${img}:${TAG} 2>/dev/null || echo '(local only)'",
+                            returnStdout: true
+                        ).trim()
+                        echo "  ${img}: ${digest}"
+                    }
+                }
+            }
+        }
+
+    }
+
+    post {
+        success {
+            echo "All images built and pushed successfully with tag: ${TAG}"
+        }
+        failure {
+            echo "Docker pipeline failed. Check build logs."
+        }
+        cleanup {
+            cleanWs(cleanWhenSuccess: true, cleanWhenFailure: false)
+        }
+    }
+}

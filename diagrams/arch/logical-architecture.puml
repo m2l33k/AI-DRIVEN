@@ -1,0 +1,306 @@
+@startuml logical-architecture
+!theme plain
+skinparam linetype ortho
+skinparam nodesep 50
+skinparam ranksep 60
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam backgroundColor #FAFAFA
+skinparam wrapWidth 200
+
+skinparam package {
+  BackgroundColor #EEF4FF
+  BorderColor #336699
+  FontStyle bold
+  FontSize 12
+}
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #555577
+  FontSize 10
+}
+skinparam database {
+  BackgroundColor #FFF8E1
+  BorderColor #CC8800
+  FontSize 10
+}
+skinparam interface {
+  BackgroundColor #E8F5E9
+  BorderColor #1B8C3A
+  FontSize 9
+  FontStyle italic
+}
+skinparam note {
+  BackgroundColor #FFFDE7
+  BorderColor #F9A825
+  FontSize 9
+}
+skinparam arrow {
+  Color #334466
+  FontSize 9
+}
+
+title Logical Architecture — 5G Telecom Security Platform\n[with Communication Interfaces]
+
+' ═══════════════════════════════════════════════════════════
+' LAYER 1 — PRESENTATION
+' ═══════════════════════════════════════════════════════════
+package "Presentation Layer  [Angular 17 SPA]" as UILayer {
+  component "Security Analyst Dashboard\n(anomalies · roaming · 5GC · rules · alerts)" as SecUI
+  component "Network Operator Dashboard\n(rate-limiting · network-functions · KPIs)" as NetUI
+  component "Auditor Dashboard\n(audit logs · actor activity · stats)" as AudUI
+  component "ML Forecasting Charts\n(LSTM · ARIMA · Prophet)" as MLUI
+}
+
+' ─── Interface I-01 ───────────────────────────────────────
+interface "«I-01»\nREST / HTTPS\nFormat : JSON\nAuth   : JWT Bearer (Authorization header)\nIssuer : Keycloak RS256" as I01
+
+' ═══════════════════════════════════════════════════════════
+' LAYER 2 — API GATEWAY
+' ═══════════════════════════════════════════════════════════
+package "Gateway Layer  [Spring Cloud Gateway]" as GWLayer {
+  component "API Gateway\n• Route predicates  /api/**\n• AuditGatewayFilter  (GlobalFilter, fire-and-forget)\n• JWT validation via Keycloak JWKS\n• Load-balancing  lb://service-name" as GW
+}
+
+' ─── Interface I-02 ───────────────────────────────────────
+interface "«I-02»\nREST / HTTP (internal)\nFormat : JSON\nAuth   : Propagated JWT\nTransport : lb:// Spring Cloud LB" as I02
+
+' ─── Interface I-03 ───────────────────────────────────────
+interface "«I-03»\nEureka REST API\nHTTP GET /eureka/apps\nHeartbeat   30 s interval\nFormat : JSON / XML" as I03
+
+' ═══════════════════════════════════════════════════════════
+' LAYER 3 — SERVICE REGISTRY
+' ═══════════════════════════════════════════════════════════
+package "Service Registry  [Netflix Eureka]" as RegLayer {
+  component "Eureka Server\n(service discovery · health)\n:8761" as Eureka
+}
+
+' ═══════════════════════════════════════════════════════════
+' LAYER 4 — CORE MICROSERVICES
+' ═══════════════════════════════════════════════════════════
+package "Core Services Layer  [Spring Boot 3 / WebFlux]" as ServiceLayer {
+
+  package "Identity & Access" {
+    component "Auth Service  :8081\n(OAuth2 Resource Server\nKeycloak realm bridge)" as AuthSvc
+  }
+
+  package "Roaming & 5G Analytics" {
+    component "Roaming Analysis Service  :8082\n• CSV ingestion (CDRs / TAP / RAP)\n• RoamingEventProjection (hourly per-operator)\n• RiskAnalyzer  0–100 additive score\n• AnomalyDetector  (Z-score + thresholds)\n• KpiCalculator  (ASR / NER / ACD / QoS)\n• ML forecast proxy · free5GC proxy" as RoamingSvc
+  }
+
+  package "Security Engine" {
+    component "Anomaly Detection Service  :8087\n• Rule engine  (DR-001…DR-005)\n• Z-score engine  (registration-flood\n  imsi-enum · auth-failure)\n• Attack simulation  POST /simulate/{type}" as AnomalySvc
+    component "Fault Injection Service  :8089\n• Latency / error injection\n• Chaos scenarios" as FaultSvc
+  }
+
+  package "Traffic Control" {
+    component "Rate Limiting Service  :8085\n• Token-bucket algorithm\n• Policy CRUD (PostgreSQL)\n• Block counters · Offender tracking (Redis)" as RLSvc
+  }
+
+  package "Audit & Messaging" {
+    component "Audit Service  :9009\n• AuditEntry store (MongoDB, 10k cap)\n• REST paginated log API\n• Stats: 7-day rolling window" as AuditSvc
+    component "Messaging Service  :9007\n• Event pub/sub\n• Notification routing" as MsgSvc
+    component "Distributed Tracing Service  :8088\n• Trace aggregation\n• OpenTelemetry bridge" as TraceSvc
+  }
+
+  package "5G Core Proxy" {
+    component "Free5GC Service  :8086\n• NF status proxy (AMF/SMF/UDM…)\n• Subscriber & UE context\n• WebConsole JWT  cache TTL 55 min" as Free5GCSvc
+  }
+}
+
+' ─── Interface I-06 ───────────────────────────────────────
+interface "«I-06»\nREST / HTTP  :8000\nFormat : JSON\nAuth   : none (internal network)\nEndpoints : POST /api/forecast/\n            POST /api/train/\n            GET  /api/metrics/" as I06
+
+' ═══════════════════════════════════════════════════════════
+' LAYER 5 — ML SERVICE
+' ═══════════════════════════════════════════════════════════
+package "ML / Forecasting Layer  [Django + TensorFlow]" as MLLayer {
+  component "ml-service  :8000\n• LSTM   lookback=120 h · ahead=72 h\n• ARIMA  (statsmodels)\n• Prophet  (Meta)\nEndpoints:\n  POST /api/forecast/\n  POST /api/train/\n  GET  /api/metrics/ · /api/status/" as ML
+}
+
+' ─── Interface I-04 (SQL) ─────────────────────────────────
+interface "«I-04»\nJDBC · Spring Data JPA\nORM : Hibernate 6\nProtocol : MySQL Wire  :3307\n           PostgreSQL Wire  :5434\nTx : @Transactional" as I04
+
+' ─── Interface I-05 (Redis) ───────────────────────────────
+interface "«I-05»\nRedis RESP3 Protocol  :6379\nClient : Lettuce (reactive)\nSpring Data Redis\nStructures : Hash · String · ZSet" as I05
+
+' ─── Interface I-07 (MongoDB) ────────────────────────────
+interface "«I-07»\nMongoDB Wire Protocol  :27017\nDriver : Spring Data MongoDB Reactive\nODM : @Document mapping" as I07
+
+' ═══════════════════════════════════════════════════════════
+' LAYER 6 — DATA TIER
+' ═══════════════════════════════════════════════════════════
+package "Data Layer" as DataLayer {
+  database "MySQL  :3307\n(roaming CDRs · network cells\ndevices · attach events · QoS)" as MySQL
+  database "PostgreSQL  :5434\n(rate-limit policies\noffenders)" as PG
+  database "Redis  :6379\n(token buckets\nrate-limit counters)" as Redis
+  database "MongoDB  :27017\n(audit entries)" as Mongo
+}
+
+' ─── Interface I-08 (OAuth2) ──────────────────────────────
+interface "«I-08»\nOAuth2 / OIDC\nFlow : Authorization Code + PKCE\nToken : JWT  RS256\nEndpoints:\n  GET  /.well-known/openid-configuration\n  GET  /protocol/openid-connect/certs  (JWKS)\n  POST /protocol/openid-connect/token" as I08
+
+' ═══════════════════════════════════════════════════════════
+' LAYER 7 — IDENTITY
+' ═══════════════════════════════════════════════════════════
+package "Identity Layer  [Keycloak 24]" as IdLayer {
+  component "Keycloak  :8080\n• Realm : telecom-realm\n• Roles : SECURITY_ANALYST\n  NETWORK_OPERATOR · AUDITOR\n• Permissions : PERM_*\n• JWT issuer (RS256)" as Keycloak
+  database "Keycloak DB\n(PostgreSQL  :5432)" as KeycloakDB
+}
+
+' ─── Interface I-09 (Prometheus scrape) ───────────────────
+interface "«I-09»\nHTTP GET /actuator/prometheus\nFormat : Prometheus text  0004\nClient : Micrometer\nInterval : 15 s scrape" as I09
+
+' ─── Interface I-10 (Loki push) ───────────────────────────
+interface "«I-10»\nHTTP POST /loki/api/v1/push  :3100\nFormat : JSON (Loki4j logback appender)\nLabels : app · level · host\nFields : traceId · spanId · class · message" as I10
+
+' ─── Interface I-11 (OTLP traces) ─────────────────────────
+interface "«I-11»\nOTLP / HTTP  :4318\nProtocol : OpenTelemetry\nFormat : Protobuf\nSpans : traceId · spanId · parentSpanId" as I11
+
+' ═══════════════════════════════════════════════════════════
+' LAYER 8 — OBSERVABILITY
+' ═══════════════════════════════════════════════════════════
+package "Observability Layer" as ObsLayer {
+  component "Prometheus  :9090\n(metrics scrape · remote-write receiver)" as Prometheus
+  component "Grafana  :3000\n(dashboards · drilldown · alerts)" as Grafana
+  component "Loki  :3100\n(log aggregation via Loki4j push)" as Loki
+  component "Tempo  :3200\n(distributed traces · OTLP ingest)" as Tempo
+}
+
+' ─── Interface I-12 (5GC WebConsole) ──────────────────────
+interface "«I-12»\nHTTP/REST  :5000\nAuth : custom Token header\n  (NOT Authorization: Bearer)\nJWT cache : 55 min TTL\nEndpoints : POST /api/login\n            GET  /api/subscriber" as I12
+
+' ─── Interface I-13 (3GPP N1/N2) ──────────────────────────
+interface "«I-13»\n3GPP N1/N2 Interface\nNAS (Non-Access Stratum) : N1\nNGAP (NG Application Protocol) : N2\nTransport : SCTP  :38412" as I13
+
+' ─── Interface I-14 (3GPP N3/N4) ──────────────────────────
+interface "«I-14»\n3GPP N3/N4 Interface\nGTP-U / UDP  (N3 — user-plane)\nPFCP / UDP   (N4 — session mgmt)\nUPF addr : 192.168.100.1" as I14
+
+' ═══════════════════════════════════════════════════════════
+' LAYER 9 — 5G CORE
+' ═══════════════════════════════════════════════════════════
+package "5G Core  [free5GC]" as CoreLayer {
+  component "Control Plane NFs\n(NRF · AMF · SMF\nUDM · UDR · PCF · AUSF · NSSF)\nSBI : HTTP/2 + JSON" as NFs
+  component "User Plane (UPF)\n[Linux only]" as UPF
+  component "UERANSIM\n(gNB + UE simulator)" as UERANSIM
+}
+
+' ═══════════════════════════════════════════════════════════
+' CROSS-CUTTING INTERFACES (notes)
+' ═══════════════════════════════════════════════════════════
+note as N_AUDIT
+  «I-15» Audit Gateway Filter (cross-cutting)
+  HTTP POST /api/audit/logs  :9009
+  WebClient · async fire-and-forget
+  Triggered on every non-GET request
+  Payload: actor · role · action · resource · outcome · IP
+end note
+
+note as N_POLL
+  «I-16» Anomaly Service → Roaming polling
+  HTTP GET /api/roaming/anomalies
+  Reactive interval 5 s (RxJS switchMap)
+  Transport: HTTP/1.1 · JSON array
+end note
+
+note as N_SBI
+  «I-17» 3GPP SBI (Service-Based Interface)
+  Between 5G Control Plane NFs
+  Protocol : HTTP/2 · TLS
+  Format   : JSON (OpenAPI 3 spec)
+  Auth     : OAuth2 client credentials (NRF)
+end note
+
+' ═══════════════════════════════════════════════════════════
+' FLOWS WITH FULL INTERFACE LABELS
+' ═══════════════════════════════════════════════════════════
+
+' UI → I-01 → Gateway
+UILayer --> I01
+I01     --> GW
+
+' Gateway → I-02 → Services
+GW --> I02
+I02 --> AuthSvc
+I02 --> RoamingSvc
+I02 --> AnomalySvc
+I02 --> RLSvc
+I02 --> AuditSvc
+I02 --> MsgSvc
+I02 --> Free5GCSvc
+I02 --> FaultSvc
+I02 --> TraceSvc
+
+' Gateway → I-03 → Eureka
+GW ..> I03
+I03 ..> Eureka : register / heartbeat\nlookup lb://
+
+' Gateway → I-08 → Keycloak (JWKS)
+GW --> I08 : JWKS token\nvalidation
+I08 --> Keycloak
+
+' AuthSvc → I-08 → Keycloak (OAuth2)
+AuthSvc --> I08 : Authorization\nCode + PKCE
+Keycloak --> KeycloakDB : JDBC\nPostgreSQL :5432
+
+' Services → I-04 → Relational DBs
+RoamingSvc --> I04
+RLSvc      --> I04
+I04 --> MySQL : MySQL Wire\nJPA/Hibernate
+I04 --> PG    : PostgreSQL Wire\nJPA/Hibernate
+
+' Services → I-05 → Redis
+RLSvc --> I05
+I05   --> Redis
+
+' Services → I-07 → MongoDB
+AuditSvc --> I07
+I07      --> Mongo
+
+' Services → I-06 → ML
+RoamingSvc --> I06 : POST /api/forecast/\nJSON body
+AnomalySvc --> I06
+I06        --> ML
+
+' 5GC proxy → I-12 → WebConsole
+Free5GCSvc --> I12
+I12        --> NFs : REST→WebConsole\n:5000
+
+' 3GPP RAN
+UERANSIM --> I13
+I13      --> NFs
+NFs      --> I14
+I14      --> UPF
+
+' Observability — services → I-09 → Prometheus
+ServiceLayer ..> I09
+I09          ..> Prometheus : pull scrape\n15 s interval
+
+' Observability — services → I-10 → Loki
+ServiceLayer ..> I10
+I10          ..> Loki : log push\nLoki4j
+
+' Observability — services → I-11 → Tempo
+ServiceLayer ..> I11
+I11          ..> Tempo : OTLP spans
+
+' Prometheus scrapes 5GC NF metrics
+Prometheus ..> NFs : HTTP GET /metrics\nPrometheus text\n:19001–:19008
+
+' Grafana reads (all via HTTP, query APIs)
+Grafana --> Prometheus : PromQL API\nHTTP :9090
+Grafana --> Loki       : LogQL API\nHTTP :3100
+Grafana --> Tempo      : TraceQL API\nHTTP :3200
+
+' Cross-cutting: AuditFilter → AuditSvc
+GW ..> AuditSvc : «I-15» HTTP POST async\n/api/audit/logs\n(WebClient, non-blocking)
+
+' Cross-cutting: AnomalyService polling
+AnomalySvc ..> RoamingSvc : «I-16» HTTP GET\npoll 5 s interval
+
+' SBI cross-cutting note layout
+N_AUDIT -[hidden]- ServiceLayer
+N_POLL  -[hidden]- AnomalySvc
+N_SBI   -[hidden]- NFs
+
+@enduml

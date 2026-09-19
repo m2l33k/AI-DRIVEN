@@ -4,17 +4,29 @@ services:
       context: ./jenkins
       dockerfile: Dockerfile
     container_name: jenkins
+    restart: unless-stopped
     ports:
-      - "8090:8080"    # Jenkins UI → http://localhost:8090
-      - "50000:50000"  # Jenkins agent inbound port
+      - "8090:8080"    # Jenkins UI  → http://localhost:8090
+      - "50000:50000"  # Agent inbound port
     environment:
-      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false -Xmx1g
+      - JENKINS_OPTS=--httpPort=8080
+      # Maven local repo inside the named volume so it persists across builds
+      - MAVEN_USER_HOME=/var/jenkins_home/.m2
     volumes:
-      - jenkins-home:/var/jenkins_home
-      - ../:/workspace:ro               # repo mounted read-only for pipelines
-      - /var/run/docker.sock:/var/run/docker.sock  # Docker CLI inside Jenkins
+      - jenkins-home:/var/jenkins_home          # all Jenkins state
+      - jenkins-m2:/var/jenkins_home/.m2        # Maven cache (persists across builds)
+      - jenkins-npm:/var/jenkins_home/.npm      # npm cache
+      - ../:/workspace:ro                       # repo root mounted read-only
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker CLI via host socket
     networks:
       - telecom-shared-network
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
 
 networks:
   telecom-shared-network:
@@ -23,3 +35,5 @@ networks:
 
 volumes:
   jenkins-home:
+  jenkins-m2:
+  jenkins-npm:

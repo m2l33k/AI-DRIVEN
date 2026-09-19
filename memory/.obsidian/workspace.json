@@ -11,13 +11,14 @@
             "id": "323760985b7783df",
             "type": "leaf",
             "state": {
-              "type": "bases",
+              "type": "markdown",
               "state": {
-                "file": "Untitled.base",
-                "viewName": "Table"
+                "file": "ML-Forecasting-Service.md",
+                "mode": "source",
+                "source": false
               },
-              "icon": "lucide-table",
-              "title": "Untitled"
+              "icon": "lucide-file",
+              "title": "ML-Forecasting-Service"
             }
           },
           {
@@ -104,8 +105,7 @@
               "title": "Bookmarks"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       }
     ],
     "direction": "horizontal",
@@ -125,7 +125,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Untitled.base",
+                "file": "ML-Forecasting-Service.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -215,6 +215,8 @@
   },
   "active": "323760985b7783df",
   "lastOpenFiles": [
+    "Untitled.base",
+    "Untitled.canvas",
     "report.md",
     "report.md.tmp.25428.70f7b564e3b6",
     "README.md.tmp.25428.fc612b4d9414",
@@ -227,8 +229,6 @@
     "Frontend-Components.md.tmp.25428.1b8d5f177b5b",
     "Frontend-Architecture.md.tmp.25428.5dd05010807f",
     "2026-09-10.md",
-    "Untitled.base",
-    "Untitled.canvas",
     "Session-Log.md",
     "Scripts-and-Tooling.md",
     "Ports-and-URLs.md",

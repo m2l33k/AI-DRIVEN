@@ -112,8 +112,8 @@ class AuditStoreTest {
     void emptyStoreStatsAreAllZero() {
         AuditStats stats = store.stats();
         assertThat(stats.total()).isZero();
-        assertThat(stats.writes()).isZero();
-        assertThat(stats.denied()).isZero();
+        assertThat(stats.writeActions()).isZero();
+        assertThat(stats.deniedActions()).isZero();
         assertThat(stats.activeActors()).isZero();
     }
 
