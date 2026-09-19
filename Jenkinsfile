@@ -176,7 +176,12 @@ pipeline {
         // Only *IT.java classes run here — unit tests are not repeated.
         stage('Backend — Integration Tests') {
             steps {
-                withEnv(['TESTCONTAINERS_RYUK_DISABLED=true']) {
+                withEnv([
+                    'TESTCONTAINERS_RYUK_DISABLED=true',
+                    // Jenkins runs in a docker-compose network; 172.17.0.1 is unreachable from there.
+                    // host.docker.internal is injected into every container by Docker Desktop.
+                    'TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal'
+                ]) {
                     // Pre-pull via ECR Public (Docker Hub is blocked on the university network).
                     // Retag to the plain name so Testcontainers finds them in the local cache.
                     sh '''

@@ -79,10 +79,12 @@
 			<artifactId>spring-security-test</artifactId>
 			<scope>test</scope>
 		</dependency>
-		<!-- Testcontainers — PostgreSQL + Redis for integration tests -->
+		<!-- Testcontainers — pin ALL to 1.20.6 to avoid Spring Boot 4's managed 2.0.3
+		     (spring-boot-testcontainers pulls in core:2.0.3 which doesn't mix with 1.20.6 modules) -->
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-testcontainers</artifactId>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers</artifactId>
+			<version>1.20.6</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
