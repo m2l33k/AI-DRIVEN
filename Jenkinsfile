@@ -221,19 +221,40 @@ pipeline {
         stage('Backend — Integration Tests') {
             steps {
                 script {
-                    // Detect the Docker host IP reachable from inside this container.
-                    // 'host.docker.internal' only works on Docker Desktop (Win/Mac).
-                    // On Linux, we read the default-route gateway which IS the Docker host.
-                    def tcHost = sh(
-                        script: "ip route show default 2>/dev/null | awk '/default/{print \$3; exit}'",
-                        returnStdout: true
-                    ).trim()
-                    if (!tcHost) tcHost = 'localhost'
-                    echo "Testcontainers host override: ${tcHost}"
+                    // On Docker Desktop for Windows, container port mappings are forwarded
+                    // to the WINDOWS host — reachable via host.docker.internal — NOT via
+                    // the docker-compose network gateway (172.x.x.1).
+                    // Jenkins was started without extra_hosts so host.docker.internal is
+                    // absent from /etc/hosts.  Fix: detect the IP from a fresh Alpine
+                    // container (Docker Desktop auto-injects it there) then write it into
+                    // Jenkins' own /etc/hosts via "docker exec -u root".
+                    sh '''
+                        if getent hosts host.docker.internal > /dev/null 2>&1; then
+                            echo "[TC] host.docker.internal already resolves — skipping injection"
+                        else
+                            echo "[TC] Injecting host.docker.internal into /etc/hosts..."
+                            HDI_IP=$(docker run --rm alpine:latest \
+                                sh -c 'getent hosts host.docker.internal 2>/dev/null' \
+                                2>/dev/null | awk '{print $1}' || true)
+                            if [ -z "$HDI_IP" ]; then
+                                HDI_IP=$(docker network inspect bridge \
+                                    --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' \
+                                    2>/dev/null || true)
+                                echo "[TC] Alpine lookup empty — using bridge gateway fallback: $HDI_IP"
+                            fi
+                            if [ -n "$HDI_IP" ]; then
+                                docker exec -u root "$(hostname)" \
+                                    sh -c "echo '$HDI_IP host.docker.internal' >> /etc/hosts"
+                                echo "[TC] host.docker.internal=$HDI_IP injected"
+                            else
+                                echo "[TC] WARNING: could not determine Docker host IP — tests may fail"
+                            fi
+                        fi
+                    '''
 
                     withEnv([
                         'TESTCONTAINERS_RYUK_DISABLED=true',
-                        "TESTCONTAINERS_HOST_OVERRIDE=${tcHost}"
+                        'TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal'
                     ]) {
                         // Pre-pull via ECR Public (Docker Hub is blocked on the university network).
                         // Retag to the plain name so Testcontainers finds them in the local cache.
