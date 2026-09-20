@@ -24,6 +24,11 @@ services:
     # Desktop forwards to the Windows host (not to the docker-compose gateway IP).
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # Ensures host.docker.internal resolves inside Jenkins on Docker Desktop for Windows.
+    # Testcontainers uses this hostname to reach container-mapped ports, which Docker
+    # Desktop forwards to the Windows host (not to the docker-compose gateway IP).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - telecom-shared-network
     healthcheck:

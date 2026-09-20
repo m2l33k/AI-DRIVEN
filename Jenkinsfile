@@ -266,7 +266,9 @@ pipeline {
                                 && docker tag public.ecr.aws/docker/library/redis:7-alpine redis:7-alpine \
                                 || true
                         '''
-                        sh 'mvn -B failsafe:integration-test failsafe:verify --no-transfer-progress'
+                        // -Dsurefire.skip=true  →  skip Surefire (unit tests already ran in Verify stage)
+                        // verify lifecycle phase →  triggers Failsafe in every child module via phase binding
+                        sh 'mvn -B verify -Dsurefire.skip=true --no-transfer-progress'
                     }
                 }
             }
