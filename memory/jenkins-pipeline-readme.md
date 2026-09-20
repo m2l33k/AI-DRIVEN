@@ -9,7 +9,7 @@ A full declarative Jenkins pipeline that compiles, tests, scans, and packages th
 ## Pipeline Architecture
 
 ```
-Checkout → Compile (parallel) → Verify (parallel) → Integration Tests → Archive → Docker (main only)
+Checkout → Compile (parallel) → Verify (parallel) → OWASP DC Scan → Integration Tests → Archive → Docker (main only)
 ```
 
 ### Stage 1 — Checkout & Metadata
@@ -31,7 +31,43 @@ Checkout → Compile (parallel) → Verify (parallel) → Integration Tests → 
 | ML — Tests | `pytest ml-service/tests/` with JUnit XML output |
 | Security — Trivy | Filesystem scan (CRITICAL + HIGH only, unfixed ignored) |
 
-### Stage 4 — Backend Integration Tests
+### Stage 4 — OWASP Dependency-Check
+Runs only when `SKIP_SECURITY` is false (default). Skipped on the `SKIP_SECURITY` parameter.
+
+- Executes `dependency-check:aggregate` across all 11 Maven modules in a single pass
+- Downloads / updates the **NVD CVE database** on first run (3–10 min); cached in `~/.m2` for subsequent runs (~30 s)
+- Requires the Jenkins secret **`nvd-api-key`** (secret text) — without it the NVD download is heavily rate-limited and takes hours
+- Output formats: HTML, XML, JSON — archived to `reports/owasp/`
+- **Build behaviour:**
+  - CVSS ≥ 9 (CRITICAL) → build **FAILURE**
+  - HIGH count > 10 → build **UNSTABLE** (via `dependencyCheckPublisher`)
+  - `failOnError=false` so network/DB errors degrade gracefully to UNSTABLE, never block the pipeline
+- The `owasp-suppressions.xml` at repo root is used to suppress accepted risks / false-positives
+
+#### NVD API Key setup
+1. Register free at `https://nvd.nist.gov/developers/request-an-api-key` (email confirmation, instant)
+2. Jenkins → Manage Jenkins → Credentials → Global → **Add Credential**
+   - Kind: `Secret text`
+   - Secret: the key (format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`)
+   - ID: `nvd-api-key`
+
+#### Jenkins Plugin required
+**OWASP Dependency-Check** plugin must be installed for `dependencyCheckPublisher()` trend graphs.
+Manage Jenkins → Plugins → Available → search "OWASP Dependency-Check" → install → restart.
+Without the plugin the stage still runs and the HTML/XML report is still archived.
+
+#### Suppressing false-positives
+Edit `owasp-suppressions.xml` at repo root:
+```xml
+<suppress>
+    <notes>Accepted risk: not reachable externally</notes>
+    <cve>CVE-2026-XXXXX</cve>
+</suppress>
+```
+
+---
+
+### Stage 5 — Backend Integration Tests
 - Runs `*IT.java` classes via Maven Failsafe plugin
 - Testcontainers spins up real **PostgreSQL 16** and **Redis 7** containers via the host Docker socket (`/var/run/docker.sock`)
 - `TESTCONTAINERS_RYUK_DISABLED=true` required for Docker socket setup in Jenkins
@@ -40,11 +76,11 @@ Checkout → Compile (parallel) → Verify (parallel) → Integration Tests → 
   - `AnomalyServiceIT` — health, event injection, clear events (in-memory, no containers)
   - `ProtectionControllerIT` — full token-bucket lifecycle with real PostgreSQL + Redis; 7 test scenarios including 429 blocking
 
-### Stage 5 — Archive
+### Stage 6 — Archive
 - Archives all `*.jar` files from `target/` directories
 - Stashes JARs for downstream Docker stages
 
-### Stage 6 — Docker (main branch / version tags only)
+### Stage 7 — Docker (main branch / version tags only)
 Runs only when `BRANCH_CLEAN == 'main'` or a `v*.*.*` tag is pushed, and `SKIP_DOCKER` is false.
 
 | Sub-stage | What it does |
@@ -121,16 +157,19 @@ This needs to be re-applied after a Docker Desktop restart.
 | Parameter | Default | Description |
 |---|---|---|
 | `SKIP_DOCKER` | `false` | Skip the Docker Build & Push stage even on main |
-| `SKIP_SECURITY` | `false` | Skip Trivy filesystem and image scans |
+| `SKIP_SECURITY` | `false` | Skip both Trivy scans **and** OWASP Dependency-Check |
 
 ---
 
 ## Required Jenkins Plugins
 
-- Pipeline
-- Pipeline Stage View
-- JUnit (for `junit()` step — must be installed manually)
-- Git
+| Plugin | Purpose |
+|---|---|
+| Pipeline | Core declarative pipeline support |
+| Pipeline Stage View | Stage visualisation in Jenkins UI |
+| JUnit | `junit()` step — publishes Surefire/Failsafe/pytest results |
+| Git | Source checkout |
+| OWASP Dependency-Check | `dependencyCheckPublisher()` step — trend graphs and thresholds |
 
 > `cleanWs` (Workspace Cleanup plugin) is **not** installed; the pipeline uses `deleteDir()` in the `cleanup` post block instead.
 
